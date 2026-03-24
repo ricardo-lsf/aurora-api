@@ -629,3 +629,49 @@ def registrar_venda(event_id: str, cocktail_id: str):
             conn.rollback()
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))    
+    
+# ==========================================
+# NOSSA DÉCIMA TERCEIRA ROTA: REGISTRAR ESTORNO (DEVOLVER AO ESTOQUE)
+# ==========================================
+@app.post("/events/{event_id}/cancel/{cocktail_id}")
+def registrar_estorno(event_id: str, cocktail_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # 1. Busca a receita exata do drink
+        cur.execute("""
+            SELECT ingredient_id, quantity 
+            FROM cocktail_ingredients 
+            WHERE cocktail_id = %s;
+        """, (cocktail_id,))
+        receita = cur.fetchall()
+        
+        if not receita:
+            return {"status": "alerta", "mensagem": "Drink estornado, mas não possui ficha técnica para devolver ao estoque."}
+
+        # 2. Inicia a DEVOLUÇÃO pro estoque físico (A Mágica do Sinal de MAIS)
+        for item in receita:
+            cur.execute("""
+                UPDATE ingredients
+                SET current_stock = current_stock + %s
+                WHERE id = %s;
+            """, (item['quantity'], item['ingredient_id']))
+            
+        # 3. Tudo certo? Confirma a devolução (Commit)
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Estorno registrado e estoque devolvido com sucesso!"}
+        
+    except Exception as e:
+        # 4. DEU RUIM? Desfaz a devolução (Rollback)
+        if conn:
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
