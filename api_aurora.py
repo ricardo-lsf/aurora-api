@@ -66,7 +66,7 @@ class NovoCocktail(BaseModel):
 def get_db_connection():
     try:
         # Apontando o motor para a nuvem do Supabase!
-        conn = psycopg2.connect("postgresql://postgres:AennUoVaXZ16EG5g@db.xnvznbmwxvflavmnmxxx.supabase.co:5432/postgres")
+        conn = psycopg2.connect("postgresql://postgres.xnvznbmwxvflavmnmxxx:AennUoVaXZ16EG5g@aws-1-sa-east-1.pooler.supabase.com:5432/postgres")
         return conn
     except Exception as e:
         print(f"Erro ao conectar no banco: {e}")
