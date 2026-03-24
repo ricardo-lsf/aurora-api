@@ -535,3 +535,43 @@ def listar_menu_evento(event_id: str):
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA PRIMEIRA ROTA: BUSCAR RECEITA DO DRINK (FICHA TÉCNICA)
+# ==========================================
+@app.get("/cocktails/{cocktail_id}/recipe")
+def ver_receita(cocktail_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # O JOIN relacional: Pega os ingredientes e quantidades exatas deste drink
+        query = """
+            SELECT 
+                i.name AS ingrediente, 
+                ci.quantity AS quantidade, 
+                ci.unit AS unidade
+            FROM cocktail_ingredients ci
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE ci.cocktail_id = %s
+            ORDER BY i.name;
+        """
+        
+        cur.execute(query, (cocktail_id,))
+        receita = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            "status": "sucesso", 
+            "dados": receita
+        }
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
