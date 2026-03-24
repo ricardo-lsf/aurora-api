@@ -548,8 +548,13 @@ def ver_receita(cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # O JOIN relacional: Pega os ingredientes e quantidades exatas deste drink
-        query = """
+        # 1. Busca os textos de preparo do próprio drink (1 linha)
+        # VERIFIQUE: Se os nomes das colunas forem diferentes no seu banco, altere aqui!
+        cur.execute("SELECT technique, description FROM cocktails WHERE id = %s;", (cocktail_id,))
+        drink_info = cur.fetchone()
+        
+        # 2. Busca a lista de ingredientes (várias linhas) com a coluna corrigida
+        query_ingredientes = """
             SELECT 
                 i.name AS ingrediente, 
                 ci.quantity AS quantidade, 
@@ -559,16 +564,17 @@ def ver_receita(cocktail_id: str):
             WHERE ci.cocktail_id = %s
             ORDER BY i.name;
         """
-        
-        cur.execute(query, (cocktail_id,))
-        receita = cur.fetchall()
+        cur.execute(query_ingredientes, (cocktail_id,))
+        ingredientes = cur.fetchall()
         
         cur.close()
         conn.close()
         
+        # Empacota o combo completo e manda para o Front-end!
         return {
             "status": "sucesso", 
-            "dados": receita
+            "drink": drink_info,
+            "ingredientes": ingredientes
         }
         
     except Exception as e:
