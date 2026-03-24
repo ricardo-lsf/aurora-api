@@ -581,3 +581,51 @@ def ver_receita(cocktail_id: str):
         if conn:
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (BAIXA DE ESTOQUE)
+# ==========================================
+@app.post("/events/{event_id}/sell/{cocktail_id}")
+def registrar_venda(event_id: str, cocktail_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # 1. Busca a receita exata do drink para saber o que descontar
+        cur.execute("""
+            SELECT ingredient_id, quantity 
+            FROM cocktail_ingredients 
+            WHERE cocktail_id = %s;
+        """, (cocktail_id,))
+        receita = cur.fetchall()
+        
+        if not receita:
+            # Se não tem receita, não tem o que descontar do estoque, mas a venda do drink pode ocorrer.
+            return {"status": "alerta", "mensagem": "Drink vendido, mas não possui ficha técnica para baixar estoque."}
+
+        # 2. Inicia a baixa no estoque para cada ingrediente da ficha técnica
+        for item in receita:
+            # VERIFIQUE: Se a sua coluna de estoque se chama diferente de 'stock', altere abaixo!
+            cur.execute("""
+                UPDATE ingredients
+                SET current_stock = current_stock - %s
+                WHERE id = %s;
+            """, (item['quantity'], item['ingredient_id']))
+            
+        # 3. Se chegou até aqui sem dar erro em nenhum ingrediente, SALVA tudo! (Efeito Dominó concluído)
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Venda registrada e estoque atualizado!"}
+        
+    except Exception as e:
+        # 4. DEU RUIM? Desfaz tudo (Rollback)! Devolve as doses para as garrafas.
+        if conn:
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))    
