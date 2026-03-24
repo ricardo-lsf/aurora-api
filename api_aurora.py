@@ -553,7 +553,7 @@ def ver_receita(cocktail_id: str):
             SELECT 
                 i.name AS ingrediente, 
                 ci.quantity AS quantidade, 
-                ci.unit AS unidade
+                i.measurement_unit AS unidade
             FROM cocktail_ingredients ci
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE ci.cocktail_id = %s
