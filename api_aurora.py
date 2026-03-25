@@ -586,8 +586,8 @@ def ver_receita(cocktail_id: str):
 # NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (AGORA COM AUDITORIA DE USUÁRIO)
 # ==========================================
 # Adicionamos o user_name na url/query
-    @app.post("/events/{event_id}/sell/{cocktail_id}")
-    def registrar_venda(event_id: str, cocktail_id: str, user_name: str = "Desconhecido"):
+@app.post("/events/{event_id}/sell/{cocktail_id}")
+def registrar_venda(event_id: str, cocktail_id: str, user_name: str = "Desconhecido"):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
