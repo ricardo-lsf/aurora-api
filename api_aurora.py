@@ -672,3 +672,39 @@ def registrar_estorno(event_id: str, cocktail_id: str):
             conn.rollback()
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA QUARTA ROTA: BUSCAR EVENTOS ATIVOS (PREPARADO PARA MÚLTIPLOS EVENTOS)
+# ==========================================
+@app.get("/events/active")
+def listar_eventos_ativos():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Busca todos os eventos abertos. 
+        # VERIFIQUE: Adapte 'name' e 'status' para os nomes reais das colunas na sua tabela events
+        cur.execute("""
+            SELECT id, event_name, event_date, status 
+            FROM events 
+            WHERE status = 'aberto' 
+            ORDER BY date ASC;
+        """)
+        eventos = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            "status": "sucesso",
+            "quantidade": len(eventos),
+            "dados": eventos
+        }
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
