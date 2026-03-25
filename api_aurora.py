@@ -612,7 +612,7 @@ def registrar_venda(event_id: str, cocktail_id: str):
             
         # 4. Grava no Livro Caixa (A Tabela 'sales')
         cur.execute("""
-            INSERT INTO sales (event_id, cocktail_id, sale_price)
+            INSERT INTO sales (event_id, cocktail_id, price)
             VALUES (%s, %s, %s);
         """, (event_id, cocktail_id, preco_venda))
             
