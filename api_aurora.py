@@ -583,10 +583,11 @@ def ver_receita(cocktail_id: str):
         raise HTTPException(status_code=400, detail=str(e))
     
 # ==========================================
-# NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (BAIXA + CAIXA)
+# NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (AGORA COM AUDITORIA DE USUÁRIO)
 # ==========================================
-@app.post("/events/{event_id}/sell/{cocktail_id}")
-def registrar_venda(event_id: str, cocktail_id: str):
+# Adicionamos o user_name na url/query
+    @app.post("/events/{event_id}/sell/{cocktail_id}")
+    def registrar_venda(event_id: str, cocktail_id: str, user_name: str = "Desconhecido"):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -594,33 +595,29 @@ def registrar_venda(event_id: str, cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Busca a receita exata do drink
         cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s;", (cocktail_id,))
         receita = cur.fetchall()
         
-        # 2. Busca o preço atual do drink para gravar no recibo
-        # VERIFIQUE: Se a sua coluna de preço na tabela cocktails se chama diferente, altere o 'price' abaixo
         cur.execute("SELECT sale_price FROM cocktails WHERE id = %s;", (cocktail_id,))
         drink_info = cur.fetchone()
         preco_venda = drink_info['sale_price'] if drink_info and 'sale_price' in drink_info else 0
 
-        # 3. Baixa no estoque
         for item in receita:
             cur.execute("""
                 UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s;
             """, (item['quantity'], item['ingredient_id']))
             
-        # 4. Grava no Livro Caixa (A Tabela 'sales')
+        # 4. Grava no Livro Caixa INCLUINDO o nome do bartender
         cur.execute("""
-            INSERT INTO sales (event_id, cocktail_id, price)
-            VALUES (%s, %s, %s);
-        """, (event_id, cocktail_id, preco_venda))
+            INSERT INTO sales (event_id, cocktail_id, price, user_name)
+            VALUES (%s, %s, %s, %s);
+        """, (event_id, cocktail_id, preco_venda, user_name))
             
         conn.commit()
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "mensagem": "Venda e Caixa registrados!"}
+        return {"status": "sucesso", "mensagem": "Venda registrada com auditoria!"}
         
     except Exception as e:
         if conn:
