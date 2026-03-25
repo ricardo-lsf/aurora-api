@@ -691,7 +691,7 @@ def listar_eventos_ativos():
             SELECT id, event_name, event_date, status 
             FROM events 
             WHERE status = 'aberto' 
-            ORDER BY date ASC;
+            ORDER BY event_date ASC;
         """)
         eventos = cur.fetchall()
         
