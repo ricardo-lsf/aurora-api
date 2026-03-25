@@ -583,7 +583,7 @@ def ver_receita(cocktail_id: str):
         raise HTTPException(status_code=400, detail=str(e))
     
 # ==========================================
-# NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (BAIXA DE ESTOQUE)
+# NOSSA DÉCIMA SEGUNDA ROTA: REGISTRAR VENDA (BAIXA + CAIXA)
 # ==========================================
 @app.post("/events/{event_id}/sell/{cocktail_id}")
 def registrar_venda(event_id: str, cocktail_id: str):
@@ -594,44 +594,42 @@ def registrar_venda(event_id: str, cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Busca a receita exata do drink para saber o que descontar
-        cur.execute("""
-            SELECT ingredient_id, quantity 
-            FROM cocktail_ingredients 
-            WHERE cocktail_id = %s;
-        """, (cocktail_id,))
+        # 1. Busca a receita exata do drink
+        cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s;", (cocktail_id,))
         receita = cur.fetchall()
         
-        if not receita:
-            # Se não tem receita, não tem o que descontar do estoque, mas a venda do drink pode ocorrer.
-            return {"status": "alerta", "mensagem": "Drink vendido, mas não possui ficha técnica para baixar estoque."}
+        # 2. Busca o preço atual do drink para gravar no recibo
+        # VERIFIQUE: Se a sua coluna de preço na tabela cocktails se chama diferente, altere o 'price' abaixo
+        cur.execute("SELECT sale_price FROM cocktails WHERE id = %s;", (cocktail_id,))
+        drink_info = cur.fetchone()
+        preco_venda = drink_info['sale_price'] if drink_info and 'sale_price' in drink_info else 0
 
-        # 2. Inicia a baixa no estoque para cada ingrediente da ficha técnica
+        # 3. Baixa no estoque
         for item in receita:
-            # VERIFIQUE: Se a sua coluna de estoque se chama diferente de 'stock', altere abaixo!
             cur.execute("""
-                UPDATE ingredients
-                SET current_stock = current_stock - %s
-                WHERE id = %s;
+                UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s;
             """, (item['quantity'], item['ingredient_id']))
             
-        # 3. Se chegou até aqui sem dar erro em nenhum ingrediente, SALVA tudo! (Efeito Dominó concluído)
+        # 4. Grava no Livro Caixa (A Tabela 'sales')
+        cur.execute("""
+            INSERT INTO sales (event_id, cocktail_id, sale_price)
+            VALUES (%s, %s, %s);
+        """, (event_id, cocktail_id, preco_venda))
+            
         conn.commit()
-        
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "mensagem": "Venda registrada e estoque atualizado!"}
+        return {"status": "sucesso", "mensagem": "Venda e Caixa registrados!"}
         
     except Exception as e:
-        # 4. DEU RUIM? Desfaz tudo (Rollback)! Devolve as doses para as garrafas.
         if conn:
             conn.rollback()
             conn.close()
-        raise HTTPException(status_code=400, detail=str(e))    
-    
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ==========================================
-# NOSSA DÉCIMA TERCEIRA ROTA: REGISTRAR ESTORNO (DEVOLVER AO ESTOQUE)
+# NOSSA DÉCIMA TERCEIRA ROTA: REGISTRAR ESTORNO (DEVOLVE ESTOQUE + CANCELA CAIXA)
 # ==========================================
 @app.post("/events/{event_id}/cancel/{cocktail_id}")
 def registrar_estorno(event_id: str, cocktail_id: str):
@@ -642,35 +640,34 @@ def registrar_estorno(event_id: str, cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Busca a receita exata do drink
-        cur.execute("""
-            SELECT ingredient_id, quantity 
-            FROM cocktail_ingredients 
-            WHERE cocktail_id = %s;
-        """, (cocktail_id,))
+        # 1. Busca a receita
+        cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s;", (cocktail_id,))
         receita = cur.fetchall()
         
-        if not receita:
-            return {"status": "alerta", "mensagem": "Drink estornado, mas não possui ficha técnica para devolver ao estoque."}
-
-        # 2. Inicia a DEVOLUÇÃO pro estoque físico (A Mágica do Sinal de MAIS)
+        # 2. Devolve para o estoque físico
         for item in receita:
             cur.execute("""
-                UPDATE ingredients
-                SET current_stock = current_stock + %s
-                WHERE id = %s;
+                UPDATE ingredients SET current_stock = current_stock + %s WHERE id = %s;
             """, (item['quantity'], item['ingredient_id']))
             
-        # 3. Tudo certo? Confirma a devolução (Commit)
+        # 3. Rasga o recibo (Apaga a ÚLTIMA venda deste drink neste evento)
+        cur.execute("""
+            DELETE FROM sales 
+            WHERE id = (
+                SELECT id FROM sales 
+                WHERE event_id = %s AND cocktail_id = %s 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            );
+        """, (event_id, cocktail_id))
+            
         conn.commit()
-        
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "mensagem": "Estorno registrado e estoque devolvido com sucesso!"}
+        return {"status": "sucesso", "mensagem": "Estorno completo: Estoque e Caixa revertidos!"}
         
     except Exception as e:
-        # 4. DEU RUIM? Desfaz a devolução (Rollback)
         if conn:
             conn.rollback()
             conn.close()
