@@ -705,3 +705,34 @@ def listar_eventos_ativos():
         if conn:
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA QUINTA ROTA: LOGIN DA EQUIPE (STAFF)
+# ==========================================
+@app.get("/login/{phone}")
+def login_staff(phone: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Busca o funcionário pelo telefone e verifica se está ativo
+        cur.execute("SELECT id, name, role FROM staff WHERE phone = %s AND status = 'ativo';", (phone,))
+        user = cur.fetchone()
+        
+        cur.close()
+        conn.close()
+        
+        if user:
+            # Se achou, devolve sucesso e os dados da pessoa
+            return {"status": "sucesso", "usuario": user}
+        else:
+            # Se não achou, devolve erro 404
+            raise HTTPException(status_code=404, detail="Telefone não cadastrado ou inativo")
+            
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
