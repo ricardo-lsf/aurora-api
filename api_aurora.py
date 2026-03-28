@@ -5,8 +5,23 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import uuid
 from typing import Optional, List
+from datetime import date, time
+from typing import Optional
 
 app = FastAPI(title="Aurora Bartenders API")
+
+class EventCreate(BaseModel):
+    nome: str
+    responsavel: Optional[str] = ""
+    telefone: Optional[str] = ""
+    dataEvento: Optional[date] = None
+    horaEvento: Optional[time] = None
+    durH: Optional[int] = 4
+    durM: Optional[int] = 0
+    extH: Optional[int] = 0
+    extM: Optional[int] = 0
+    termino: Optional[time] = None
+    local: Optional[str] = ""
 
 # ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA (CORS)
@@ -732,6 +747,58 @@ def login_staff(phone: str):
             # Se não achou, devolve erro 404
             raise HTTPException(status_code=404, detail="Telefone não cadastrado ou inativo")
             
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA SEXTA ROTA: CRIAR NOVO EVENTO (ADMIN)
+# ==========================================
+@app.post("/events/new")
+def create_event(event: EventCreate):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+   # 1. AQUI É SÓ SQL (O comando que vai para o banco)
+        query = """
+            INSERT INTO events (
+                name, responsible_name, phone, event_date, start_time, 
+                duration_h, duration_m, extra_h, extra_m, end_time, location
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id; 
+        """
+        
+        # 2. O Python executa o SQL mandando as variáveis
+        cur.execute(query, (
+            event.nome, event.responsavel, event.telefone, event.dataEvento, 
+            event.horaEvento, event.durH, event.durM, event.extH, event.extM, 
+            event.termino, event.local
+        ))
+        
+        # 3. AQUI ENTRA A SUA MUDANÇA: O Python pega a resposta e transforma em Texto (String)
+        novo_id = str(cur.fetchone()['id'])
+        
+        conn.commit()
+        
+        cur.execute(query, (
+            event.nome, event.responsavel, event.telefone, event.dataEvento, 
+            event.horaEvento, event.durH, event.durM, event.extH, event.extM, 
+            event.termino, event.local
+        ))
+        
+        novo_id = cur.fetchone()['id']
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "id": novo_id, "mensagem": "Evento criado!"}
+        
     except Exception as e:
         if conn:
             conn.close()
