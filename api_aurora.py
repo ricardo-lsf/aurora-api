@@ -797,3 +797,29 @@ def create_event(event: EventCreate):
     except Exception as e:
         if conn: conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOSSA DÉCIMA SÉTIMA ROTA: LISTAR EVENTOS (ADMIN)
+# ==========================================
+@app.get("/events")
+def list_events():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Traz todos os eventos ordenados pela data (os mais recentes primeiro)
+        cur.execute("SELECT * FROM events ORDER BY event_date DESC;")
+        eventos = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "eventos": eventos}
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
