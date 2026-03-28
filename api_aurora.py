@@ -759,47 +759,41 @@ def login_staff(phone: str):
 def create_event(event: EventCreate):
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+        raise HTTPException(status_code=500, detail="Erro de conexão")
     
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-   # 1. AQUI É SÓ SQL (O comando que vai para o banco)
+        # --- VERIFICAÇÃO DE DUPLICADOS ---
+        check_query = "SELECT id FROM events WHERE name = %s AND event_date = %s"
+        cur.execute(check_query, (event.nome, event.dataEvento))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            # Se já existe, avisamos o interface e não fazemos nada
+            raise HTTPException(status_code=400, detail="Este evento já foi cadastrado!")
+
+        # --- SE NÃO EXISTE, SEGUE O BAILE ---
         query = """
             INSERT INTO events (
                 name, responsible_name, phone, event_date, start_time, 
                 duration_h, duration_m, extra_h, extra_m, end_time, location
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-            ) RETURNING id; 
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+            RETURNING id;
         """
-        
-        # 2. O Python executa o SQL mandando as variáveis
         cur.execute(query, (
             event.nome, event.responsavel, event.telefone, event.dataEvento, 
             event.horaEvento, event.durH, event.durM, event.extH, event.extM, 
             event.termino, event.local
         ))
         
-        # 3. AQUI ENTRA A SUA MUDANÇA: O Python pega a resposta e transforma em Texto (String)
         novo_id = str(cur.fetchone()['id'])
-        
-        conn.commit()
-        
-        cur.execute(query, (
-            event.nome, event.responsavel, event.telefone, event.dataEvento, 
-            event.horaEvento, event.durH, event.durM, event.extH, event.extM, 
-            event.termino, event.local
-        ))
-        
-        novo_id = cur.fetchone()['id']
         conn.commit()
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "id": novo_id, "mensagem": "Evento criado!"}
+        return {"status": "sucesso", "id": novo_id}
         
     except Exception as e:
-        if conn:
-            conn.close()
+        if conn: conn.close()
         raise HTTPException(status_code=400, detail=str(e))
