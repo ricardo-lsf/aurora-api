@@ -230,7 +230,7 @@ def get_db_connection():
 # ==========================================
 # NOSSA PRIMEIRA ROTA (ENDPOINT)
 # ==========================================
-@app.get("/drinks/{account_id}")
+@app.get("/drinks/{account_id}/recipes")
 def listar_drinks(account_id: str):
     conn = get_db_connection()
     if not conn:
