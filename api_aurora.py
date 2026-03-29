@@ -7,47 +7,52 @@ import uuid
 from typing import Optional, List
 from datetime import date, time
 from typing import Optional
-from flask import jsonify
+
 
 app = FastAPI(title="Aurora Bartenders API")
 
 # ... (suas configurações de app e rotas antigas) ...
-@app.route('/events/<event_id>', methods=['GET'])
-def buscar_detalhes_evento(event_id):
+# ==========================================
+# BUSCAR DETALHES DE UM EVENTO ESPECÍFICO (FASTAPI)
+# ==========================================
+@app.get("/events/{event_id}")
+def buscar_detalhes_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
     try:
-        # 1. Abre a conexão com o banco (Use a variável da sua URL do Render)
-        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # O RealDictCursor é mágico: ele já transforma a resposta do banco em um Dicionário (perfeito para JSON)
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # 2. Busca o evento específico pelo ID
+        # Busca o evento específico pelo ID
         sql = "SELECT * FROM events WHERE id = %s;"
-        cursor.execute(sql, (event_id,))
-        evento = cursor.fetchone()
+        cur.execute(sql, (event_id,))
+        evento = cur.fetchone()
         
-        # 3. Fecha a conexão
-        cursor.close()
+        cur.close()
         conn.close()
         
-        # 4. Verifica se achou e devolve para o JavaScript
+        # Verifica se achou e devolve para o JavaScript
         if evento:
-            # Como data e hora no banco podem vir como objetos Python, 
-            # convertemos para texto (string) antes de enviar como JSON
+            # Converte datas e horas para texto para o JSON não reclamar
             if evento.get('event_date'):
                 evento['event_date'] = str(evento['event_date'])
-            if evento.get('event_time'):
-                evento['event_time'] = str(evento['event_time'])
+            if evento.get('start_time'):
+                evento['start_time'] = str(evento['start_time'])
             if evento.get('end_time'):
                 evento['end_time'] = str(evento['end_time'])
+            if evento.get('created_at'):
+                evento['created_at'] = str(evento['created_at'])
                 
-            return jsonify(evento), 200
+            return evento
         else:
-            return jsonify({"erro": "Evento não encontrado"}), 404
+            raise HTTPException(status_code=404, detail="Evento não encontrado")
             
     except Exception as e:
+        if conn:
+            conn.close()
         print("Erro ao buscar evento:", e)
-        return jsonify({"erro": "Falha interna no servidor"}), 500
+        raise HTTPException(status_code=500, detail="Falha interna no servidor")
 
 class EventCreate(BaseModel):
     nome: str
