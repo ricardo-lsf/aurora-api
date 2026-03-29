@@ -11,6 +11,24 @@ from typing import Optional
 
 app = FastAPI(title="Aurora Bartenders API")
 
+class EventoUpdate(BaseModel):
+    responsavel: Optional[str] = ""
+    telefone: Optional[str] = ""
+    dataEvento: Optional[date] = None
+    horaEvento: Optional[time] = None
+    durH: Optional[int] = 4
+    durM: Optional[int] = 0
+    extH: Optional[int] = 0
+    extM: Optional[int] = 0
+    termino: Optional[time] = None
+    local: Optional[str] = ""
+    valorContrato: Optional[float] = 0.0
+    valorHoraExtra: Optional[float] = 0.0
+    valorCustosAdicionais: Optional[float] = 0.0
+    descCustosAdicionais: Optional[str] = ""
+    sinalPerc: Optional[float] = 0.0
+
+
 # ... (suas configurações de app e rotas antigas) ...
 # ==========================================
 # BUSCAR DETALHES DE UM EVENTO ESPECÍFICO (FASTAPI)
@@ -66,6 +84,84 @@ class EventCreate(BaseModel):
     extM: Optional[int] = 0
     termino: Optional[time] = None
     local: Optional[str] = ""
+
+# ==========================================
+# ATUALIZAR DADOS DO EVENTO (SALVAR EDIÇÃO)
+# ==========================================
+@app.put("/events/{event_id}")
+def atualizar_evento(event_id: str, dados: EventoUpdate):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        # O poderoso comando UPDATE do SQL
+        query = """
+            UPDATE events 
+            SET 
+                responsible_name = %s,
+                phone = %s,
+                event_date = %s,
+                start_time = %s,
+                duration_h = %s,
+                duration_m = %s,
+                extra_h = %s,
+                extra_m = %s,
+                end_time = %s,
+                location = %s,
+                contract_value = %s,
+                extra_hour_value = %s,
+                extra_costs_value = %s,
+                extra_costs_desc = %s,
+                upfront_perc = %s
+            WHERE id = %s
+        """
+        
+        # A ordem aqui tem que ser EXATAMENTE igual a dos %s ali em cima!
+        valores = (
+            dados.responsavel,
+            dados.telefone,
+            dados.dataEvento,
+            dados.horaEvento,
+            dados.durH,
+            dados.durM,
+            dados.extH,
+            dados.extM,
+            dados.termino,
+            dados.local,
+            dados.valorContrato,
+            dados.valorHoraExtra,
+            dados.valorCustosAdicionais,
+            dados.descCustosAdicionais,
+            dados.sinalPerc,
+            event_id # O ID vai por último para o WHERE
+        )
+        
+        cur.execute(query, valores)
+        
+        # Verifica se achou a linha para atualizar
+        linhas_afetadas = cur.rowcount
+        
+        # O Commit é o que grava de verdade no Supabase!
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        if linhas_afetadas == 0:
+            raise HTTPException(status_code=404, detail="Evento não encontrado para atualizar")
+            
+        return {"status": "sucesso", "mensagem": "Dados atualizados com sucesso no banco!"}
+        
+    except Exception as e:
+        if conn:
+            conn.rollback() # Desfaz a operação se der erro
+            conn.close()
+        print("Erro no PUT /events:", str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA (CORS)
