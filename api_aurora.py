@@ -963,3 +963,63 @@ def list_events():
         if conn:
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ==========================================
+# NOVOS MOLDES PARA AS AÇÕES DOS BOTÕES
+# ==========================================
+class EventStatus(BaseModel):
+    status: str
+
+# 1. ROTA PARA MUDAR STATUS (Encerrar / Reabrir)
+@app.patch("/events/{event_id}/status")
+def mudar_status_evento(event_id: str, status_data: EventStatus):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE events SET status = %s WHERE id = %s", (status_data.status, event_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": f"Status alterado para {status_data.status}"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# 2. ROTA PARA ZERAR O EVENTO (Limpar Vendas/Pedidos do Caixa)
+@app.post("/events/{event_id}/reset")
+def zerar_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    try:
+        cur = conn.cursor()
+        # Apaga todo o histórico de vendas/caixa atrelado a este evento
+        cur.execute("DELETE FROM sales WHERE event_id = %s", (event_id,))
+        # Se você tiver uma tabela de 'orders' (pedidos do KDS) no Postgres, descomente a linha abaixo:
+        # cur.execute("DELETE FROM orders WHERE event_id = %s", (event_id,))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Caixa e histórico do evento zerados!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# 3. ROTA PARA EXCLUIR EVENTO PERMANENTEMENTE
+@app.delete("/events/{event_id}")
+def deletar_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    try:
+        cur = conn.cursor()
+        # Apaga o evento (O PostgreSQL deve estar configurado com 'ON DELETE CASCADE' 
+        # para apagar automaticamente o cardápio e as vendas vinculadas a ele)
+        cur.execute("DELETE FROM events WHERE id = %s", (event_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Evento excluído com sucesso!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
