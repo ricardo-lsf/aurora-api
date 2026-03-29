@@ -7,8 +7,47 @@ import uuid
 from typing import Optional, List
 from datetime import date, time
 from typing import Optional
+from flask import jsonify
 
 app = FastAPI(title="Aurora Bartenders API")
+
+# ... (suas configurações de app e rotas antigas) ...
+@app.route('/events/<event_id>', methods=['GET'])
+def buscar_detalhes_evento(event_id):
+    try:
+        # 1. Abre a conexão com o banco (Use a variável da sua URL do Render)
+        conn = psycopg2.connect(DATABASE_URL)
+        
+        # O RealDictCursor é mágico: ele já transforma a resposta do banco em um Dicionário (perfeito para JSON)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # 2. Busca o evento específico pelo ID
+        sql = "SELECT * FROM events WHERE id = %s;"
+        cursor.execute(sql, (event_id,))
+        evento = cursor.fetchone()
+        
+        # 3. Fecha a conexão
+        cursor.close()
+        conn.close()
+        
+        # 4. Verifica se achou e devolve para o JavaScript
+        if evento:
+            # Como data e hora no banco podem vir como objetos Python, 
+            # convertemos para texto (string) antes de enviar como JSON
+            if evento.get('event_date'):
+                evento['event_date'] = str(evento['event_date'])
+            if evento.get('event_time'):
+                evento['event_time'] = str(evento['event_time'])
+            if evento.get('end_time'):
+                evento['end_time'] = str(evento['end_time'])
+                
+            return jsonify(evento), 200
+        else:
+            return jsonify({"erro": "Evento não encontrado"}), 404
+            
+    except Exception as e:
+        print("Erro ao buscar evento:", e)
+        return jsonify({"erro": "Falha interna no servidor"}), 500
 
 class EventCreate(BaseModel):
     nome: str
