@@ -1023,3 +1023,30 @@ def deletar_evento(event_id: str):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# Molde para receber a atualização de estoque
+class EstoqueDrink(BaseModel):
+    quantidade: int
+
+# ROTA PARA ATUALIZAR A QUANTIDADE DE UM DRINK NO EVENTO
+@app.patch("/events/{event_id}/menu/{cocktail_id}/quantity")
+def atualizar_quantidade_drink(event_id: str, cocktail_id: str, dados: EstoqueDrink):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    
+    try:
+        cur = conn.cursor()
+        query = """
+            UPDATE event_menus 
+            SET planned_quantity = %s 
+            WHERE event_id = %s AND cocktail_id = %s
+        """
+        cur.execute(query, (dados.quantidade, event_id, cocktail_id))
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Quantidade atualizada!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
