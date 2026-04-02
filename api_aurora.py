@@ -1050,3 +1050,21 @@ def atualizar_quantidade_drink(event_id: str, cocktail_id: str, dados: EstoqueDr
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    
+# ROTA PARA ATUALIZAR ESTOQUE EM MASSA
+@app.post("/events/{event_id}/menu/bulk-quantity")
+def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    try:
+        cur = conn.cursor()
+        # Atualiza a quantidade planejada de TODOS os drinks daquele evento
+        query = "UPDATE event_menus SET planned_quantity = %s WHERE event_id = %s"
+        cur.execute(query, (dados.quantidade, event_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": f"Estoque de todos os drinks alterado para {dados.quantidade}"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
