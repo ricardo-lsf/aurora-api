@@ -668,7 +668,8 @@ def listar_menu_evento(event_id: str):
                 c.id, 
                 c.name AS drink_nome, 
                 c.sale_price AS preco_venda, 
-                c.image_url
+                c.image_url,
+                em.planned_quantity
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
             WHERE em.event_id = %s
