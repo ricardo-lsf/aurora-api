@@ -1069,3 +1069,46 @@ def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+# ==========================================
+# ROTA: GERAR LISTA DE COMPRAS DO EVENTO
+# ==========================================
+@app.get("/events/{event_id}/shopping-list")
+def gerar_lista_compras(event_id: str):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # A MÁGICA DO SQL: 
+        # 1. Pega os drinks do menu (com a qtd planejada)
+        # 2. Cruza com os ingredientes da receita
+        # 3. Soma tudo o que for o mesmo insumo
+        query = """
+            SELECT 
+                i.name AS insumo,
+                i.brand AS marca,
+                SUM(em.planned_quantity * ci.quantity) AS total_necessario,
+                i.measurement_unit AS unidade,
+                i.package_quantity AS tamanho_embalagem,
+                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) AS qtd_garrafas
+            FROM event_menus em
+            JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE em.event_id = %s
+            GROUP BY i.id, i.name, i.brand, i.measurement_unit, i.package_quantity
+            ORDER BY i.name;
+        """
+        
+        cur.execute(query, (event_id,))
+        lista = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "lista": lista}
+        
+    except Exception as e:
+        if conn: conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
