@@ -1071,7 +1071,7 @@ def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
-# ROTA: GERAR LISTA DE COMPRAS DO EVENTO
+# ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (POSTGRES)
 # ==========================================
 @app.get("/events/{event_id}/shopping-list")
 def gerar_lista_compras(event_id: str):
@@ -1081,10 +1081,9 @@ def gerar_lista_compras(event_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # A MÁGICA DO SQL: 
-        # 1. Pega os drinks do menu (com a qtd planejada)
-        # 2. Cruza com os ingredientes da receita
-        # 3. Soma tudo o que for o mesmo insumo
+        # A MÁGICA RELACIONAL:
+        # Calculamos volume total, arredondamos para garrafas cheias 
+        # e multiplicamos pelo custo unitário da embalagem, tudo no banco!
         query = """
             SELECT 
                 i.name AS insumo,
@@ -1092,23 +1091,35 @@ def gerar_lista_compras(event_id: str):
                 SUM(em.planned_quantity * ci.quantity) AS total_necessario,
                 i.measurement_unit AS unidade,
                 i.package_quantity AS tamanho_embalagem,
-                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) AS qtd_garrafas
+                i.current_cost_price AS preco_unitario,
+                -- Arredonda para cima (CEIL) o número de garrafas
+                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) AS qtd_comprar,
+                -- Multiplica as garrafas pelo preço unitário de cada uma
+                (CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) * i.current_cost_price) AS subtotal_custo
             FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE em.event_id = %s
-            GROUP BY i.id, i.name, i.brand, i.measurement_unit, i.package_quantity
+            GROUP BY i.id, i.name, i.brand, i.measurement_unit, i.package_quantity, i.current_cost_price
             ORDER BY i.name;
         """
         
         cur.execute(query, (event_id,))
         lista = cur.fetchall()
         
+        # Cálculo do valor total de desembolso estimado para o evento inteiro
+        total_desembolso = sum(float(item['subtotal_custo'] or 0) for item in lista)
+        
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "lista": lista}
+        return {
+            "status": "sucesso", 
+            "total_estimado": round(total_desembolso, 2),
+            "lista": lista
+        }
         
     except Exception as e:
         if conn: conn.close()
+        print(f"Erro na lista de compras: {e}")
         raise HTTPException(status_code=400, detail=str(e))
