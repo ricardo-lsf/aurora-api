@@ -392,39 +392,38 @@ class NovoMenu(BaseModel):
 @app.post("/events/{event_id}/menu")
 def salvar_cardapio(event_id: str, menu: NovoMenu):
     conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
     
     try:
         cur = conn.cursor()
         
-        # 1. Limpeza de Segurança (Se já tinha cardápio antes, apagamos para não duplicar)
-        cur.execute("DELETE FROM event_menus WHERE event_id = %s;", (event_id,))
-        
-        # 2. O comando base de inserção
-        query = """
+        # 1. Primeiro, removemos apenas os drinks que NÃO estão na nova lista enviada
+        # (Isso permite que você remova drinks do evento sem zerar os outros)
+        if menu.drinks:
+            placeholder = ', '.join(['%s'] * len(menu.drinks))
+            query_delete = f"DELETE FROM event_menus WHERE event_id = %s AND cocktail_id NOT IN ({placeholder})"
+            cur.execute(query_delete, [event_id] + menu.drinks)
+        else:
+            cur.execute("DELETE FROM event_menus WHERE event_id = %s", (event_id,))
+
+        # 2. Inserimos os novos, mas usamos ON CONFLICT para não zerar o que já existe
+        # Nota: Para isso funcionar, sua tabela event_menus precisa de uma constraint UNIQUE(event_id, cocktail_id)
+        query_upsert = """
             INSERT INTO event_menus (event_id, cocktail_id, display_order)
-            VALUES (%s, %s, %s);
+            VALUES (%s, %s, %s)
+            ON CONFLICT (event_id, cocktail_id) DO NOTHING;
         """
         
-        # 3. O Loop Inteligente: Lemos a lista e salvamos um por um já com a posição (index)
         for posicao, drink_id in enumerate(menu.drinks, start=1):
-            cur.execute(query, (event_id, drink_id, posicao))
+            cur.execute(query_upsert, (event_id, drink_id, posicao))
             
-        # 4. Confirma a transação inteira no banco
         conn.commit()
-        
         cur.close()
         conn.close()
-        
-        return {
-            "status": "sucesso", 
-            "mensagem": f"Cardápio salvo com {len(menu.drinks)} drinks na ordem correta!"
-        }
+        return {"status": "sucesso", "mensagem": "Cardápio atualizado preservando quantidades!"}
         
     except Exception as e:
-        conn.rollback() # Cancela tudo se der erro no meio do caminho
-        conn.close()
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
         
 
@@ -1081,33 +1080,30 @@ def gerar_lista_compras(event_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # A MÁGICA RELACIONAL:
-        # Calculamos volume total, arredondamos para garrafas cheias 
-        # e multiplicamos pelo custo unitário da embalagem, tudo no banco!
+        # Usamos COALESCE para garantir que se o preço for nulo, vire 0 em vez de quebrar o cálculo
         query = """
             SELECT 
                 i.name AS insumo,
                 i.brand AS marca,
                 SUM(em.planned_quantity * ci.quantity) AS total_necessario,
                 i.measurement_unit AS unidade,
-                i.package_quantity AS tamanho_embalagem,
-                i.current_cost_price AS preco_unitario,
-                -- Arredonda para cima (CEIL) o número de garrafas
-                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) AS qtd_comprar,
-                -- Multiplica as garrafas pelo preço unitário de cada uma
-                (CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(i.package_quantity, 0)) * i.current_cost_price) AS subtotal_custo
+                COALESCE(i.package_quantity, 1) AS tamanho_embalagem,
+                COALESCE(i.current_cost_price, 0) AS preco_unitario,
+                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(COALESCE(i.package_quantity, 1), 0)) AS qtd_comprar,
+                (CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(COALESCE(i.package_quantity, 1), 0)) * COALESCE(i.current_cost_price, 0)) AS subtotal_custo
             FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE em.event_id = %s
             GROUP BY i.id, i.name, i.brand, i.measurement_unit, i.package_quantity, i.current_cost_price
+            HAVING SUM(em.planned_quantity * ci.quantity) > 0
             ORDER BY i.name;
         """
         
         cur.execute(query, (event_id,))
         lista = cur.fetchall()
         
-        # Cálculo do valor total de desembolso estimado para o evento inteiro
+        # Forçamos a conversão para float para garantir que o JSON aceite
         total_desembolso = sum(float(item['subtotal_custo'] or 0) for item in lista)
         
         cur.close()
@@ -1118,8 +1114,6 @@ def gerar_lista_compras(event_id: str):
             "total_estimado": round(total_desembolso, 2),
             "lista": lista
         }
-        
     except Exception as e:
         if conn: conn.close()
-        print(f"Erro na lista de compras: {e}")
         raise HTTPException(status_code=400, detail=str(e))
