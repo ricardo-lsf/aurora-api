@@ -1072,6 +1072,9 @@ def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
 # ==========================================
 # ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (POSTGRES)
 # ==========================================
+# ==========================================
+# ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (CORREÇÃO DE DIVISÃO)
+# ==========================================
 @app.get("/events/{event_id}/shopping-list")
 def gerar_lista_compras(event_id: str):
     conn = get_db_connection()
@@ -1080,7 +1083,8 @@ def gerar_lista_compras(event_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Usamos COALESCE para garantir que se o preço for nulo, vire 0 em vez de quebrar o cálculo
+        # AQUI ESTÁ O SEGREDO: O "::numeric" força o Postgres a calcular as casas decimais 
+        # antes de aplicar o CEIL (arredondamento para cima).
         query = """
             SELECT 
                 i.name AS insumo,
@@ -1089,8 +1093,21 @@ def gerar_lista_compras(event_id: str):
                 i.measurement_unit AS unidade,
                 COALESCE(i.package_quantity, 1) AS tamanho_embalagem,
                 COALESCE(i.current_cost_price, 0) AS preco_unitario,
-                CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(COALESCE(i.package_quantity, 1), 0)) AS qtd_comprar,
-                (CEIL(SUM(em.planned_quantity * ci.quantity) / NULLIF(COALESCE(i.package_quantity, 1), 0)) * COALESCE(i.current_cost_price, 0)) AS subtotal_custo
+                
+                -- Cálculo de Garrafas (Forçando decimal)
+                CEIL(
+                    SUM(em.planned_quantity * ci.quantity)::numeric / 
+                    NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric
+                ) AS qtd_comprar,
+                
+                -- Cálculo do Custo Total
+                (
+                    CEIL(
+                        SUM(em.planned_quantity * ci.quantity)::numeric / 
+                        NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric
+                    ) * COALESCE(i.current_cost_price, 0)::numeric
+                ) AS subtotal_custo
+                
             FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
@@ -1103,7 +1120,7 @@ def gerar_lista_compras(event_id: str):
         cur.execute(query, (event_id,))
         lista = cur.fetchall()
         
-        # Forçamos a conversão para float para garantir que o JSON aceite
+        # O Python soma o total geral de forma segura
         total_desembolso = sum(float(item['subtotal_custo'] or 0) for item in lista)
         
         cur.close()
