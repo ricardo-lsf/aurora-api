@@ -187,11 +187,11 @@ class NovoEvento(BaseModel):
 # ==========================================
 class NovoInsumo(BaseModel):
     account_id: str
-    category_id: str
+    type_id: str  # Mudamos de category_id para type_id
     name: str
     brand: str
-    measurement_unit: str  # Ex: ml, g, un
-    package_quantity: float # Ex: 1000 (para 1 litro)
+    measurement_unit: str
+    package_quantity: float
 
 class NovaCompra(BaseModel):
     ingredient_id: str
@@ -523,17 +523,18 @@ def relatorio_estoque(account_id: str):
         # Usamos NULLIF para evitar o erro de "divisão por zero" caso alguma embalagem esteja zerada
         query = """
             SELECT 
-                id,
-                name AS insumo,
-                current_stock AS estoque_ml_g,
-                measurement_unit AS unidade,
-                current_cost_price AS custo_ultima_embalagem,
-                ROUND((current_stock / NULLIF(package_quantity, 0)), 2) AS qtd_embalagens_estoque,
-                ROUND((current_cost_price / NULLIF(package_quantity, 0)), 4) AS custo_por_gota,
-                ROUND((current_stock / NULLIF(package_quantity, 0)) * current_cost_price, 2) AS dinheiro_parado
-            FROM ingredients
-            WHERE account_id = %s
-            ORDER BY name;
+                i.id,
+                i.name AS insumo,
+                it.name AS tipo,  -- Agora buscando da ingredient_types
+                i.current_stock AS estoque_ml_g,
+                i.measurement_unit AS unidade,
+                i.current_cost_price AS custo_ultima_embalagem,
+                ROUND((i.current_stock / NULLIF(i.package_quantity, 0)), 2) AS qtd_embalagens_estoque,
+                ROUND((i.current_stock / NULLIF(i.package_quantity, 0)) * i.current_cost_price, 2) AS dinheiro_parado
+            FROM ingredients i
+            LEFT JOIN ingredient_types it ON i.type_id = it.id
+            WHERE i.account_id = %s
+            ORDER BY it.name, i.name;
         """
         
         cur.execute(query, (account_id,))
