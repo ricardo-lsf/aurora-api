@@ -73,6 +73,7 @@ def buscar_detalhes_evento(event_id: str):
         raise HTTPException(status_code=500, detail="Falha interna no servidor")
 
 class EventCreate(BaseModel):
+    account_id: str
     nome: str
     responsavel: Optional[str] = ""
     telefone: Optional[str] = ""
@@ -83,7 +84,7 @@ class EventCreate(BaseModel):
     extH: Optional[int] = 0
     extM: Optional[int] = 0
     termino: Optional[time] = None
-    local: Optional[str] = ""
+    local: Optional[str] = ""   
 
 # ==========================================
 # ATUALIZAR DADOS DO EVENTO (SALVAR EDIÇÃO)
@@ -911,18 +912,18 @@ def create_event(event: EventCreate):
         if cur.fetchone():
             cur.close()
             conn.close()
-            # Se já existe, avisamos o interface e não fazemos nada
             raise HTTPException(status_code=400, detail="Este evento já foi cadastrado!")
 
-        # --- SE NÃO EXISTE, SEGUE O BAILE ---
+        # --- SE NÃO EXISTE, SEGUE O BAILE (AGORA COM ACCOUNT_ID) ---
         query = """
             INSERT INTO events (
-                name, responsible_name, phone, event_date, start_time, 
+                account_id, name, responsible_name, phone, event_date, start_time, 
                 duration_h, duration_m, extra_h, extra_m, end_time, location
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
             RETURNING id;
         """
         cur.execute(query, (
+            event.account_id, # <--- ADICIONADO AQUI!
             event.nome, event.responsavel, event.telefone, event.dataEvento, 
             event.horaEvento, event.durH, event.durM, event.extH, event.extM, 
             event.termino, event.local
