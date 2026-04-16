@@ -1110,11 +1110,10 @@ def gerar_lista_compras(event_id: str):
                     ) * COALESCE(i.current_cost_price, 0)::numeric
                 ) AS subtotal_custo
                 
-           FROM event_menus em
-            -- A MÁGICA ESTÁ AQUI NOS ::text E NO ::uuid
-            JOIN cocktail_ingredients ci ON em.cocktail_id::text = ci.cocktail_id::text
-            JOIN ingredients i ON ci.ingredient_id::text = i.id::text
-            WHERE em.event_id::text = %s
+            FROM event_menus em
+            JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE em.event_id = %s
             GROUP BY i.id, i.name, i.brand, i.measurement_unit, i.package_quantity, i.current_cost_price
             HAVING SUM(COALESCE(em.planned_quantity, 0) * ci.quantity) > 0
             ORDER BY i.name;
