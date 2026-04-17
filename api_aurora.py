@@ -1072,9 +1072,6 @@ def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
-# ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (POSTGRES)
-# ==========================================
-# ==========================================
 # ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (CORREÇÃO DE DIVISÃO)
 # ==========================================
 @app.get("/events/{event_id}/shopping-list")
@@ -1091,24 +1088,45 @@ def gerar_lista_compras(event_id: str):
             SELECT 
                 i.name AS insumo,
                 i.brand AS marca,
-                SUM(em.planned_quantity * ci.quantity) AS total_necessario,
-                i.measurement_unit AS unidade,
-                COALESCE(i.package_quantity, 1) AS tamanho_embalagem,
+                
+                -- FORMATADOR DE NECESSIDADE
+                CASE 
+                    WHEN i.measurement_unit IN ('g', 'ml') AND SUM(COALESCE(em.planned_quantity, 0) * ci.quantity) >= 1000 THEN 
+                        TO_CHAR(SUM(COALESCE(em.planned_quantity, 0) * ci.quantity) / 1000.0, 'FM999999990.00') || CASE WHEN i.measurement_unit = 'g' THEN ' Kg' ELSE ' L' END
+                    ELSE 
+                        SUM(COALESCE(em.planned_quantity, 0) * ci.quantity) || ' ' || i.measurement_unit
+                END AS total_necessario_formatado,
+
+                -- FORMATADOR DA EMBALAGEM
+                CASE 
+                    WHEN i.package_quantity IS NULL THEN '⚠️ Sem Cadastro'
+                    WHEN i.measurement_unit IN ('g', 'ml') AND i.package_quantity >= 1000 THEN 
+                        TO_CHAR(i.package_quantity / 1000.0, 'FM999999990.00') || CASE WHEN i.measurement_unit = 'g' THEN ' Kg' ELSE ' L' END
+                    ELSE 
+                        i.package_quantity || ' ' || i.measurement_unit
+                END AS tamanho_embalagem,
+                
                 COALESCE(i.current_cost_price, 0) AS preco_unitario,
                 
-                -- Cálculo de Garrafas (Forçando decimal)
+                -- 1. CUSTO REAL/PROPORCIONAL (O que você pediu: Ex: 60% da garrafa)
+                ROUND(
+                    (SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
+                    NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric) * COALESCE(i.current_cost_price, 0)::numeric, 2
+                ) AS custo_real_uso,
+
+                -- 2. QUANTIDADE DE PACOTES (Arredondado para cima para compra)
                 CEIL(
-                    SUM(em.planned_quantity * ci.quantity)::numeric / 
+                    SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
                     NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric
                 ) AS qtd_comprar,
                 
-                -- Cálculo do Custo Total
+                -- 3. CUSTO DE AQUISIÇÃO (Total a pagar no fornecedor)
                 (
                     CEIL(
-                        SUM(em.planned_quantity * ci.quantity)::numeric / 
+                        SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
                         NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric
                     ) * COALESCE(i.current_cost_price, 0)::numeric
-                ) AS subtotal_custo
+                ) AS custo_aquisicao
                 
             FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
