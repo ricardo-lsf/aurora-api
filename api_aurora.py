@@ -1072,7 +1072,7 @@ def atualizar_estoque_massa(event_id: str, dados: EstoqueDrink):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
-# ROTA: GERAR LISTA DE COMPRAS COM CUSTOS (CORREÇÃO DE DIVISÃO)
+# ROTA: GERAR LISTA DE COMPRAS (AGORA COM CUSTO REAL E DE AQUISIÇÃO)
 # ==========================================
 @app.get("/events/{event_id}/shopping-list")
 def gerar_lista_compras(event_id: str):
@@ -1082,8 +1082,6 @@ def gerar_lista_compras(event_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # AQUI ESTÁ O SEGREDO: O "::numeric" força o Postgres a calcular as casas decimais 
-        # antes de aplicar o CEIL (arredondamento para cima).
         query = """
             SELECT 
                 i.name AS insumo,
@@ -1108,19 +1106,19 @@ def gerar_lista_compras(event_id: str):
                 
                 COALESCE(i.current_cost_price, 0) AS preco_unitario,
                 
-                -- 1. CUSTO REAL/PROPORCIONAL (O que você pediu: Ex: 60% da garrafa)
+                -- 1. CUSTO REAL/PROPORCIONAL
                 ROUND(
                     (SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
                     NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric) * COALESCE(i.current_cost_price, 0)::numeric, 2
                 ) AS custo_real_uso,
 
-                -- 2. QUANTIDADE DE PACOTES (Arredondado para cima para compra)
+                -- 2. QUANTIDADE DE PACOTES (COMPRA)
                 CEIL(
                     SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
                     NULLIF(COALESCE(i.package_quantity, 1), 0)::numeric
                 ) AS qtd_comprar,
                 
-                -- 3. CUSTO DE AQUISIÇÃO (Total a pagar no fornecedor)
+                -- 3. CUSTO DE AQUISIÇÃO
                 (
                     CEIL(
                         SUM(COALESCE(em.planned_quantity, 0) * ci.quantity)::numeric / 
@@ -1140,15 +1138,18 @@ def gerar_lista_compras(event_id: str):
         cur.execute(query, (event_id,))
         lista = cur.fetchall()
         
-        # O Python soma o total geral de forma segura
-        total_desembolso = sum(float(item['subtotal_custo'] or 0) for item in lista)
+        # O Python agora soma os dois fluxos financeiros de forma segura
+        total_desembolso = sum(float(item['custo_aquisicao'] or 0) for item in lista)
+        total_real = sum(float(item['custo_real_uso'] or 0) for item in lista)
         
         cur.close()
         conn.close()
         
+        # Devolvemos a estrutura completa para o seu admin.html ler!
         return {
             "status": "sucesso", 
             "total_estimado": round(total_desembolso, 2),
+            "total_custo_real": round(total_real, 2),
             "lista": lista
         }
     except Exception as e:
