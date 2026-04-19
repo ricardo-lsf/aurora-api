@@ -625,11 +625,11 @@ def atualizar_drink_completo(cocktail_id: str, drink: NovoCocktail):
         # 1. Atualiza o Cabeçalho do drink
         query_drink = """
             UPDATE cocktails 
-            SET name = %s, description = %s, category = %s, technique = %s, drink_type = %s, sale_price = %s, image_url = %s
+            SET name = %s, preparation_steps = %s, category = %s, technique = %s, drink_type = %s, sale_price = %s, image_url = %s
             WHERE id = %s AND account_id = %s;
         """
         cur.execute(query_drink, (
-            drink.name, drink.description, drink.category, drink.technique, drink.drink_type, 
+            drink.name, drink.preparation_steps, drink.category, drink.technique, drink.drink_type, 
             drink.sale_price, drink.image_url, cocktail_id, drink.account_id
         ))
         
