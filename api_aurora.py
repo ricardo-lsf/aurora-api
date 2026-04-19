@@ -628,8 +628,12 @@ def listar_todos_drinks(account_id: str):
                 id, 
                 name AS drink_nome, 
                 sale_price AS preco_venda, 
-                image_url 
-            FROM cocktails
+                image_url,
+                technique,          -- ADICIONAR ISSO
+                drink_type,         -- ADICIONAR ISSO
+                category,           -- ADICIONAR ISSO
+                preparation_steps   -- ADICIONAR ISSO
+            FROM cocktails 
             WHERE account_id = %s
             ORDER BY name;
         """
