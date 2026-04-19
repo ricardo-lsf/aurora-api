@@ -527,11 +527,12 @@ def relatorio_estoque(account_id: str):
             SELECT 
                 i.id,
                 i.name AS insumo,
-                it.name AS tipo,  -- Agora buscando da ingredient_types
-                i.brand AS marca,
+                i.brand AS marca,             -- CORREÇÃO: MARCA ADICIONADA!
+                it.name AS tipo,  
                 i.current_stock AS estoque_ml_g,
                 i.measurement_unit AS unidade,
                 i.current_cost_price AS custo_ultima_embalagem,
+                i.package_quantity AS tamanho_embalagem,  -- CORREÇÃO: PRECISAMOS PARA DIVIDIR O PREÇO!
                 ROUND((i.current_stock / NULLIF(i.package_quantity, 0)), 2) AS qtd_embalagens_estoque,
                 ROUND((i.current_stock / NULLIF(i.package_quantity, 0)) * i.current_cost_price, 2) AS dinheiro_parado
             FROM ingredients i
@@ -768,6 +769,7 @@ def ver_receita(cocktail_id: str):
         # 2. Busca a lista de ingredientes (várias linhas) com a coluna corrigida
         query_ingredientes = """
             SELECT 
+                i.id AS ingrediente_id,    -- CORREÇÃO: O ID ESTAVA FALTANDO!
                 i.name AS ingrediente, 
                 ci.quantity AS quantidade, 
                 i.measurement_unit AS unidade
