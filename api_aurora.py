@@ -212,9 +212,10 @@ class NovoCocktail(BaseModel):
     name: str
     description: Optional[str] = ""
     category: str
+    technique: Optional[str] = "Montado"     # <--- ADICIONADO!
+    drink_type: Optional[str] = "Cocktail"   # <--- ADICIONADO!
     sale_price: float
     image_url: Optional[str] = ""
-    # Aqui é o pulo do gato: uma lista com a receita embutida!
     recipe: List[IngredienteReceita]
 
 
@@ -560,7 +561,8 @@ def relatorio_estoque(account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
         
 # ==========================================
-# NOSSA OITAVA ROTA: CRIAR DRINK COM FICHA TÉCNICA
+# ==========================================
+# NOSSA OITAVA ROTA: CRIAR DRINK COM FICHA TÉCNICA (POST)
 # ==========================================
 @app.post("/cocktails/")
 def criar_drink_completo(drink: NovoCocktail):
@@ -570,21 +572,19 @@ def criar_drink_completo(drink: NovoCocktail):
     
     try:
         cur = conn.cursor()
-        
-        # 1. Geramos o ID único para o novo drink
         novo_drink_id = str(uuid.uuid4())
         
-        # 2. Inserimos o "Cabeçalho" do drink na tabela principal
+        # Inserimos o Cabeçalho (AGORA COM TECHNIQUE E DRINK_TYPE)
         query_drink = """
-            INSERT INTO cocktails (id, account_id, name, description, category, sale_price, image_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s);
+            INSERT INTO cocktails (id, account_id, name, description, category, technique, drink_type, sale_price, image_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         cur.execute(query_drink, (
             novo_drink_id, drink.account_id, drink.name, 
-            drink.description, drink.category, drink.sale_price, drink.image_url
+            drink.description, drink.category, drink.technique, drink.drink_type, drink.sale_price, drink.image_url
         ))
         
-        # 3. O Loop da Ficha Técnica: ligando cada dose ao drink novo
+        # Loop da Ficha Técnica
         query_receita = """
             INSERT INTO cocktail_ingredients (cocktail_id, ingredient_id, quantity)
             VALUES (%s, %s, %s);
@@ -592,22 +592,72 @@ def criar_drink_completo(drink: NovoCocktail):
         for item in drink.recipe:
             cur.execute(query_receita, (novo_drink_id, item.ingredient_id, item.quantity))
             
-        # 4. O Gran Finale: Confirma TUDO de uma vez!
         conn.commit()
-        
         cur.close()
         conn.close()
         
         return {
             "status": "sucesso", 
-            "mensagem": f"Drink '{drink.name}' criado com {len(drink.recipe)} ingredientes na ficha técnica!",
+            "mensagem": f"Drink '{drink.name}' criado com sucesso!",
             "drink_id": novo_drink_id
         }
         
     except Exception as e:
-        # Se der BO em qualquer etapa, desfaz TUDO. Zero lixo no banco!
         conn.rollback() 
         conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# ROTA NOVA: ATUALIZAR DRINK EXISTENTE (PUT)
+# ==========================================
+@app.put("/cocktails/{cocktail_id}")
+def atualizar_drink_completo(cocktail_id: str, drink: NovoCocktail):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        # 1. Atualiza o Cabeçalho do drink
+        query_drink = """
+            UPDATE cocktails 
+            SET name = %s, description = %s, category = %s, technique = %s, drink_type = %s, sale_price = %s, image_url = %s
+            WHERE id = %s AND account_id = %s;
+        """
+        cur.execute(query_drink, (
+            drink.name, drink.description, drink.category, drink.technique, drink.drink_type, 
+            drink.sale_price, drink.image_url, cocktail_id, drink.account_id
+        ))
+        
+        # 2. Apaga a receita antiga inteira (é mais seguro que tentar adivinhar o que mudou)
+        cur.execute("DELETE FROM cocktail_ingredients WHERE cocktail_id = %s;", (cocktail_id,))
+        
+        # 3. Insere a receita nova e atualizada
+        query_receita = """
+            INSERT INTO cocktail_ingredients (cocktail_id, ingredient_id, quantity)
+            VALUES (%s, %s, %s);
+        """
+        for item in drink.recipe:
+            cur.execute(query_receita, (cocktail_id, item.ingredient_id, item.quantity))
+            
+        # 4. Confirma a transação
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {
+            "status": "sucesso", 
+            "mensagem": f"Drink '{drink.name}' atualizado perfeitamente!"
+        }
+        
+    except Exception as e:
+        conn.rollback() 
+        conn.close()
+        # Se for erro de nome duplicado, repassamos de forma legível
+        if "unique_drink_name" in str(e):
+            raise HTTPException(status_code=400, detail="unique_drink_name")
         raise HTTPException(status_code=400, detail=str(e))
         
 # ==========================================
@@ -629,10 +679,10 @@ def listar_todos_drinks(account_id: str):
                 name AS drink_nome, 
                 sale_price AS preco_venda, 
                 image_url,
-                technique,          -- ADICIONAR ISSO
-                drink_type,         -- ADICIONAR ISSO
-                category,           -- ADICIONAR ISSO
-                preparation_steps   -- ADICIONAR ISSO
+                technique,
+                drink_type,
+                category,
+                preparation_steps
             FROM cocktails 
             WHERE account_id = %s
             ORDER BY name;
