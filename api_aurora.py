@@ -528,6 +528,7 @@ def relatorio_estoque(account_id: str):
                 i.id,
                 i.name AS insumo,
                 it.name AS tipo,  -- Agora buscando da ingredient_types
+                i.brand AS marca,
                 i.current_stock AS estoque_ml_g,
                 i.measurement_unit AS unidade,
                 i.current_cost_price AS custo_ultima_embalagem,
