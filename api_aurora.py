@@ -210,7 +210,7 @@ class IngredienteReceita(BaseModel):
 class NovoCocktail(BaseModel):
     account_id: str
     name: str
-    description: Optional[str] = ""
+    preparation_steps: Optional[str] = ""
     category: str
     technique: Optional[str] = "Montado"     # <--- ADICIONADO!
     drink_type: Optional[str] = "Cocktail"   # <--- ADICIONADO!
@@ -578,12 +578,12 @@ def criar_drink_completo(drink: NovoCocktail):
         
         # Inserimos o Cabeçalho (AGORA COM TECHNIQUE E DRINK_TYPE)
         query_drink = """
-            INSERT INTO cocktails (id, account_id, name, description, category, technique, drink_type, sale_price, image_url)
+            INSERT INTO cocktails (id, account_id, name, preparation_steps, category, technique, drink_type, sale_price, image_url)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         cur.execute(query_drink, (
             novo_drink_id, drink.account_id, drink.name, 
-            drink.description, drink.category, drink.technique, drink.drink_type, drink.sale_price, drink.image_url
+            drink.preparation_steps, drink.category, drink.technique, drink.drink_type, drink.sale_price, drink.image_url
         ))
         
         # Loop da Ficha Técnica
