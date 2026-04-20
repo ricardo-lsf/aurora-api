@@ -509,70 +509,70 @@ def registrar_compra(compra: NovaCompra):
         conn.close()
         raise HTTPException(status_code=400, detail=str(e))
         
-    # ==========================================
-    # ROTA EXTRA 1: ZERAR ESTOQUE FÍSICO DO INSUMO
-    # ==========================================
-    @app.put("/ingredients/{ingredient_id}/zero")
-    def zerar_estoque(ingredient_id: str):
-        conn = get_db_connection()
-        if not conn: 
-            raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+# ==========================================
+# ROTA EXTRA 1: ZERAR ESTOQUE FÍSICO DO INSUMO
+# ==========================================
+@app.put("/ingredients/{ingredient_id}/zero")
+def zerar_estoque(ingredient_id: str):
+    conn = get_db_connection()
+    if not conn: 
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        # O UPDATE perfeito: Zera apenas o saldo, mantendo o item no catálogo!
+        query = "UPDATE ingredients SET current_stock = 0 WHERE id = %s"
+        cur.execute(query, (ingredient_id,))
         
-        try:
-            cur = conn.cursor()
-            # O UPDATE perfeito: Zera apenas o saldo, mantendo o item no catálogo!
-            query = "UPDATE ingredients SET current_stock = 0 WHERE id = %s"
-            cur.execute(query, (ingredient_id,))
-            
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {"status": "sucesso", "mensagem": "Estoque físico zerado com sucesso!"}
-            
-        except Exception as e:
-            if conn: conn.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Estoque físico zerado com sucesso!"}
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # ==========================================
-    # ROTA EXTRA 2: EXCLUIR INSUMO DO SISTEMA (PERIGO)
-    # ==========================================
-    @app.delete("/ingredients/{ingredient_id}")
-    def excluir_insumo_definitivo(ingredient_id: str):
-        conn = get_db_connection()
-        if not conn: 
-            raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+# ==========================================
+# ROTA EXTRA 2: EXCLUIR INSUMO DO SISTEMA (PERIGO)
+# ==========================================
+@app.delete("/ingredients/{ingredient_id}")
+def excluir_insumo_definitivo(ingredient_id: str):
+    conn = get_db_connection()
+    if not conn: 
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
         
-        try:
-            cur = conn.cursor()
+        # Tenta deletar a linha inteira da tabela
+        query = "DELETE FROM ingredients WHERE id = %s"
+        cur.execute(query, (ingredient_id,))
+        
+        # Verifica se algo foi deletado de fato
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Insumo não encontrado no banco.")
             
-            # Tenta deletar a linha inteira da tabela
-            query = "DELETE FROM ingredients WHERE id = %s"
-            cur.execute(query, (ingredient_id,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Insumo apagado do catálogo geral!"}
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        erro = str(e)
+        
+        # A MAGIA DO BANCO RELACIONAL: Se o item estiver numa receita, o Postgres bloqueia!
+        # Nós pegamos esse erro e avisamos o usuário de forma amigável.
+        if "violates foreign key constraint" in erro or "violates_foreign_key" in erro:
+            raise HTTPException(
+                status_code=400, 
+                detail="Operação bloqueada: Este insumo está sendo usado na ficha técnica de um ou mais drinks. Retire ele das receitas antes de excluir o cadastro."
+            )
             
-            # Verifica se algo foi deletado de fato
-            if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Insumo não encontrado no banco.")
-                
-            conn.commit()
-            cur.close()
-            conn.close()
-            
-            return {"status": "sucesso", "mensagem": "Insumo apagado do catálogo geral!"}
-            
-        except Exception as e:
-            if conn: conn.rollback()
-            erro = str(e)
-            
-            # A MAGIA DO BANCO RELACIONAL: Se o item estiver numa receita, o Postgres bloqueia!
-            # Nós pegamos esse erro e avisamos o usuário de forma amigável.
-            if "violates foreign key constraint" in erro or "violates_foreign_key" in erro:
-                raise HTTPException(
-                    status_code=400, 
-                    detail="Operação bloqueada: Este insumo está sendo usado na ficha técnica de um ou mais drinks. Retire ele das receitas antes de excluir o cadastro."
-                )
-                
-            raise HTTPException(status_code=400, detail=erro)
+        raise HTTPException(status_code=400, detail=erro)
 
 
 # ==========================================
