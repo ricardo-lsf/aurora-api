@@ -584,16 +584,15 @@ def editar_insumo(ingredient_id: str, payload: EdicaoInsumo):
     try:
         cur = conn.cursor()
 
-        # 1. Tenta achar o ID do Tipo de Insumo
+# 1. Tenta achar o ID do Tipo de Insumo
         cur.execute("SELECT id FROM ingredient_types WHERE name = %s", (payload.type_name,))
         tipo_row = cur.fetchone()
         
         if not tipo_row:
-            # Se não existir, cria o tipo novo na hora e pega o ID dele
             cur.execute("INSERT INTO ingredient_types (name) VALUES (%s) RETURNING id", (payload.type_name,))
-            type_id = cur.fetchone()['id']
+            type_id = cur.fetchone()[0]  # <-- CORREÇÃO: Pegamos a posição 0 da resposta
         else:
-            type_id = tipo_row['id']
+            type_id = tipo_row[0]        # <-- CORREÇÃO: Pegamos a posição 0 da resposta
 
         # 2. Atualiza o Insumo de fato
         query = """
