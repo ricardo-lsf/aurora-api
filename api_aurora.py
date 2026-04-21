@@ -615,7 +615,30 @@ def editar_insumo(ingredient_id: str, payload: EdicaoInsumo):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-
+        
+# ==========================================
+# ROTA: LISTAR TIPOS DE INSUMOS
+# ==========================================
+@app.get("/ingredient-types/")
+def listar_tipos_insumos():
+    conn = get_db_connection()
+    if not conn: 
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        # Busca todos os tipos cadastrados no Postgres em ordem alfabética
+        cur.execute("SELECT id, name FROM ingredient_types ORDER BY name")
+        tipos = cur.fetchall()
+        cur.close()
+        conn.close()
+        
+        # Mapeia para uma lista de dicionários fáceis de ler no JS
+        return {"status": "sucesso", "dados": [dict(t) for t in tipos]}
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
 # NOSSA SÉTIMA ROTA: PAINEL DE ESTOQUE (INVENTORY)
