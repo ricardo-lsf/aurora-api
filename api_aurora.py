@@ -735,6 +735,69 @@ def registrar_venda(payload: NovaVenda):
         if conn: conn.rollback() # O ESCUDO DE PROTEÇÃO: Cancela toda a baixa de estoque se der erro
         raise HTTPException(status_code=400, detail=str(e))
 
+# 1. O Molde para o Estorno (vem lá do seu index.html)
+class EstornoVenda(BaseModel):
+    event_id: str
+    cocktail_id: str
+    user_name: Optional[str] = "Bartender"
+
+# ==========================================
+# ROTA MESTRA 2: ESTORNAR VENDA E DEVOLVER ESTOQUE
+# ==========================================
+@app.post("/sales/cancel")
+def estornar_venda(payload: EstornoVenda):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
+    try:
+        cur = conn.cursor()
+        
+        # PASSO 1: Achar o último "recibo" desse drink neste evento
+        query_find = """
+            SELECT id FROM sales 
+            WHERE event_id = %s AND cocktail_id = %s 
+            ORDER BY created_at DESC LIMIT 1
+        """
+        cur.execute(query_find, (payload.event_id, payload.cocktail_id))
+        venda = cur.fetchone()
+        
+        if not venda:
+            raise HTTPException(status_code=400, detail="Nenhuma venda encontrada para estornar.")
+            
+        venda_id = venda['id']
+        
+        # PASSO 2: Rasgar o recibo (Deletar a venda)
+        cur.execute("DELETE FROM sales WHERE id = %s", (venda_id,))
+        
+        # PASSO 3: Buscar a Ficha Técnica para saber o que devolver
+        query_receita = """
+            SELECT ci.ingredient_id, ci.quantity
+            FROM cocktails_ingredients ci
+            WHERE ci.cocktail_id = %s
+        """
+        cur.execute(query_receita, (payload.cocktail_id,))
+        ingredientes_receita = cur.fetchall()
+        
+        # PASSO 4: Devolver os insumos para as garrafas (Soma no estoque)
+        for ing in ingredientes_receita:
+            query_estorno = """
+                UPDATE ingredients 
+                SET current_stock = current_stock + %s 
+                WHERE id = %s
+            """
+            cur.execute(query_estorno, (ing['quantity'], ing['ingredient_id']))
+            
+        # O "Martelo do Juiz" (Confirma a devolução)
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Estorno realizado e insumos devolvidos ao estoque!"}
+        
+    except Exception as e:
+        if conn: conn.rollback() # Se der erro, cancela a devolução
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
 # NOSSA SÉTIMA ROTA: PAINEL DE ESTOQUE (INVENTORY)
