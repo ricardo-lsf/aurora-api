@@ -535,7 +535,7 @@ def zerar_estoque(ingredient_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
-# ROTA EXTRA 2: EXCLUIR INSUMO DO SISTEMA (PERIGO)
+# ROTA EXTRA 2: EXCLUIR INSUMO (SOFT DELETE)
 # ==========================================
 @app.delete("/ingredients/{ingredient_id}")
 def excluir_insumo_definitivo(ingredient_id: str):
@@ -546,11 +546,11 @@ def excluir_insumo_definitivo(ingredient_id: str):
     try:
         cur = conn.cursor()
         
-        # Tenta deletar a linha inteira da tabela
-        query = "DELETE FROM ingredients WHERE id = %s"
-        cur.execute(query, (ingredient_id,))
+        # O GOLPE DE MESTRE: Em vez de DELETE, nós fazemos um UPDATE
+        # O item some da tela, mas as compras dele continuam intactas no banco!
+        query_insumo = "UPDATE ingredients SET is_active = FALSE WHERE id = %s"
+        cur.execute(query_insumo, (ingredient_id,))
         
-        # Verifica se algo foi deletado de fato
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="Insumo não encontrado no banco.")
             
@@ -558,21 +558,11 @@ def excluir_insumo_definitivo(ingredient_id: str):
         cur.close()
         conn.close()
         
-        return {"status": "sucesso", "mensagem": "Insumo apagado do catálogo geral!"}
+        return {"status": "sucesso", "mensagem": "Insumo arquivado com sucesso! O histórico financeiro foi mantido."}
         
     except Exception as e:
         if conn: conn.rollback()
-        erro = str(e)
-        
-        # A MAGIA DO BANCO RELACIONAL: Se o item estiver numa receita, o Postgres bloqueia!
-        # Nós pegamos esse erro e avisamos o usuário de forma amigável.
-        if "violates foreign key constraint" in erro or "violates_foreign_key" in erro:
-            raise HTTPException(
-                status_code=400, 
-                detail="Operação bloqueada: Este insumo está sendo usado na ficha técnica de um ou mais drinks. Retire ele das receitas antes de excluir o cadastro."
-            )
-            
-        raise HTTPException(status_code=400, detail=erro)
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ==========================================
@@ -593,17 +583,18 @@ def relatorio_estoque(account_id: str):
             SELECT 
                 i.id,
                 i.name AS insumo,
-                i.brand AS marca,             -- CORREÇÃO: MARCA ADICIONADA!
+                i.brand AS marca,             
                 it.name AS tipo,  
                 i.current_stock AS estoque_ml_g,
                 i.measurement_unit AS unidade,
                 i.current_cost_price AS custo_ultima_embalagem,
-                i.package_quantity AS tamanho_embalagem,  -- CORREÇÃO: PRECISAMOS PARA DIVIDIR O PREÇO!
+                i.package_quantity AS tamanho_embalagem,  
                 ROUND((i.current_stock / NULLIF(i.package_quantity, 0)), 2) AS qtd_embalagens_estoque,
                 ROUND((i.current_stock / NULLIF(i.package_quantity, 0)) * i.current_cost_price, 2) AS dinheiro_parado
             FROM ingredients i
             LEFT JOIN ingredient_types it ON i.type_id = it.id
-            WHERE i.account_id = %s
+            -- A MÁGICA AQUI: Só trazemos os ativos!
+            WHERE i.account_id = %s AND i.is_active = TRUE
             ORDER BY it.name, i.name;
         """
         
