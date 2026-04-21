@@ -218,6 +218,14 @@ class NovoCocktail(BaseModel):
     image_url: Optional[str] = ""
     recipe: List[IngredienteReceita]
 
+class EdicaoInsumo(BaseModel):
+    name: str
+    brand: Optional[str] = ""
+    type_name: str
+    measurement_unit: str
+    package_quantity: float
+    current_cost_price: float
+
 
 # Função para conectar no banco local
 def get_db_connection():
@@ -559,6 +567,51 @@ def excluir_insumo_definitivo(ingredient_id: str):
         conn.close()
         
         return {"status": "sucesso", "mensagem": "Insumo arquivado com sucesso! O histórico financeiro foi mantido."}
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ==========================================
+# ROTA EXTRA 3: ATUALIZAR INSUMO EXISTENTE
+# ==========================================
+@app.put("/ingredients/{ingredient_id}")
+def editar_insumo(ingredient_id: str, payload: EdicaoInsumo):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
+    try:
+        cur = conn.cursor()
+
+        # 1. Tenta achar o ID do Tipo de Insumo
+        cur.execute("SELECT id FROM ingredient_types WHERE name = %s", (payload.type_name,))
+        tipo_row = cur.fetchone()
+        
+        if not tipo_row:
+            # Se não existir, cria o tipo novo na hora e pega o ID dele
+            cur.execute("INSERT INTO ingredient_types (name) VALUES (%s) RETURNING id", (payload.type_name,))
+            type_id = cur.fetchone()['id']
+        else:
+            type_id = tipo_row['id']
+
+        # 2. Atualiza o Insumo de fato
+        query = """
+            UPDATE ingredients
+            SET name = %s, brand = %s, type_id = %s, measurement_unit = %s,
+                package_quantity = %s, current_cost_price = %s
+            WHERE id = %s
+        """
+        cur.execute(query, (
+            payload.name, payload.brand, type_id, payload.measurement_unit,
+            payload.package_quantity, payload.current_cost_price, ingredient_id
+        ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {"status": "sucesso", "mensagem": "Insumo atualizado!"}
         
     except Exception as e:
         if conn: conn.rollback()
