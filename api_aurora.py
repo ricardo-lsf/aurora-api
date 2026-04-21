@@ -643,6 +643,99 @@ def listar_tipos_insumos():
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+from pydantic import BaseModel
+from typing import Optional
+
+# 1. O Molde do que o seu PDV (index.html) vai enviar para a API
+class NovaVenda(BaseModel):
+    event_id: str
+    cocktail_id: str
+    price: float  # Se for Open Bar, o PDV vai mandar 0.00. Se for Cash Bar, manda o valor pago.
+    user_name: Optional[str] = "Bartender"
+
+# ==========================================
+# ROTA MESTRA: REGISTRAR VENDA (PDV)
+# ==========================================
+@app.post("/sales/")
+def registrar_venda(payload: NovaVenda):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
+    try:
+        cur = conn.cursor()
+        
+        # O banco inicia uma transação invisível aqui. Se algo der erro, nada é salvo.
+
+        # PASSO 1: Buscar a Ficha Técnica e os custos atuais no estoque
+        query_receita = """
+            SELECT 
+                ci.ingredient_id, 
+                ci.quantity AS qtd_necessaria,
+                i.current_stock,
+                i.current_cost_price,
+                i.package_quantity
+            FROM cocktails_ingredients ci
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE ci.cocktail_id = %s AND i.is_active = TRUE
+        """
+        cur.execute(query_receita, (payload.cocktail_id,))
+        ingredientes_receita = cur.fetchall()
+
+        if not ingredientes_receita:
+            raise HTTPException(status_code=400, detail="Ficha técnica vazia ou insumos inativos.")
+
+        custo_total_drink = 0.0
+
+        # PASSO 2: Loop da Baixa de Estoque e Cálculo do Frozen Cost
+        for ing in ingredientes_receita:
+            # Segurança contra divisão por zero (caso alguém cadastre uma garrafa com 0ml)
+            tamanho_emb = float(ing['package_quantity']) if ing['package_quantity'] else 1.0
+            
+            # Matemática financeira: (Preço da Garrafa / Tamanho da Garrafa) * Quantidade Usada
+            custo_por_unidade = float(ing['current_cost_price']) / tamanho_emb
+            custo_ingrediente = custo_por_unidade * float(ing['qtd_necessaria'])
+            
+            custo_total_drink += custo_ingrediente
+
+            # Executa a baixa do estoque (A Cascata)
+            novo_estoque = float(ing['current_stock']) - float(ing['qtd_necessaria'])
+            query_baixa = "UPDATE ingredients SET current_stock = %s WHERE id = %s"
+            cur.execute(query_baixa, (novo_estoque, ing['ingredient_id']))
+
+        # PASSO 3: Salvar a Venda com o Lucro Blindado
+        query_venda = """
+            INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+        """
+        cur.execute(query_venda, (
+            payload.event_id, 
+            payload.cocktail_id, 
+            payload.price, 
+            custo_total_drink, 
+            payload.user_name
+        ))
+        
+        venda_id = cur.fetchone()['id']
+
+        # PASSO 4: O "Martelo do Juiz" (Confirma todas as alterações de uma vez)
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {
+            "status": "sucesso", 
+            "mensagem": "Venda confirmada!", 
+            "venda_id": str(venda_id),
+            "frozen_cost": round(custo_total_drink, 2)
+        }
+
+    except Exception as e:
+        if conn: conn.rollback() # O ESCUDO DE PROTEÇÃO: Cancela toda a baixa de estoque se der erro
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ==========================================
 # NOSSA SÉTIMA ROTA: PAINEL DE ESTOQUE (INVENTORY)
 # ==========================================
