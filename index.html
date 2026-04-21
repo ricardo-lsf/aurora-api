@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aurora App V20 (Estorno Automático)</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding-bottom: 40px; }
+
+        /* LOGIN */
+        #login-overlay { position: fixed; inset: 0; background: radial-gradient(circle at center, #222 0%, #000 100%); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        .login-box { width: 100%; max-width: 320px; text-align: center; }
+        .login-input { background: #222; border: 1px solid #444; color: white; padding: 15px; border-radius: 8px; width: 100%; font-size: 1.3rem; text-align: center; margin-bottom: 15px; outline: none; transition: 0.3s; }
+        .login-input:focus { border-color: #2ecc71; background: #2a2a2a; }
+        .login-btn { background: #2ecc71; color: #000; width: 100%; padding: 15px; border-radius: 8px; font-weight: 800; font-size: 1.1rem; border: none; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3); }
+        .error-msg { color: #e74c3c; margin-top: 15px; display: none; font-weight: bold; background: rgba(231, 76, 60, 0.1); padding: 10px; border-radius: 6px; }
+        #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 98; color:#2ecc71; flex-direction: column; }
+
+        /* HEADER */
+        header { background: rgba(30,30,30,0.95); position: sticky; top: 0; z-index: 100; padding: 12px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        h1 { margin: 0; font-size: 1.1rem; color: #2ecc71; font-weight: 800; }
+        .user-badge { font-size: 0.8rem; background: #333; padding: 4px 10px; border-radius: 20px; color: #fff; border: 1px solid #444; }
+        .event-bar { text-align: center; padding: 8px; background: #1e1e1e; margin-bottom: 15px; border-bottom: 1px solid #222; font-size: 0.9rem; color: #888; }
+
+        /* GRID */
+        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 12px; }
+        @media (min-width: 600px) { .grid-container { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); } }
+        
+        .drink-card { background: #252525; border-radius: 12px; overflow: hidden; border: 1px solid #333; position: relative; transition: 0.2s; display: flex; flex-direction: column; }
+        .drink-card.stock-low { border: 1px solid #e67e22; box-shadow: inset 0 0 10px rgba(230, 126, 34, 0.1); }
+        .drink-card.stock-out { border: 1px solid #c0392b; opacity: 0.6; filter: grayscale(0.8); }
+        .sold-out-overlay { position: absolute; top: 35%; left: 0; width: 100%; background: rgba(192, 57, 43, 0.9); color: white; text-align: center; padding: 5px; font-weight: bold; transform: rotate(-5deg); z-index: 10; display: none; pointer-events: none; }
+        .drink-card.stock-out .sold-out-overlay { display: block; }
+
+        .img-wrapper { position: relative; width: 100%; height: 110px; cursor: pointer; }
+        .drink-img { width: 100%; height: 100%; object-fit: cover; border-bottom: 1px solid #333; }
+        .info-icon { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.8em; border: 1px solid rgba(255,255,255,0.3); z-index: 5; pointer-events: none; }
+
+        .card-body { padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .drink-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; color: #fff; line-height: 1.2; height: 34px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .price-tag { color: #f1c40f; font-weight: 700; font-size: 0.9rem; }
+        .stock-badge { font-size: 0.7rem; color: #bbb; background: #333; padding: 2px 6px; border-radius: 4px; border: 1px solid #444; }
+        
+        .controls { display: flex; align-items: center; justify-content: space-between; background: #1a1a1a; padding: 4px; border-radius: 25px; border: 1px solid #333; }
+        .btn-circle { width: 32px; height: 32px; border-radius: 50%; border: none; color: white; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .btn-add { background: #27ae60; } .btn-remove { background: #c0392b; }
+        .drink-count { font-size: 1.1rem; font-weight: 700; color: #fff; min-width: 20px; text-align: center; }
+        button:disabled { background: #444 !important; opacity: 0.3; cursor: not-allowed; }
+
+        /* MODAL RECEITA */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: flex-end; z-index: 2000; backdrop-filter: blur(5px); }
+        .modal-content { background: #1e1e1e; width: 100%; max-width: 500px; height: 85vh; border-radius: 20px 20px 0 0; padding: 20px; overflow-y: auto; position: relative; animation: slideUp 0.3s; border-top: 1px solid #333; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .close-modal { position: absolute; top: 15px; right: 15px; background: #333; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 1.5em; cursor: pointer; z-index: 10; }
+        .rec-img { width: 100%; height: 200px; object-fit: cover; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .rec-title { font-size: 1.5em; font-weight: 800; color: #2ecc71; margin: 0 0 5px 0; }
+        .rec-badge { background: #3498db; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.8em; text-transform: uppercase; display: inline-block; margin-bottom: 15px; letter-spacing: 1px; font-weight: bold; }
+        .rec-section { margin-bottom: 20px; background: #252525; padding: 15px; border-radius: 8px; border: 1px solid #333; }
+        .rec-section h4 { margin: 0 0 10px 0; color: #888; border-bottom: 1px solid #444; padding-bottom: 5px; font-size: 0.9em; letter-spacing: 1px; text-transform: uppercase; }
+        .rec-text { color: #ddd; line-height: 1.6; font-size: 1em; white-space: pre-wrap; }
+        .rec-list { list-style: none; padding: 0; margin: 0; }
+        .rec-list li { padding: 8px 0; border-bottom: 1px solid #333; color: #ccc; font-size: 0.95em; display: flex; justify-content: space-between; }
+        .rec-list li span { color: #fff; font-weight: bold; }
+
+        /* DASHBOARD */
+        .dashboard { padding: 20px 12px; display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 700px) { .dashboard { grid-template-columns: 2fr 1fr; } } 
+        
+        .panel { background: #1e1e1e; padding: 15px; border-radius: 12px; border: 1px solid #333; }
+        .chart-wrapper { position: relative; height: 300px; width: 100%; margin-top:15px; }
+        .total-display { font-size: 1.6rem; font-weight: 800; color: #fff; }
+        .export-btn { background: #27ae60; width: 100%; padding: 12px; border-radius: 8px; color: white; border: none; font-weight: bold; margin-top: 15px; font-size: 1rem; }
+        
+        /* HISTÓRICO */
+        #log-list { max-height: 300px; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+        #log-list li { 
+            padding: 8px 0; 
+            border-bottom: 1px solid #2a2a2a; 
+            font-size: 0.85rem; 
+            color: #ccc; 
+            display: grid; 
+            grid-template-columns: 50px 1fr 30px; 
+            align-items: center; 
+        }
+        .log-time { color:#666; font-size:0.8em; }
+        .log-user { color:#3498db; font-weight:bold; margin-right:5px; }
+        
+        #evento-fechado-msg { background: #c0392b; color: white; text-align: center; padding: 12px; position: fixed; bottom: 0; width: 100%; z-index: 90; display: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <div style="font-size:3rem; margin-bottom:10px;">🍸</div>
+            <h2 style="color:#fff; margin:0 0 5px 0;">Aurora App</h2>
+            <p style="color:#777; margin:0 0 30px 0;">Equipe</p>
+            <input type="tel" id="loginPhone" class="login-input" placeholder="(DDD) 9xxxx-xxxx" onkeyup="mascaraTelefone(this)">
+            <button onclick="fazerLogin()" class="login-btn">ENTRAR</button>
+            <p id="login-error" class="error-msg">Número não encontrado!</p>
+        </div>
+    </div>
+
+    <div id="event-selection-overlay" style="display: none; position: fixed; inset: 0; background: radial-gradient(circle at center, #222 0%, #000 100%); z-index: 9998; flex-direction: column; justify-content: center; align-items: center; padding: 20px;">
+        <div class="login-box">
+            <div style="font-size:3rem; margin-bottom:10px;">📅</div>
+            <h2 style="color:#fff; margin-bottom: 20px;">Selecione o Evento</h2>
+            
+            <div id="lista-eventos-ativos" style="width: 100%; display: flex; flex-direction: column; gap: 15px;">
+                <p style="color: #777;">Buscando festas...</p>
+            </div>
+            
+        </div>
+    </div>
+
+    <div id="loading"><h3>Conectando...</h3></div>
+    <div id="evento-fechado-msg">🚫 EVENTO ENCERRADO</div>
+
+    <header>
+        <h1>Aurora App</h1>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="user-badge" id="user-display">...</div>
+            <button onclick="sairDoEvento()" style="background: #e74c3c; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">🔄 Trocar</button>
+        </div>
+    </header>
+
+    <div class="event-bar"><span class="event-name" id="nome-evento">...</span></div>
+    
+    <div class="grid-container" id="grid"></div>
+
+    <div class="dashboard">
+        <div class="panel">
+            <h3>PERFORMANCE</h3>
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+                <div><div class="total-display" id="total-count">0</div><small style="color:#666">Drinks</small></div>
+                <div style="text-align:right;"><div class="total-display" id="total-valor" style="color:#f1c40f;">R$ 0</div><small style="color:#666">Vendas</small></div>
+            </div>
+            <div class="chart-wrapper"><canvas id="chart"></canvas></div>
+            <button onclick="window.exportarCSV()" class="export-btn">Baixar Relatório</button>
+        </div>
+        <div class="panel"><h3>HISTÓRICO</h3><ul id="log-list"></ul></div>
+    </div>
+
+    <div id="modalReceita" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-modal" onclick="document.getElementById('modalReceita').style.display='none'">×</span>
+            <img id="recImg" class="rec-img" src="">
+            <h2 id="recNome" class="rec-title"></h2>
+            <div id="recTecnica" class="rec-badge"></div>
+            <div class="rec-section"><h4>Ingredientes</h4><ul id="recIngredientes" class="rec-list"></ul></div>
+            <div class="rec-section"><h4>Modo de Preparo</h4><p id="recTexto" class="rec-text"></p></div>
+        </div>
+    </div>
+
+    <div id="status-conexao" style="position: fixed; bottom: 20px; right: 20px; background: #fff; padding: 8px 15px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; font-family: sans-serif; font-size: 13px; z-index: 9999; border: 1px solid #eee; transition: all 0.3s ease;">
+        <div id="bolinha-status" style="width: 12px; height: 12px; border-radius: 50%; background-color: #2ecc71; box-shadow: 0 0 5px #2ecc71;"></div>
+        <span id="texto-status" style="color: #27ae60; font-weight: bold;">Online</span>
+    </div>
+
+    <script type="module">
+        // --- FUNÇÃO PARA FORMATAR O TELEFONE NA TELA DE LOGIN ---
+        window.mascaraTelefone = (input) => {
+            let v = input.value.replace(/\D/g,"");
+            v = v.replace(/^(\d{2})(\d)/g,"($1) $2");
+            v = v.replace(/(\d)(\d{4})$/,"$1-$2");
+            input.value = v;
+        };
+
+        // VARIÁVEIS GLOBAIS
+        let eventoID=null, eventoStatus="aberto", usuarioAtual=localStorage.getItem('aurora_user_name'), drinks=[], counts={}, localLogs=[], chart=null, ultimoReset=localStorage.getItem('last_reset_signal');
+        
+        // 👇 SUA NOVA BÚSSOLA DO BANCO DE DADOS 👇
+        // Quando criar um evento novo no banco, basta colar o ID novo aqui e o app inteiro vai obedecer!
+        let ID_FESTA_POSTGRES = "5fdc435e-2c08-4937-81f0-efdd07634bfe";
+
+        // ✅ COMO VAI FICAR AGORA:
+        if(usuarioAtual) { 
+            // 1. Esconde a tela de login
+            document.getElementById('login-overlay').style.display = 'none'; 
+            
+            // 2. Bota o nome do bartender lá no topo
+            document.getElementById('user-display').innerText = usuarioAtual.split(' ')[0]; 
+            
+            // 3. 👉 O GATILHO: Chama a nossa nova Recepção VIP!
+            buscarEventosAtivos(); 
+        }
+
+        // --- MOTOR DE LOGIN: VERIFICA NO POSTGRESQL ---
+        window.fazerLogin = async () => {
+            // A CORREÇÃO: Usando o ID correto do HTML (loginPhone)
+            const telInput = document.getElementById("loginPhone"); 
+            const tel = telInput.value.replace(/\D/g, ''); 
+            
+            if (tel.length < 10) {
+                alert("Por favor, digite um telefone válido com DDD.");
+                return;
+            }
+
+            // Mostra pro usuário que está pensando...
+            const btn = document.querySelector(".login-btn");
+            const textoOriginal = btn.innerText;
+            btn.innerText = "Verificando...";
+
+            try {
+                // Bate na porta da nossa API em Python!
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/login/${tel}`);
+                
+                if (!resposta.ok) {
+                    throw new Error("Telefone não autorizado ou inativo.");
+                }
+
+                const dados = await resposta.json();
+                
+                if (dados.status === "sucesso") {
+                    const usuario = dados.usuario;
+                    
+                    // Salva o nome (ex: Ricardo) na variável mestra e na memória do celular
+                    usuarioAtual = usuario.name;
+                    localStorage.setItem('usuarioLogado', usuarioAtual);
+                    localStorage.setItem('usuarioRole', usuario.role); // Guardamos o cargo pro futuro (painel admin!)
+                    
+                    // Atualiza a interface
+                    document.getElementById('user-display').innerText = "👤 " + usuarioAtual;
+                    document.getElementById('login-overlay').style.display = 'none'; // <-- NOME CORRIGIDO!
+                    
+                    // Puxa o calendário (Recepção VIP)!
+                    buscarEventosAtivos();
+                }
+            } catch (erro) {
+                console.error("Erro no login:", erro);
+                alert("Acesso negado: " + erro.message);
+            } finally {
+                // Volta o botão ao normal
+                btn.innerText = textoOriginal;
+            }
+        };
+
+        
+        // --- RADAR DE EVENTOS (SUBSTITUI O ONSNAPSHOT DO FIREBASE) ---
+        let intervaloMonitoramento;
+
+        function monitorarEvento(idPostgres) {
+            // Limpa o radar antigo se houver
+            if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
+
+            // Cria um radar que pergunta o status da festa a cada 30 segundos
+            intervaloMonitoramento = setInterval(async () => {
+                try {
+                    const res = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idPostgres}/status`);
+                    const dados = await res.json();
+
+                    if (dados.status === "sucesso") {
+                        eventoStatus = dados.evento.status || 'aberto';
+                        const ban = document.getElementById('evento-fechado-msg'); 
+                        const btns = document.querySelectorAll('.btn-circle');
+                        
+                        if (eventoStatus === 'fechado') { 
+                            ban.style.display = 'block'; 
+                            btns.forEach(b => b.disabled = true); 
+                        } else { 
+                            ban.style.display = 'none'; 
+                            btns.forEach(b => b.disabled = false); 
+                        }
+                    }
+                } catch (e) {
+                    console.log("Radar de evento sem conexão no momento...");
+                }
+            }, 30000); // 30.000 ms = 30 segundos
+        }
+
+        // --- MOTOR DE RECEPÇÃO: BUSCAR FESTAS ABERTAS ---
+        // Alterado para 'async function' para o navegador carregar primeiro!
+        async function buscarEventosAtivos() {
+            document.getElementById('loading').style.display = 'flex';
+            
+            try {
+                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/events/active');
+                const dadosApi = await resposta.json();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (dadosApi.status === "sucesso" && dadosApi.dados.length > 0) {
+                    const lista = document.getElementById('lista-eventos-ativos');
+                    lista.innerHTML = ''; 
+                    
+                    dadosApi.dados.forEach(evento => {
+                        const btn = document.createElement('button');
+                        btn.className = 'login-btn'; 
+                        btn.style.fontSize = '1rem';
+                        btn.innerText = evento.event_name; 
+                        
+                        btn.onclick = () => entrarNaFesta(evento.id, evento.event_name);
+                        
+                        lista.appendChild(btn);
+                    });
+                    
+                    document.getElementById('event-selection-overlay').style.display = 'flex';
+                } else {
+                    document.getElementById('lista-eventos-ativos').innerHTML = '<p style="color:#e74c3c; font-weight:bold;">Nenhum evento aberto no momento.</p>';
+                    document.getElementById('event-selection-overlay').style.display = 'flex';
+                }
+            } catch (e) {
+                console.error("Erro ao buscar eventos:", e);
+                document.getElementById('loading').style.display = 'none';
+                alert("Erro de conexão com o servidor de festas.");
+            }
+        } // <-- Fechamento limpo sem ponto e vírgula
+
+        // --- MOTOR DE ENTRADA: CONFIGURAR O APP PARA A FESTA ESCOLHIDA ---
+        function entrarNaFesta(idPostgres, nomeEvento) {
+            // 1. Esconde a tela de recepção
+            document.getElementById('event-selection-overlay').style.display = 'none';
+            
+            // 2. Alimenta a Variável Mestra Nova e a Antiga (para destravar o botão!)
+            ID_FESTA_POSTGRES = idPostgres;
+            eventoID = idPostgres; 
+            
+            // 3. Coloca o nome da festa lá no topo
+            document.getElementById('nome-evento').innerText = nomeEvento;
+            
+            // 4. Recupera a contagem de cliques do celular (caso o bartender dê F5 sem querer)
+            const c = localStorage.getItem('counts_ev_' + idPostgres); 
+            counts = c ? JSON.parse(c) : {};
+            
+            // 5. Manda buscar o cardápio no banco
+            carregarDrinks(idPostgres); 
+            monitorarEvento(idPostgres);
+        }
+
+        // --- MOTOR DE SAÍDA: TROCAR DE FESTA ---
+        window.sairDoEvento = () => {
+            // 1. Limpa a "Variável Mestra"
+            ID_FESTA_POSTGRES = null;
+            eventoID = null;
+            
+            // 2. Limpa a tela de fundo para o bartender não achar que ainda está na festa antiga
+            document.getElementById('nome-evento').innerText = "Aguardando...";
+            document.getElementById('grid').innerHTML = '';
+            document.getElementById('total-count').innerText = "0";
+            document.getElementById('total-valor').innerText = "R$ 0.00";
+            
+            // 3. Puxa a Recepção VIP de volta para a tela!
+            buscarEventosAtivos();
+        };
+
+
+        // --- FUNÇÃO MUDAR (ATUALIZADA COM BAIXA DE ESTOQUE) ---
+        // --- NOVO MOTOR DE VENDAS E ESTORNOS (POSTGRESQL + API PYTHON) ---
+        window.mudar = async (id, q) => {
+            if (!eventoID || eventoStatus === 'fechado') return;
+            const d = drinks.find(x => x.id === id);
+            if (!d) return;
+
+            if (q > 0 && d.estoque <= 0) return navigator.vibrate(200); 
+            if (q < 0 && (!counts[id] || counts[id] <= 0)) return;
+
+            // Atualiza a tela imediatamente (sensação de rapidez pro bartender)
+            if (!counts[id]) counts[id] = 0;
+            counts[id] += q;
+            localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+            
+            renderizar();
+            if (q > 0) navigator.vibrate(50);
+            
+            try {
+                if (q > 0) {
+                    // VENDA (+1): Chama a Rota Mestra que criamos no Python
+                    const payloadVenda = {
+                        event_id: ID_FESTA_POSTGRES,
+                        cocktail_id: id,
+                        price: d.precoVenda || 0.00, // Se for Open Bar, manda 0 ou o preço do drink
+                        user_name: usuarioAtual
+                    };
+
+                    const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/`, { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadVenda)
+                    });
+                    
+                    if (!resposta.ok) throw new Error("Erro ao registrar a venda.");
+                    
+                    // Adiciona no histórico de log da tela
+                    adicionarLog(d.nome, 1);
+
+                } else {
+                    // ESTORNO (-1): Chama a Rota de Cancelamento
+                    const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/cancel`, { 
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            event_id: ID_FESTA_POSTGRES,
+                            cocktail_id: id,
+                            user_name: usuarioAtual
+                        })
+                    });
+                    
+                    if (!resposta.ok) throw new Error("Erro ao registrar o estorno.");
+                    
+                    // Adiciona no histórico de log da tela
+                    adicionarLog(d.nome, -1);
+                }
+            } catch (e) {
+                console.error("Erro na API:", e);
+                // Se der erro de internet, desfaz a contagem na tela
+                counts[id] -= q;
+                localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                renderizar();
+                alert("Erro de conexão. A venda não foi registrada no sistema.");
+            }
+        };
+
+// --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL VIA API PYTHON---
+async function carregarDrinks(id_firebase) {
+    try {
+        console.log(`Buscando cardápio no banco relacional...`);
+        
+        // Usando a Variável Mestra para buscar os drinks da festa certa!
+        const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${ID_FESTA_POSTGRES}/menu`);
+        const dadosApi = await resposta.json();
+        
+        if (dadosApi.status === "sucesso") {
+            drinks = [];
+            dadosApi.dados.forEach(item => {
+                drinks.push({
+                    id: item.id,
+                    nome: item.drink_nome,
+                    precoVenda: item.preco_venda,
+                    estoque: 999, 
+                    imagem: item.image_url || "./imagens/moscow.jpg" 
+                });
+            });
+            renderizar();
+        }
+    } catch (erro) {
+        console.error("Erro ao buscar cardápio:", erro);
+    }
+}
+
+// --- FUNÇÃO QUE DESENHA OS DRINKS NA TELA (Sua original) ---
+		function renderizar(){
+			const g=document.getElementById('grid'); g.innerHTML='';
+			drinks.forEach(d=>{
+				if(!counts[d.id])counts[d.id]=0;
+				const p=d.precoVenda||d.VlCusto||0; const sold=d.estoque<=0; const low=d.estoque<10&&!sold;
+				let cls='drink-card'; if(low)cls+=' stock-low'; if(sold)cls+=' stock-out';
+				
+				const clickAction = `onclick="verReceita('${d.id}')"`;
+
+				g.innerHTML+=`
+				<div class="${cls}">
+					<div class="sold-out-overlay">ESGOTADO</div>
+					<div class="img-wrapper" ${clickAction}>
+						<div class="info-icon">i</div>
+						<img src="${d.imagem||''}" class="drink-img" onerror="this.style.opacity=0.3">
+					</div>
+					<div class="card-body">
+						<div class="drink-name">${d.nome}</div>
+						<div class="info-row"><span class="price-tag">R$ ${parseFloat(p).toFixed(2)}</span><span class="stock-badge">${d.estoque} un</span></div>
+						<div class="controls"><button class="btn-circle btn-remove" onclick="mudar('${d.id}',-1)" ${eventoStatus==='fechado'?'disabled':''}>-</button><span class="drink-count">${counts[d.id]}</span><button class="btn-circle btn-add" onclick="mudar('${d.id}',1)" ${eventoStatus==='fechado'||sold?'disabled':''}>+</button></div>
+					</div>
+				</div>`;
+			});
+			atualizarTotais();
+}
+
+ // --- FUNÇÃO DE RECEITA (VERSÃO NOVA: POSTGRESQL + API RENDER) ---
+// --- FUNÇÃO DE RECEITA (VERSÃO BLINDADA) ---
+    window.verReceita = async (drinkId) => {
+    if(!drinkId) return;
+    
+    try {
+        // 1. Carrega foto e nome direto da memória da tela
+        const drinkAtual = drinks.find(d => d.id === drinkId);
+        document.getElementById('recImg').src = drinkAtual ? drinkAtual.imagem : '';
+        document.getElementById('recNome').innerText = drinkAtual ? drinkAtual.nome : 'Sem nome';
+        
+        console.log(`Buscando receita do drink ${drinkId}...`);
+        
+        // 2. Busca na API
+        const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/cocktails/${drinkId}/recipe`);
+        const dadosApi = await resposta.json();
+        
+        // Proteção: Se a API deu erro 400/500 (ex: nome de coluna errada no banco)
+        if (!resposta.ok) {
+            console.error("Erro retornado pelo banco:", dadosApi.detail);
+            alert(`Erro no banco de dados: ${dadosApi.detail}`);
+            return; // Para a execução aqui para não quebrar a tela!
+        }
+
+        const lista = document.getElementById('recIngredientes');
+        lista.innerHTML = '';
+
+        // 3. Monta os dados na tela
+        if (dadosApi.status === "sucesso") {
+            
+            // Ingredientes
+            if (dadosApi.ingredientes && dadosApi.ingredientes.length > 0) {
+                dadosApi.ingredientes.forEach(item => {
+                    const qtdDisplay = `${item.quantidade} ${item.unidade}`;
+                    lista.innerHTML += `<li><span>${item.ingrediente}</span> ${qtdDisplay}</li>`;
+                });
+            } else { 
+                lista.innerHTML = '<li>Sem ingredientes cadastrados na ficha técnica.</li>'; 
+            }
+
+            // Textos do Drink
+            const info = dadosApi.drink;
+            // ATENÇÃO: Se os nomes das colunas no banco forem diferentes, troque o 'technique' e 'description' abaixo
+            document.getElementById('recTecnica').innerText = info && info.technique ? info.technique : 'Técnica Padrão';
+            document.getElementById('recTexto').innerText = info && info.description ? info.description : 'Modo de preparo não informado.';
+            
+        } else {
+            lista.innerHTML = '<li>Erro ao carregar dados.</li>';
+        }
+        
+        // 4. Mostra o modal
+        document.getElementById('modalReceita').style.display = 'flex';
+        
+    } catch(e) { 
+        console.error("Erro crítico ao buscar ficha técnica:", e); 
+        alert("Erro de conexão com o servidor. Veja o console (F12).");
+    }
+};
+
+        // GRÁFICO
+        function atualizarTotais(){
+            let tQ=0, tV=0; drinks.forEach(d=>{const q=counts[d.id]||0; tQ+=q; tV+=q*parseFloat(d.precoVenda||d.VlCusto||0);});
+            document.getElementById('total-count').innerText=tQ; document.getElementById('total-valor').innerText='R$ '+tV.toFixed(2);
+            const ctx=document.getElementById('chart').getContext('2d'); if(chart)chart.destroy();
+            
+            const act=drinks.filter(d=>(counts[d.id]||0)>0);
+            const labels = act.map(d => d.nome.length > 10 ? d.nome.substring(0,10)+'...' : d.nome);
+
+            chart=new Chart(ctx,{
+                type:'bar',
+                data:{
+                    labels: labels,
+                    datasets:[
+                        {label:'Qtd', data:act.map(d=>counts[d.id]), backgroundColor:'#2ecc71', yAxisID:'y'},
+                        {label:'Valor', data:act.map(d=>counts[d.id]*(d.precoVenda||0)), backgroundColor:'#f1c40f', yAxisID:'y1'}
+                    ]
+                },
+                options:{
+                    responsive:true, maintainAspectRatio:false,
+                    plugins:{legend:{display:false}},
+                    scales:{
+                        x:{ticks:{color:'#888',font:{size:10}, autoSkip:false, maxRotation:90}, grid:{display:false}},
+                        y:{type:'linear',position:'left',ticks:{color:'#2ecc71'},grid:{color:'#333'}},
+                        y1:{type:'linear',position:'right',ticks:{color:'#f1c40f'},grid:{display:false}}
+                    }
+                }
+            });
+        }
+
+        function adicionarLog(n,q){const i={n,q,h:new Date().toLocaleTimeString().substring(0,5),u:usuarioAtual};localLogs.unshift(i);if(localLogs.length>30)localLogs.pop();localStorage.setItem('logs_ev_'+eventoID,JSON.stringify(localLogs));renderLog(i,true);}
+        function carregarLogsAntigos(){document.getElementById('log-list').innerHTML='';const s=localStorage.getItem('logs_ev_'+eventoID);if(s){localLogs=JSON.parse(s);localLogs.forEach(i=>renderLog(i,false));}}
+        
+        function renderLog(i,pre){
+            const li=document.createElement('li');
+            li.innerHTML=`<span class="log-time">${i.h}</span> <span class="log-msg"><span class="log-user">${i.u.split(' ')[0]}:</span> ${i.n}</span> <b style="color:${i.q>0?'#2ecc71':'#c0392b'}">${i.q>0?'+1':'-1'}</b>`;
+            const l=document.getElementById('log-list');
+            if(pre)l.prepend(li);else l.appendChild(li);
+        }
+        
+        window.exportarCSV=()=>{let c=`Evento: ${document.getElementById('nome-evento').innerText}\nBartender: ${usuarioAtual}\nData: ${new Date().toLocaleDateString()}\n\nBebida,Qtd,Total\n`;drinks.forEach(d=>{if(counts[d.id]>0)c+=`${d.nome},${counts[d.id]},${(counts[d.id]*parseFloat(d.precoVenda||0)).toFixed(2)}\n`;});c+=`\nTOTAL,,${document.getElementById('total-valor').innerText}`;const l=document.createElement("a");l.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8;'}));l.download=`fechamento_${usuarioAtual}.csv`;l.click();};
+        if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+// Monitoramento de Conexão Online/Offline
+function atualizarStatusConexao() {
+    const bolinha = document.getElementById('bolinha-status');
+    const texto = document.getElementById('texto-status');
+    
+    // Trava de segurança caso o HTML ainda não tenha carregado
+    if (!bolinha || !texto) return; 
+
+    if (navigator.onLine) {
+        bolinha.style.backgroundColor = '#2ecc71'; // Verde
+        bolinha.style.boxShadow = '0 0 5px #2ecc71';
+        texto.innerText = 'Online';
+        texto.style.color = '#27ae60';
+    } else {
+        bolinha.style.backgroundColor = '#e74c3c'; // Vermelho
+        bolinha.style.boxShadow = '0 0 5px #e74c3c';
+        texto.innerText = 'Offline (Salvo no Aparelho)';
+        texto.style.color = '#c0392b';
+    }
+}
+
+    // Inicia os monitores de rede
+    window.addEventListener('load', atualizarStatusConexao);
+    window.addEventListener('online', atualizarStatusConexao);
+    window.addEventListener('offline', atualizarStatusConexao);
+
+
+// if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+    // --- CÓDIGO NUCLEAR: EXTERMINADOR DE SERVICE WORKERS ANTIGOS ---
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                    console.log("💀 Fantasma do Service Worker antigo foi eliminado!");
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
