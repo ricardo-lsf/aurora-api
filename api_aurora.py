@@ -8,6 +8,7 @@ from typing import Optional, List
 from datetime import date, time
 from typing import Optional
 
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Aurora Bartenders API")
 
@@ -615,9 +616,9 @@ def editar_insumo(ingredient_id: str, payload: EdicaoInsumo):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-        
+
 # ==========================================
-# ROTA: LISTAR TIPOS DE INSUMOS
+# ROTA: LISTAR TIPOS DE INSUMOS (CORRIGIDA)
 # ==========================================
 @app.get("/ingredient-types/")
 def listar_tipos_insumos():
@@ -627,14 +628,16 @@ def listar_tipos_insumos():
     
     try:
         cur = conn.cursor()
-        # Busca todos os tipos cadastrados no Postgres em ordem alfabética
         cur.execute("SELECT id, name FROM ingredient_types ORDER BY name")
         tipos = cur.fetchall()
         cur.close()
         conn.close()
         
-        # Mapeia para uma lista de dicionários fáceis de ler no JS
-        return {"status": "sucesso", "dados": [dict(t) for t in tipos]}
+        # A CORREÇÃO: Pegamos as posições exatas da tupla [0] e [1]
+        # e montamos o formato bonitinho que o Javascript consegue ler
+        dados_formatados = [{"id": str(t[0]), "name": t[1]} for t in tipos]
+        
+        return {"status": "sucesso", "dados": dados_formatados}
         
     except Exception as e:
         if conn: conn.rollback()
