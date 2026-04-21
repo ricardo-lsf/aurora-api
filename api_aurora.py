@@ -998,9 +998,9 @@ def listar_todos_drinks(account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
         
 # ==========================================
-# ROTA: LISTAR EVENTOS ATIVOS (BLINDADA)
+# ROTA: LISTAR EVENTOS ATIVOS (COM NOVA ESTRUTURA)
 # ==========================================
-@app.get("/events/active")
+@app.get("/eventos-ativos")
 def listar_eventos_ativos():
     conn = get_db_connection()
     if not conn:
@@ -1008,7 +1008,8 @@ def listar_eventos_ativos():
 
     try:
         cur = conn.cursor()
-        # Busca o ID e o Nome dos eventos
+        # A MÁGICA AQUI: Traz as festas que estão com status 'aberto' 
+        # (mesmo que o is_active esteja false, pois o status é o que rege o PDV)
         cur.execute("SELECT id, name FROM events WHERE status = 'aberto' OR status IS NULL")
         eventos = cur.fetchall()
         cur.close()
@@ -1016,7 +1017,7 @@ def listar_eventos_ativos():
 
         dados_formatados = []
         for e in eventos:
-            # O Python decide na hora como ler: se for dicionário lê pelo nome, se for tupla lê pela posição.
+            # Lendo exatamente a coluna 'name' (posição 1) que vimos na sua estrutura
             if isinstance(e, dict):
                 dados_formatados.append({"id": str(e['id']), "event_name": str(e['name'])})
             else:
@@ -1026,8 +1027,7 @@ def listar_eventos_ativos():
 
     except Exception as e:
         if conn: conn.rollback()
-        # 🔥 ESSA LINHA É A NOSSA LUPA: Ela grita o erro real no console do Render
-        print(f"🔥 ERRO FATAL NA ROTA /events/active: {str(e)}") 
+        print(f"🔥 ERRO FATAL NA ROTA /eventos-ativos: {str(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
