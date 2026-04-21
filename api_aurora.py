@@ -1178,38 +1178,38 @@ def registrar_estorno(event_id: str, cocktail_id: str):
 # ==========================================
 # NOSSA DÉCIMA QUARTA ROTA: BUSCAR EVENTOS ATIVOS (PREPARADO PARA MÚLTIPLOS EVENTOS)
 # ==========================================
+# ==========================================
+# ROTA: LISTAR EVENTOS ATIVOS (BLINDADA)
+# ==========================================
 @app.get("/events/active")
 def listar_eventos_ativos():
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
-    
+
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Busca todos os eventos abertos. 
-        # VERIFIQUE: Adapte 'name' e 'status' para os nomes reais das colunas na sua tabela events
-        cur.execute("""
-            SELECT id, event_name, event_date, status 
-            FROM events 
-            WHERE status = 'aberto' 
-            ORDER BY event_date ASC;
-        """)
+        cur = conn.cursor()
+        # Busca o ID e o Nome dos eventos
+        cur.execute("SELECT id, name FROM events WHERE status = 'aberto' OR status IS NULL")
         eventos = cur.fetchall()
-        
         cur.close()
         conn.close()
-        
-        return {
-            "status": "sucesso",
-            "quantidade": len(eventos),
-            "dados": eventos
-        }
-        
+
+        dados_formatados = []
+        for e in eventos:
+            # O Python decide na hora como ler: se for dicionário lê pelo nome, se for tupla lê pela posição.
+            if isinstance(e, dict):
+                dados_formatados.append({"id": str(e['id']), "event_name": str(e['name'])})
+            else:
+                dados_formatados.append({"id": str(e[0]), "event_name": str(e[1])})
+
+        return {"status": "sucesso", "dados": dados_formatados}
+
     except Exception as e:
-        if conn:
-            conn.close()
-        raise HTTPException(status_code=400, detail=str(e))
+        if conn: conn.rollback()
+        # 🔥 ESSA LINHA É A NOSSA LUPA: Ela grita o erro real no console do Render
+        print(f"🔥 ERRO FATAL NA ROTA /events/active: {str(e)}") 
+        raise HTTPException(status_code=500, detail=str(e))
     
 # ==========================================
 # NOSSA DÉCIMA QUINTA ROTA: LOGIN DA EQUIPE (STAFF)
