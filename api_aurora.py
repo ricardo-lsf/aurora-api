@@ -35,7 +35,6 @@ class EventoUpdate(BaseModel):
 # ==========================================
 # ROTA MESTRA (NO TOPO!): LISTAR EVENTOS ATIVOS
 # ==========================================
-# DUAS PORTAS: Uma para o código novo e outra para enganar o cache do celular velho!
 @app.get("/events/active")
 @app.get("/eventos-ativos")
 def listar_eventos_ativos():
@@ -45,8 +44,11 @@ def listar_eventos_ativos():
 
     try:
         cur = conn.cursor()
-        # Traz as festas que estão com status 'aberto'
-        cur.execute("SELECT id, name FROM events WHERE status = 'aberto' OR status IS NULL")
+        
+        # O CADEADO DUPLO: Exatamente como você pediu!
+        # Só vai pro celular do bartender se o Gerente ativou (TRUE) E o bar abriu ('aberto')
+        cur.execute("SELECT id, name FROM events WHERE is_active = TRUE AND status = 'aberto'")
+        
         eventos = cur.fetchall()
         cur.close()
         conn.close()
