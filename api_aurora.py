@@ -1330,7 +1330,16 @@ def mudar_status_evento(event_id: str, status_data: EventStatus):
     if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
     try:
         cur = conn.cursor()
-        cur.execute("UPDATE events SET status = %s WHERE id = %s", (status_data.status, event_id))
+        
+        # A MÁGICA DE SINCRONIA AQUI:
+        if status_data.status == 'aberto':
+            # Se abriu o bar, garante que o evento seja is_active = TRUE
+            cur.execute("UPDATE events SET status = %s, is_active = TRUE WHERE id = %s", (status_data.status, event_id))
+        else:
+            # Se o bar fechou ('fechado'), apenas trava o celular dos bartenders, 
+            # mas deixa o evento is_active = TRUE para o gerente ver os relatórios amanhã!
+            cur.execute("UPDATE events SET status = %s WHERE id = %s", (status_data.status, event_id))
+            
         conn.commit()
         cur.close()
         conn.close()
