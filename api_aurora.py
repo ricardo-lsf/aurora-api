@@ -31,6 +31,40 @@ class EventoUpdate(BaseModel):
 
 
 # ... (suas configurações de app e rotas antigas) ...
+
+# ==========================================
+# ROTA MESTRA (NO TOPO!): LISTAR EVENTOS ATIVOS
+# ==========================================
+# DUAS PORTAS: Uma para o código novo e outra para enganar o cache do celular velho!
+@app.get("/events/active")
+@app.get("/eventos-ativos")
+def listar_eventos_ativos():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
+    try:
+        cur = conn.cursor()
+        # Traz as festas que estão com status 'aberto'
+        cur.execute("SELECT id, name FROM events WHERE status = 'aberto' OR status IS NULL")
+        eventos = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        dados_formatados = []
+        for e in eventos:
+            if isinstance(e, dict):
+                dados_formatados.append({"id": str(e['id']), "event_name": str(e['name'])})
+            else:
+                dados_formatados.append({"id": str(e[0]), "event_name": str(e[1])})
+
+        return {"status": "sucesso", "dados": dados_formatados}
+
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"🔥 ERRO FATAL NA ROTA /eventos-ativos: {str(e)}") 
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==========================================
 # BUSCAR DETALHES DE UM EVENTO ESPECÍFICO (FASTAPI)
 # ==========================================
@@ -997,39 +1031,6 @@ def listar_todos_drinks(account_id: str):
         conn.close()
         raise HTTPException(status_code=400, detail=str(e))
         
-# ==========================================
-# ROTA: LISTAR EVENTOS ATIVOS (COM NOVA ESTRUTURA)
-# ==========================================
-@app.get("/eventos-ativos")
-def listar_eventos_ativos():
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
-
-    try:
-        cur = conn.cursor()
-        # A MÁGICA AQUI: Traz as festas que estão com status 'aberto' 
-        # (mesmo que o is_active esteja false, pois o status é o que rege o PDV)
-        cur.execute("SELECT id, name FROM events WHERE status = 'aberto' OR status IS NULL")
-        eventos = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        dados_formatados = []
-        for e in eventos:
-            # Lendo exatamente a coluna 'name' (posição 1) que vimos na sua estrutura
-            if isinstance(e, dict):
-                dados_formatados.append({"id": str(e['id']), "event_name": str(e['name'])})
-            else:
-                dados_formatados.append({"id": str(e[0]), "event_name": str(e[1])})
-
-        return {"status": "sucesso", "dados": dados_formatados}
-
-    except Exception as e:
-        if conn: conn.rollback()
-        print(f"🔥 ERRO FATAL NA ROTA /eventos-ativos: {str(e)}") 
-        raise HTTPException(status_code=500, detail=str(e))
-
 # ==========================================
 # NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO EXATO DO EVENTO
 # ==========================================
