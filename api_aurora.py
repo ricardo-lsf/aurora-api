@@ -711,7 +711,7 @@ def registrar_venda(payload: NovaVenda):
                 i.current_stock,
                 i.current_cost_price,
                 i.package_quantity
-            FROM cocktails_ingredients ci
+            FROM cocktail_ingredients ci
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE ci.cocktail_id = %s AND i.is_active = TRUE
         """
@@ -809,7 +809,7 @@ def estornar_venda(payload: EstornoVenda):
         # PASSO 3: Buscar a Ficha Técnica para saber o que devolver
         query_receita = """
             SELECT ci.ingredient_id, ci.quantity
-            FROM cocktails_ingredients ci
+            FROM cocktail_ingredients ci
             WHERE ci.cocktail_id = %s
         """
         cur.execute(query_receita, (payload.cocktail_id,))
