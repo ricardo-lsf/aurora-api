@@ -699,11 +699,11 @@ def registrar_venda(payload: NovaVenda):
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
 
     try:
-        cur = conn.cursor()
+        cur = conn.cursor() # Mantemos o cursor padrão (Tupla)
         
-        # O banco inicia uma transação invisível aqui. Se algo der erro, nada é salvo.
-
-        # PASSO 1: Buscar a Ficha Técnica e os custos atuais no estoque
+        # Ordem do SELECT: 
+        # 0: ingredient_id, 1: qtd_necessaria, 2: current_stock, 
+        # 3: current_cost_price, 4: package_quantity
         query_receita = """
             SELECT 
                 ci.ingredient_id, 
@@ -723,52 +723,40 @@ def registrar_venda(payload: NovaVenda):
 
         custo_total_drink = 0.0
 
-        # PASSO 2: Loop da Baixa de Estoque e Cálculo do Frozen Cost
         for ing in ingredientes_receita:
-            # Segurança contra divisão por zero (caso alguém cadastre uma garrafa com 0ml)
-            tamanho_emb = float(ing['package_quantity']) if ing['package_quantity'] else 1.0
+            # ACESSO POR ÍNDICE (Garante que não dê erro de Tupla)
+            id_insumo = ing[0]
+            qtd_necessaria = float(ing[1])
+            estoque_atual = float(ing[2])
+            custo_garrafa = float(ing[3])
+            tamanho_emb = float(ing[4]) if ing[4] else 1.0
             
-            # Matemática financeira: (Preço da Garrafa / Tamanho da Garrafa) * Quantidade Usada
-            custo_por_unidade = float(ing['current_cost_price']) / tamanho_emb
-            custo_ingrediente = custo_por_unidade * float(ing['qtd_necessaria'])
-            
+            custo_por_unidade = custo_garrafa / tamanho_emb
+            custo_ingrediente = custo_por_unidade * qtd_necessaria
             custo_total_drink += custo_ingrediente
 
-            # Executa a baixa do estoque (A Cascata)
-            novo_estoque = float(ing['current_stock']) - float(ing['qtd_necessaria'])
-            query_baixa = "UPDATE ingredients SET current_stock = %s WHERE id = %s"
-            cur.execute(query_baixa, (novo_estoque, ing['ingredient_id']))
+            # Baixa de estoque
+            novo_estoque = estoque_atual - qtd_necessaria
+            cur.execute("UPDATE ingredients SET current_stock = %s WHERE id = %s", (novo_estoque, id_insumo))
 
-        # PASSO 3: Salvar a Venda com o Lucro Blindado
+        # Salva a venda
         query_venda = """
             INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name)
             VALUES (%s, %s, %s, %s, %s)
             RETURNING id
         """
-        cur.execute(query_venda, (
-            payload.event_id, 
-            payload.cocktail_id, 
-            payload.price, 
-            custo_total_drink, 
-            payload.user_name
-        ))
+        cur.execute(query_venda, (payload.event_id, payload.cocktail_id, payload.price, custo_total_drink, payload.user_name))
         
-        venda_id = cur.fetchone()['id']
+        venda_id = cur.fetchone()[0] # [0] em vez de ['id']
 
-        # PASSO 4: O "Martelo do Juiz" (Confirma todas as alterações de uma vez)
         conn.commit()
         cur.close()
         conn.close()
 
-        return {
-            "status": "sucesso", 
-            "mensagem": "Venda confirmada!", 
-            "venda_id": str(venda_id),
-            "frozen_cost": round(custo_total_drink, 2)
-        }
+        return {"status": "sucesso", "venda_id": str(venda_id), "frozen_cost": round(custo_total_drink, 2)}
 
     except Exception as e:
-        if conn: conn.rollback() # O ESCUDO DE PROTEÇÃO: Cancela toda a baixa de estoque se der erro
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 # 1. O Molde para o Estorno (vem lá do seu index.html)
@@ -784,55 +772,36 @@ class EstornoVenda(BaseModel):
 def estornar_venda(payload: EstornoVenda):
     conn = get_db_connection()
     if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+        raise HTTPException(status_code=500, detail="Erro de conexão")
 
     try:
         cur = conn.cursor()
         
-        # PASSO 1: Achar o último "recibo" desse drink neste evento
-        query_find = """
-            SELECT id FROM sales 
-            WHERE event_id = %s AND cocktail_id = %s 
-            ORDER BY created_at DESC LIMIT 1
-        """
-        cur.execute(query_find, (payload.event_id, payload.cocktail_id))
+        # Passo 1: Busca venda
+        cur.execute("SELECT id FROM sales WHERE event_id = %s AND cocktail_id = %s ORDER BY created_at DESC LIMIT 1", (payload.event_id, payload.cocktail_id))
         venda = cur.fetchone()
         
         if not venda:
-            raise HTTPException(status_code=400, detail="Nenhuma venda encontrada para estornar.")
+            raise HTTPException(status_code=400, detail="Nenhuma venda encontrada.")
             
-        venda_id = venda['id']
-        
-        # PASSO 2: Rasgar o recibo (Deletar a venda)
+        venda_id = venda[0] # Índice 0
         cur.execute("DELETE FROM sales WHERE id = %s", (venda_id,))
         
-        # PASSO 3: Buscar a Ficha Técnica para saber o que devolver
-        query_receita = """
-            SELECT ci.ingredient_id, ci.quantity
-            FROM cocktail_ingredients ci
-            WHERE ci.cocktail_id = %s
-        """
-        cur.execute(query_receita, (payload.cocktail_id,))
-        ingredientes_receita = cur.fetchall()
+        # Passo 2: Devolve estoque
+        cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s", (payload.cocktail_id,))
+        ingredientes = cur.fetchall()
         
-        # PASSO 4: Devolver os insumos para as garrafas (Soma no estoque)
-        for ing in ingredientes_receita:
-            query_estorno = """
-                UPDATE ingredients 
-                SET current_stock = current_stock + %s 
-                WHERE id = %s
-            """
-            cur.execute(query_estorno, (ing['quantity'], ing['ingredient_id']))
+        for ing in ingredientes:
+            # ing[0] = id, ing[1] = qtd
+            cur.execute("UPDATE ingredients SET current_stock = current_stock + %s WHERE id = %s", (ing[1], ing[0]))
             
-        # O "Martelo do Juiz" (Confirma a devolução)
         conn.commit()
         cur.close()
         conn.close()
-        
-        return {"status": "sucesso", "mensagem": "Estorno realizado e insumos devolvidos ao estoque!"}
+        return {"status": "sucesso", "mensagem": "Estorno realizado!"}
         
     except Exception as e:
-        if conn: conn.rollback() # Se der erro, cancela a devolução
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
