@@ -801,7 +801,7 @@ def estornar_venda(payload: EstornoVenda):
         
         for ing in ingredientes:
             # ing[0] = id, ing[1] = qtd
-            cur.execute("UPDATE ingredients SET current_stock = current_stock + %s WHERE id = %s", (ing[1], ing[0]))
+            cur.execute("UPDATE event_stocks SET quantity_used = quantity_used - %s WHERE event_id = %s AND ingredient_id = %s", (ing[1], payload.event_id, ing[0]))
             
         conn.commit()
         cur.close()
