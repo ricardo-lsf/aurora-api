@@ -433,6 +433,47 @@ class NovoMenu(BaseModel):
     # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
     drinks: List[str] 
 
+
+# ==========================================
+# O "MOLDE" PARA MULTIPLOS INSUMOS
+# ==========================================
+class ItemCarga(BaseModel):
+    ingredient_id: str
+    quantity: float
+
+class CargaEvento(BaseModel):
+    event_id: str
+    itens: List[ItemCarga]
+
+@app.post("/inventory/load-event")
+def carregar_estoque_evento(payload: CargaEvento):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        for item in payload.itens:
+            # 1. Tira do estoque central
+            cur.execute("UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s", 
+                        (item.quantity, item.ingredient_id))
+            
+            # 2. Aloca no estoque do evento (Soma se já existir)
+            query_upsert = """
+                INSERT INTO event_stocks (event_id, ingredient_id, quantity_sent)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (event_id, ingredient_id) 
+                DO UPDATE SET quantity_sent = event_stocks.quantity_sent + EXCLUDED.quantity_sent;
+            """
+            cur.execute(query_upsert, (payload.event_id, item.ingredient_id, item.quantity))
+        
+        conn.commit()
+        return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
 # ==========================================
 # NOSSA QUARTA ROTA: SALVAR O CARDÁPIO DA FESTA
 # ==========================================
