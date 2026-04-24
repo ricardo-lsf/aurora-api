@@ -699,11 +699,9 @@ def registrar_venda(payload: NovaVenda):
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
 
     try:
-        cur = conn.cursor() # Mantemos o cursor padrão (Tupla)
+        cur = conn.cursor() 
         
-        # Ordem do SELECT: 
-        # 0: ingredient_id, 1: qtd_necessaria, 2: current_stock, 
-        # 3: current_cost_price, 4: package_quantity
+        # PASSO 1: Busca a receita e os custos globais (para cálculo financeiro)
         query_receita = """
             SELECT 
                 ci.ingredient_id, 
@@ -723,23 +721,33 @@ def registrar_venda(payload: NovaVenda):
 
         custo_total_drink = 0.0
 
+        # ==========================================
+        # NOVO PASSO 2: BAIXA DE ESTOQUE POR EVENTO
+        # ==========================================
         for ing in ingredientes_receita:
-            # ACESSO POR ÍNDICE (Garante que não dê erro de Tupla)
             id_insumo = ing[0]
             qtd_necessaria = float(ing[1])
-            estoque_atual = float(ing[2])
             custo_garrafa = float(ing[3])
             tamanho_emb = float(ing[4]) if ing[4] else 1.0
             
+            # Cálculo financeiro (Frozen Cost) baseado no preço do Galpão Central
             custo_por_unidade = custo_garrafa / tamanho_emb
-            custo_ingrediente = custo_por_unidade * qtd_necessaria
-            custo_total_drink += custo_ingrediente
+            custo_total_drink += (custo_por_unidade * qtd_necessaria)
 
-            # Baixa de estoque
-            novo_estoque = estoque_atual - qtd_necessaria
-            cur.execute("UPDATE ingredients SET current_stock = %s WHERE id = %s", (novo_estoque, id_insumo))
+            # A MÁGICA: Em vez de tirar do central, aumentamos o 'quantity_used' no estoque do evento
+            query_baixa_evento = """
+                UPDATE event_stocks 
+                SET quantity_used = quantity_used + %s 
+                WHERE event_id = %s AND ingredient_id = %s
+            """
+            cur.execute(query_baixa_evento, (qtd_necessaria, payload.event_id, id_insumo))
+            
+            # Verificação de segurança: O insumo precisa estar alocado para o evento
+            if cur.rowcount == 0:
+                # Se cair aqui, significa que você esqueceu de registrar a "saída de estoque" pro evento
+                raise Exception(f"Insumo ID {id_insumo} não foi alocado para este evento na tabela event_stocks.")
 
-        # Salva a venda
+        # PASSO 3: Salva a venda no histórico
         query_venda = """
             INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name)
             VALUES (%s, %s, %s, %s, %s)
@@ -747,23 +755,23 @@ def registrar_venda(payload: NovaVenda):
         """
         cur.execute(query_venda, (payload.event_id, payload.cocktail_id, payload.price, custo_total_drink, payload.user_name))
         
-        venda_id = cur.fetchone()[0] # [0] em vez de ['id']
+        venda_id = cur.fetchone()[0]
 
         conn.commit()
         cur.close()
         conn.close()
 
-        return {"status": "sucesso", "venda_id": str(venda_id), "frozen_cost": round(custo_total_drink, 2)}
+        return {
+            "status": "sucesso", 
+            "venda_id": str(venda_id), 
+            "frozen_cost": round(custo_total_drink, 2),
+            "mensagem": "Venda e baixa no estoque do evento realizadas!"
+        }
 
     except Exception as e:
         if conn: conn.rollback()
+        # Detalha o erro para sabermos se foi falta de estoque alocado
         raise HTTPException(status_code=400, detail=str(e))
-
-# 1. O Molde para o Estorno (vem lá do seu index.html)
-class EstornoVenda(BaseModel):
-    event_id: str
-    cocktail_id: str
-    user_name: Optional[str] = "Bartender"
 
 # ==========================================
 # ROTA MESTRA 2: ESTORNAR VENDA E DEVOLVER ESTOQUE
