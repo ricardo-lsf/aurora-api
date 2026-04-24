@@ -433,6 +433,43 @@ class NovoMenu(BaseModel):
     # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
     drinks: List[str] 
 
+# ==========================================
+# O "MOLDE" DE SUGESTÃO DE CARGA
+# ==========================================
+@app.get("/inventory/suggest-load/{event_id}")
+def sugerir_carga(event_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Busca todos os ingredientes necessários para todos os drinks do evento
+        query = """
+            SELECT 
+                i.id as ingredient_id, 
+                i.name as ingredient_name,
+                SUM(ci.quantity * em.planned_quantity) as total_suggested,
+                i.unit_type
+            FROM events_menus em
+            JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE em.event_id = %s
+            GROUP BY i.id, i.name, i.unit_type
+        """
+        cur.execute(query, (event_id,))
+        sugestoes = cur.fetchall()
+        
+        # Formata para o frontend
+        return [
+            {
+                "id": s[0], 
+                "nome": s[1], 
+                "sugerido": s[2], 
+                "unidade": s[3]
+            } for s in sugestoes
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
 
 # ==========================================
 # O "MOLDE" PARA MULTIPLOS INSUMOS
