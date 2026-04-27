@@ -4,11 +4,8 @@ from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import uuid
-from typing import Optional, List
+from typing import Optional, List  # Aqui já resolve todos os tipos
 from datetime import date, time
-from typing import Optional
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Aurora Bartenders API")
 
@@ -441,12 +438,12 @@ def sugerir_carga(event_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # Busca todos os ingredientes necessários para todos os drinks do evento
+        # Adicionado COALESCE para evitar erros com campos vazios
         query = """
             SELECT 
                 i.id as ingredient_id, 
                 i.name as ingredient_name,
-                SUM(ci.quantity * em.planned_quantity) as total_suggested,
+                SUM(ci.quantity * COALESCE(em.planned_quantity, 0)) as total_suggested,
                 i.unit_type
             FROM events_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
@@ -457,12 +454,11 @@ def sugerir_carga(event_id: str):
         cur.execute(query, (event_id,))
         sugestoes = cur.fetchall()
         
-        # Formata para o frontend
         return [
             {
                 "id": s[0], 
                 "nome": s[1], 
-                "sugerido": s[2], 
+                "sugerido": float(s[2]) if s[2] else 0.0, # Garante retorno numérico
                 "unidade": s[3]
             } for s in sugestoes
         ]
@@ -482,6 +478,9 @@ class CargaEvento(BaseModel):
     event_id: str
     itens: List[ItemCarga]
 
+# ==========================================
+# CARREGAR ESTOQUE (VALIDADA)
+# ==========================================
 @app.post("/inventory/load-event")
 def carregar_estoque_evento(payload: CargaEvento):
     conn = get_db_connection()
@@ -492,7 +491,7 @@ def carregar_estoque_evento(payload: CargaEvento):
             cur.execute("UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s", 
                         (item.quantity, item.ingredient_id))
             
-            # 2. Aloca no estoque do evento (Soma se já existir)
+            # 2. Aloca no estoque do evento
             query_upsert = """
                 INSERT INTO event_stocks (event_id, ingredient_id, quantity_sent)
                 VALUES (%s, %s, %s)
@@ -504,7 +503,7 @@ def carregar_estoque_evento(payload: CargaEvento):
         conn.commit()
         return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         cur.close()
@@ -779,12 +778,11 @@ def registrar_venda(payload: NovaVenda):
     try:
         cur = conn.cursor() 
         
-        # PASSO 1: Busca a receita e os custos globais (para cálculo financeiro)
+        # PASSO 1: Busca a receita e os custos (Removido o current_stock global que não usaremos)
         query_receita = """
             SELECT 
                 ci.ingredient_id, 
                 ci.quantity AS qtd_necessaria,
-                i.current_stock,
                 i.current_cost_price,
                 i.package_quantity
             FROM cocktail_ingredients ci
@@ -805,14 +803,14 @@ def registrar_venda(payload: NovaVenda):
         for ing in ingredientes_receita:
             id_insumo = ing[0]
             qtd_necessaria = float(ing[1])
-            custo_garrafa = float(ing[3])
-            tamanho_emb = float(ing[4]) if ing[4] else 1.0
+            custo_garrafa = float(ing[2]) if ing[2] else 0.0 # Índice 2: Custo
+            tamanho_emb = float(ing[3]) if ing[3] and ing[3] > 0 else 1.0 # Índice 3: Embalagem
             
-            # Cálculo financeiro (Frozen Cost) baseado no preço do Galpão Central
+            # Cálculo do Frozen Cost
             custo_por_unidade = custo_garrafa / tamanho_emb
             custo_total_drink += (custo_por_unidade * qtd_necessaria)
 
-            # A MÁGICA: Em vez de tirar do central, aumentamos o 'quantity_used' no estoque do evento
+            # Baixa no estoque do evento
             query_baixa_evento = """
                 UPDATE event_stocks 
                 SET quantity_used = quantity_used + %s 
@@ -820,12 +818,10 @@ def registrar_venda(payload: NovaVenda):
             """
             cur.execute(query_baixa_evento, (qtd_necessaria, payload.event_id, id_insumo))
             
-            # Verificação de segurança: O insumo precisa estar alocado para o evento
             if cur.rowcount == 0:
-                # Se cair aqui, significa que você esqueceu de registrar a "saída de estoque" pro evento
-                raise Exception(f"Insumo ID {id_insumo} não foi alocado para este evento na tabela event_stocks.")
+                raise Exception(f"Insumo ID {id_insumo} não foi alocado para este evento.")
 
-        # PASSO 3: Salva a venda no histórico
+        # PASSO 3: Salva a venda
         query_venda = """
             INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name)
             VALUES (%s, %s, %s, %s, %s)
@@ -842,13 +838,11 @@ def registrar_venda(payload: NovaVenda):
         return {
             "status": "sucesso", 
             "venda_id": str(venda_id), 
-            "frozen_cost": round(custo_total_drink, 2),
-            "mensagem": "Venda e baixa no estoque do evento realizadas!"
+            "frozen_cost": round(custo_total_drink, 2)
         }
 
     except Exception as e:
         if conn: conn.rollback()
-        # Detalha o erro para sabermos se foi falta de estoque alocado
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
