@@ -872,38 +872,40 @@ def registrar_venda(payload: NovaVenda):
 # ==========================================
 class EstornoVenda(BaseModel):
     sale_id: str
-    event_id: str  # <--- ESSENCIAL: O JS precisa enviar o ID do evento agora
+    event_id: str
 
-@app.post("/sales/cancel") # Use a rota que já está no seu index.html
+@app.post("/sales/cancel")
 def estornar_venda(payload: EstornoVenda):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # 1. Descobrir o que foi vendido e a quantidade
-        cur.execute("""
-            SELECT ci.ingredient_id, ci.quantity 
-            FROM sales s
-            JOIN cocktail_ingredients ci ON s.cocktail_id = ci.cocktail_id
-            WHERE s.id = %s
-        """, (payload.sale_id,))
-        itens = cur.fetchall()
+        # 1. Busca o cocktail_id dessa venda para saber o que devolver ao estoque
+        cur.execute("SELECT cocktail_id FROM sales WHERE id = %s", (payload.sale_id,))
+        venda = cur.fetchone()
+        if not venda:
+            raise Exception("Venda não encontrada.")
+        
+        cocktail_id = venda[0]
 
-        # 2. Devolver para o estoque do EVENTO (quantity_used diminuir)
-        for item in itens:
+        # 2. Busca os ingredientes daquele drink
+        cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s", (cocktail_id,))
+        ingredientes = cur.fetchall()
+
+        # 3. Devolve para o quantity_used do evento
+        for ing in ingredientes:
             cur.execute("""
                 UPDATE event_stocks 
                 SET quantity_used = quantity_used - %s 
                 WHERE event_id = %s::uuid AND ingredient_id = %s
-            """, (float(item[1]), payload.event_id, item[0]))
+            """, (float(ing[1]), payload.event_id, ing[0]))
 
-        # 3. Deletar a venda
+        # 4. Deleta a venda
         cur.execute("DELETE FROM sales WHERE id = %s", (payload.sale_id,))
         
         conn.commit()
         return {"status": "sucesso"}
     except Exception as e:
-        conn.rollback()
-        print(f"Erro no estorno: {e}")
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         cur.close()
