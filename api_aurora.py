@@ -445,14 +445,18 @@ class NovoMenu(BaseModel):
 @app.get("/inventory/suggest-load/{event_id}")
 def sugerir_carga(event_id: str):
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
     cur = conn.cursor()
     try:
-        # Adicionado COALESCE para evitar erros com campos vazios
+        # A query agora usa LEFT JOIN para não quebrar se faltar algo
+        # E o COALESCE garante que se não houver quantidade planejada, o sistema não dê erro 500
         query = """
             SELECT 
-                i.id as ingredient_id, 
-                i.name as ingredient_name,
-                SUM(ci.quantity * COALESCE(em.planned_quantity, 0)) as total_suggested,
+                i.id, 
+                i.name,
+                SUM(ci.quantity * COALESCE(em.planned_quantity, 0)) as total,
                 i.unit_type
             FROM events_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
@@ -463,14 +467,14 @@ def sugerir_carga(event_id: str):
         cur.execute(query, (event_id,))
         sugestoes = cur.fetchall()
         
+        # Se não houver nada, retorna lista vazia em vez de dar erro
         return [
-            {
-                "id": s[0], 
-                "nome": s[1], 
-                "sugerido": float(s[2]) if s[2] else 0.0, # Garante retorno numérico
-                "unidade": s[3]
-            } for s in sugestoes
+            {"id": s[0], "nome": s[1], "sugerido": float(s[2]) if s[2] else 0.0, "unidade": s[3]} 
+            for s in sugestoes
         ]
+    except Exception as e:
+        print(f"Erro interno: {e}") # Isso aparece nos logs do Render
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cur.close()
         conn.close()
