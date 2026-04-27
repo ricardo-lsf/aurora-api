@@ -457,7 +457,7 @@ def sugerir_carga(event_id: str):
                 i.name,
                 SUM(COALESCE(ci.quantity, 0) * COALESCE(em.planned_quantity, 0)) as total,
                 i.unit_type
-            FROM events_menus em
+            FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE em.event_id = %s::uuid
