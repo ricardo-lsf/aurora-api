@@ -450,31 +450,40 @@ def sugerir_carga(event_id: str):
     
     cur = conn.cursor()
     try:
-        # A query agora usa LEFT JOIN para não quebrar se faltar algo
-        # E o COALESCE garante que se não houver quantidade planejada, o sistema não dê erro 500
+        # A query agora usa COALESCE em tudo que é número para evitar o Erro 500
         query = """
             SELECT 
                 i.id, 
                 i.name,
-                SUM(ci.quantity * COALESCE(em.planned_quantity, 0)) as total,
+                SUM(COALESCE(ci.quantity, 0) * COALESCE(em.planned_quantity, 0)) as total,
                 i.unit_type
             FROM events_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
-            WHERE em.event_id = %s
+            WHERE em.event_id = %s::uuid
             GROUP BY i.id, i.name, i.unit_type
         """
+        # O ::uuid ali em cima força o banco a reconhecer o ID corretamente
+        
         cur.execute(query, (event_id,))
         sugestoes = cur.fetchall()
         
-        # Se não houver nada, retorna lista vazia em vez de dar erro
-        return [
-            {"id": s[0], "nome": s[1], "sugerido": float(s[2]) if s[2] else 0.0, "unidade": s[3]} 
-            for s in sugestoes
-        ]
+        # Transformamos o resultado em uma lista limpa
+        lista_final = []
+        for s in sugestoes:
+            lista_final.append({
+                "id": str(s[0]), 
+                "nome": s[1], 
+                "sugerido": float(s[2]) if s[2] else 0.0, 
+                "unidade": s[3]
+            })
+        
+        return lista_final
+
     except Exception as e:
-        print(f"Erro interno: {e}") # Isso aparece nos logs do Render
-        raise HTTPException(status_code=500, detail=str(e))
+        # Esse print vai aparecer nos logs do seu Render!
+        print(f"DEBUG LOGÍSTICA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro no cálculo: {str(e)}")
     finally:
         cur.close()
         conn.close()
