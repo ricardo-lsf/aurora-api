@@ -456,12 +456,12 @@ def sugerir_carga(event_id: str):
                 i.id, 
                 i.name,
                 SUM(COALESCE(ci.quantity, 0) * COALESCE(em.planned_quantity, 0)) as total,
-                i.unit_type
+                i.measurement_unit
             FROM event_menus em
             JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE em.event_id = %s::uuid
-            GROUP BY i.id, i.name, i.unit_type
+            GROUP BY i.id, i.name, i.measurement_unit
         """
         # O ::uuid ali em cima força o banco a reconhecer o ID corretamente
         
