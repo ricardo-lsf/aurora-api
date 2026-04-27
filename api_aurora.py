@@ -9,6 +9,15 @@ from datetime import date, time
 
 app = FastAPI(title="Aurora Bartenders API")
 
+# Configuração de CORS - Garanta que está assim:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # O "*" permite que qualquer site (inclusive seu localhost) acesse a API
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class EventoUpdate(BaseModel):
     responsavel: Optional[str] = ""
     telefone: Optional[str] = ""
