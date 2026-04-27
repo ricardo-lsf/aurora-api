@@ -870,41 +870,44 @@ def registrar_venda(payload: NovaVenda):
 # ==========================================
 # ROTA MESTRA 2: ESTORNAR VENDA E DEVOLVER ESTOQUE
 # ==========================================
-@app.post("/sales/cancel")
+class EstornoVenda(BaseModel):
+    sale_id: str
+    event_id: str  # <--- ESSENCIAL: O JS precisa enviar o ID do evento agora
+
+@app.post("/sales/cancel") # Use a rota que já está no seu index.html
 def estornar_venda(payload: EstornoVenda):
     conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão")
-
+    cur = conn.cursor()
     try:
-        cur = conn.cursor()
+        # 1. Descobrir o que foi vendido e a quantidade
+        cur.execute("""
+            SELECT ci.ingredient_id, ci.quantity 
+            FROM sales s
+            JOIN cocktail_ingredients ci ON s.cocktail_id = ci.cocktail_id
+            WHERE s.id = %s
+        """, (payload.sale_id,))
+        itens = cur.fetchall()
+
+        # 2. Devolver para o estoque do EVENTO (quantity_used diminuir)
+        for item in itens:
+            cur.execute("""
+                UPDATE event_stocks 
+                SET quantity_used = quantity_used - %s 
+                WHERE event_id = %s::uuid AND ingredient_id = %s
+            """, (float(item[1]), payload.event_id, item[0]))
+
+        # 3. Deletar a venda
+        cur.execute("DELETE FROM sales WHERE id = %s", (payload.sale_id,))
         
-        # Passo 1: Busca venda
-        cur.execute("SELECT id FROM sales WHERE event_id = %s AND cocktail_id = %s ORDER BY created_at DESC LIMIT 1", (payload.event_id, payload.cocktail_id))
-        venda = cur.fetchone()
-        
-        if not venda:
-            raise HTTPException(status_code=400, detail="Nenhuma venda encontrada.")
-            
-        venda_id = venda[0] # Índice 0
-        cur.execute("DELETE FROM sales WHERE id = %s", (venda_id,))
-        
-        # Passo 2: Devolve estoque
-        cur.execute("SELECT ingredient_id, quantity FROM cocktail_ingredients WHERE cocktail_id = %s", (payload.cocktail_id,))
-        ingredientes = cur.fetchall()
-        
-        for ing in ingredientes:
-            # ing[0] = id, ing[1] = qtd
-            cur.execute("UPDATE event_stocks SET quantity_used = quantity_used - %s WHERE event_id = %s AND ingredient_id = %s", (ing[1], payload.event_id, ing[0]))
-            
         conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro no estorno: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
         cur.close()
         conn.close()
-        return {"status": "sucesso", "mensagem": "Estorno realizado!"}
-        
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
 # NOSSA SÉTIMA ROTA: PAINEL DE ESTOQUE (INVENTORY)
