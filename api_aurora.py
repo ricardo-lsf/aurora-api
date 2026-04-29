@@ -1706,22 +1706,25 @@ def finalizar_pedido_e_baixar_estoque(order_id: str, payload: dict):
 @app.get("/orders/active")
 def verificar_pedido_cliente(event_id: str, client_id: str):
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor) # Para retornar como dicionário
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Busca pedido que NÃO seja 'Entregue'
+        # Fazemos um JOIN com a tabela events para ele entender o Slug ("Festa-Teste")
         cur.execute("""
-            SELECT id, status 
-            FROM event_orders 
-            WHERE event_id = %s AND client_id = %s AND status != 'Entregue'
-            ORDER BY created_at DESC LIMIT 1
-        """, (event_id, client_id))
+            SELECT eo.id, eo.status 
+            FROM event_orders eo
+            JOIN events e ON eo.event_id = e.id
+            WHERE (e.custom_url_slug = %s OR e.id::text = %s)
+              AND eo.client_id = %s 
+              AND eo.status != 'Entregue'
+            ORDER BY eo.created_at DESC LIMIT 1
+        """, (event_id, event_id, client_id))
         
         pedido = cur.fetchone()
         
         if not pedido:
             return {"has_active_order": False}
             
-        # Se tem pedido, busca os nomes dos drinks para mostrar na tela
+        # Se tem pedido, busca os nomes dos drinks
         cur.execute("""
             SELECT c.name as nome, oi.quantity as qtd
             FROM event_order_items oi
@@ -1738,6 +1741,9 @@ def verificar_pedido_cliente(event_id: str, client_id: str):
                 "itens": itens
             }
         }
+    except Exception as e:
+        print(f"Erro fatal em orders/active: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno ao checar pedido")
     finally:
         cur.close()
         conn.close()
