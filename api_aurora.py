@@ -1118,7 +1118,7 @@ def listar_menu_evento(event_id: str):
     cur = conn.cursor(cursor_factory=RealDictCursor) 
     
     try:
-        # 1. TRADUTOR: Acha a festa e JÁ PEGA O NOME DELA!
+        # 1. TRADUTOR: Acha a festa e pega o ID e o Nome dela!
         cur.execute("""
             SELECT id, name FROM events 
             WHERE custom_url_slug = %s OR id::text = %s
@@ -1129,16 +1129,22 @@ def listar_menu_evento(event_id: str):
             raise HTTPException(status_code=404, detail="Festa não encontrada.")
 
         id_verdadeiro = evento['id']
-        nome_da_festa = evento['name'] # Pegamos o nome real da festa
+        nome_da_festa = evento['name']
 
-        # 2. Busca os drinks com a receita (preparation_steps)
+        # 2. Busca os drinks e faz o JOIN DUPLO nos insumos!
         cur.execute("""
             SELECT 
                 c.id, 
                 c.name AS drink_nome, 
                 c.sale_price AS preco_venda, 
                 c.image_url,
-                c.preparation_steps AS descricao,
+                (
+                    -- Magia do Postgres: Atravessa a ponte e junta os nomes separados por vírgula!
+                    SELECT STRING_AGG(i.name, ', ') 
+                    FROM cocktail_ingredients ci 
+                    JOIN ingredients i ON ci.ingredient_id = i.id
+                    WHERE ci.cocktail_id = c.id
+                ) AS descricao,
                 em.planned_quantity
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
@@ -1148,7 +1154,7 @@ def listar_menu_evento(event_id: str):
         
         drinks = cur.fetchall()
         
-        # 3. EMPACOTA IGUAL AO SEU ORIGINAL (O PDV e o Cardápio vão amar isso)
+        # 3. Empacota e envia pro celular!
         return {
             "festa": nome_da_festa,
             "drinks": drinks
@@ -1608,17 +1614,31 @@ def gerar_lista_compras(event_id: str):
 # ==========================================
 @app.post("/orders/create")
 def criar_pedido(payload: dict):
-    # payload: { "client_name": "Rica", "items": [{"id": "uuid-drink", "qty": 1}] }
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        # 🛡️ REGRA DE OURO: Verifica se o cliente já tem 2 drinks não entregues
+        # 1. TRADUTOR: Descobre o ID verdadeiro da festa (mesmo que chegue "Festa-Teste")
+        identificador = payload['event_id']
+        cur.execute("""
+            SELECT id FROM events 
+            WHERE custom_url_slug = %s OR id::text = %s
+        """, (identificador, identificador))
+        evento = cur.fetchone()
+        if not evento:
+            raise Exception("Festa não encontrada.")
+        
+        id_verdadeiro = evento[0]
+
+        # 2. REGRA DE OURO (Agora checando pelo ID do celular, muito mais seguro!)
+        client_id = payload.get('client_id')
+        client_name = payload.get('client_name')
+
         cur.execute("""
             SELECT SUM(quantity) FROM event_order_items oi
             JOIN event_orders o ON oi.order_id = o.id
-            WHERE o.client_name = %s AND o.status IN ('Pendente', 'Preparando', 'Pronto')
+            WHERE o.client_id = %s AND o.status IN ('Pendente', 'Preparando', 'Pronto')
             AND o.event_id = %s
-        """, (payload['client_name'], payload['event_id']))
+        """, (client_id, id_verdadeiro))
         
         total_ativo = cur.fetchone()[0] or 0
         novos_itens = sum(item['qty'] for item in payload['items'])
@@ -1626,13 +1646,14 @@ def criar_pedido(payload: dict):
         if (total_ativo + novos_itens) > 2:
             raise Exception("Limite de 2 drinks por vez atingido! Aguarde a entrega.")
 
-        # Cria o Pedido (Caixa Forte)
+        # 3. Cria o Pedido (Caixa Forte) - Inserindo o client_id e usando id_verdadeiro!
         cur.execute("""
-            INSERT INTO event_orders (event_id, client_name, status) 
-            VALUES (%s, %s, 'Pendente') RETURNING id
-        """, (payload['event_id'], payload['client_name']))
+            INSERT INTO event_orders (event_id, client_name, client_id, status) 
+            VALUES (%s, %s, %s, 'Pendente') RETURNING id
+        """, (id_verdadeiro, client_name, client_id))
         order_id = cur.fetchone()[0]
 
+        # 4. Insere os Itens
         for item in payload['items']:
             cur.execute("INSERT INTO event_order_items (order_id, cocktail_id, quantity) VALUES (%s, %s, %s)",
                         (order_id, item['id'], item['qty']))
@@ -1642,6 +1663,9 @@ def criar_pedido(payload: dict):
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 # ==========================================
 # ROTA: FINALIZAR PEDIDO (KDS)
