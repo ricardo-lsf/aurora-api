@@ -1113,50 +1113,44 @@ def listar_todos_drinks(account_id: str):
 # NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO EXATO DO EVENTO
 # ==========================================
 @app.get("/events/{event_id}/menu")
-def listar_menu_evento(event_id: str): # <-- Mantivemos o SEU nome original!
+def listar_menu_evento(event_id: str):
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor) 
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
     
     try:
-        # 1. Busca o nome do Evento
-        cur.execute("SELECT name FROM events WHERE id = %s", (event_id,))
-        evento = cur.fetchone()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        if not evento:
-            raise HTTPException(status_code=404, detail="Festa não encontrada.")
-
-        # 2. Busca os Drinks (com os AS corretos para o JavaScript)
-        cur.execute("""
+        # O JOIN mágico: Pega só os drinks que estão na tabela event_menus para esta festa
+        # E já traz ordenado pelo 'display_order' que salvamos antes!
+        query = """
             SELECT 
                 c.id, 
-                c.name AS nome_do_drink, 
+                c.name AS drink_nome, 
                 c.sale_price AS preco_venda, 
-                c.image_url AS foto,
-                c.description AS descricao
+                c.image_url,
+                em.planned_quantity
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
             WHERE em.event_id = %s
             ORDER BY em.display_order;
-        """, (event_id,))
+        """
         
-        drinks = cur.fetchall()
-
-        if not drinks:
-            raise HTTPException(status_code=404, detail="404: Ops! Cardápio não encontrado.")
-
-        # 3. Retorna no formato exato que o seu Front-end espera
-        return {
-            "event_id": event_id,
-            "festa": evento['name'], 
-            "drinks": drinks
-        }
-
-    except Exception as e:
-        print(f"Erro na rota de menu: {e}") 
-        raise HTTPException(status_code=400, detail=str(e))
-    finally:
+        cur.execute(query, (event_id,))
+        drinks_evento = cur.fetchall()
+        
         cur.close()
         conn.close()
+        
+        return {
+            "status": "sucesso", 
+            "quantidade": len(drinks_evento), 
+            "dados": drinks_evento
+        }
+        
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
     
 # ==========================================
 # NOSSA DÉCIMA PRIMEIRA ROTA: BUSCAR RECEITA DO DRINK (FICHA TÉCNICA)
