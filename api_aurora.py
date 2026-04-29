@@ -1593,3 +1593,146 @@ def gerar_lista_compras(event_id: str):
     except Exception as e:
         if conn: conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+
+# ==========================================
+# ROTA: CRIAR PEDIDO (KDS)
+# ==========================================
+@app.post("/orders/create")
+def criar_pedido(payload: dict):
+    # payload: { "client_name": "Rica", "items": [{"id": "uuid-drink", "qty": 1}] }
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # 🛡️ REGRA DE OURO: Verifica se o cliente já tem 2 drinks não entregues
+        cur.execute("""
+            SELECT SUM(quantity) FROM event_order_items oi
+            JOIN event_orders o ON oi.order_id = o.id
+            WHERE o.client_name = %s AND o.status IN ('Pendente', 'Preparando', 'Pronto')
+            AND o.event_id = %s
+        """, (payload['client_name'], payload['event_id']))
+        
+        total_ativo = cur.fetchone()[0] or 0
+        novos_itens = sum(item['qty'] for item in payload['items'])
+
+        if (total_ativo + novos_itens) > 2:
+            raise Exception("Limite de 2 drinks por vez atingido! Aguarde a entrega.")
+
+        # Cria o Pedido (Caixa Forte)
+        cur.execute("""
+            INSERT INTO event_orders (event_id, client_name, status) 
+            VALUES (%s, %s, 'Pendente') RETURNING id
+        """, (payload['event_id'], payload['client_name']))
+        order_id = cur.fetchone()[0]
+
+        for item in payload['items']:
+            cur.execute("INSERT INTO event_order_items (order_id, cocktail_id, quantity) VALUES (%s, %s, %s)",
+                        (order_id, item['id'], item['qty']))
+        
+        conn.commit()
+        return {"status": "sucesso", "order_id": order_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ==========================================
+# ROTA: FINALIZAR PEDIDO (KDS)
+# ==========================================
+@app.post("/orders/{order_id}/finalize")
+def finalizar_pedido_e_baixar_estoque(order_id: str, payload: dict):
+    # payload: { "bartender": "Ricardo" }
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Busca os itens do pedido e o ID do evento
+        cur.execute("""
+            SELECT o.event_id, oi.cocktail_id, oi.quantity, o.client_name 
+            FROM event_orders o
+            JOIN event_order_items oi ON o.id = oi.order_id
+            WHERE o.id = %s AND o.status != 'Entregue'
+        """, (order_id,))
+        itens = cur.fetchall()
+        
+        if not itens:
+            raise Exception("Pedido não encontrado ou já finalizado.")
+
+        event_id = itens[0][0]
+        client_name = itens[0][3]
+
+        for event_id, cocktail_id, qtd, client in itens:
+            # 2. Busca a Ficha Técnica do Drink (Ingredientes e ML)
+            cur.execute("""
+                SELECT ingredient_id, quantity 
+                FROM cocktail_ingredients 
+                WHERE cocktail_id = %s
+            """, (cocktail_id,))
+            ingredientes = cur.fetchall()
+
+            # 3. Baixa o Estoque do Evento (ML por ML)[cite: 1]
+            for ing_id, dose_ml in ingredientes:
+                total_ml = float(dose_ml) * qtd
+                cur.execute("""
+                    UPDATE event_stocks 
+                    SET quantity_used = quantity_used + %s 
+                    WHERE event_id = %s AND ingredient_id = %s
+                """, (total_ml, event_id, ing_id))
+
+            # 4. Registra a Venda Financeira para o BI[cite: 1]
+            cur.execute("""
+                INSERT INTO sales (event_id, cocktail_id, bartender_name, client_name, price, cost)
+                SELECT %s, %s, %s, %s, c.price, c.cost 
+                FROM cocktails c WHERE c.id = %s
+            """, (event_id, cocktail_id, payload['bartender'], client_name, cocktail_id))
+
+        # 5. Atualiza o status do pedido para 'Entregue'
+        cur.execute("UPDATE event_orders SET status = 'Entregue', updated_at = now() WHERE id = %s", (order_id,))
+        
+        conn.commit()
+        return {"status": "sucesso", "message": "Estoque baixado e venda registrada."}
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro no KDS: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/orders/active")
+def verificar_pedido_cliente(event_id: str, client_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor) # Para retornar como dicionário
+    try:
+        # Busca pedido que NÃO seja 'Entregue'
+        cur.execute("""
+            SELECT id, status 
+            FROM event_orders 
+            WHERE event_id = %s AND client_id = %s AND status != 'Entregue'
+            ORDER BY created_at DESC LIMIT 1
+        """, (event_id, client_id))
+        
+        pedido = cur.fetchone()
+        
+        if not pedido:
+            return {"has_active_order": False}
+            
+        # Se tem pedido, busca os nomes dos drinks para mostrar na tela
+        cur.execute("""
+            SELECT c.name as nome, oi.quantity as qtd
+            FROM event_order_items oi
+            JOIN cocktails c ON oi.cocktail_id = c.id
+            WHERE oi.order_id = %s
+        """, (pedido['id'],))
+        
+        itens = cur.fetchall()
+        
+        return {
+            "has_active_order": True,
+            "order": {
+                "status": pedido['status'],
+                "itens": itens
+            }
+        }
+    finally:
+        cur.close()
+        conn.close()
