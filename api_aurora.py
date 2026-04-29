@@ -339,7 +339,7 @@ def ver_cardapio_publico(url_slug: str):
         # O SQL que une o Evento, o Menu e o Coquetel em uma cajadada só!
         query = """
             SELECT 
-                e.event_name AS nome_da_festa,
+                e.name AS nome_da_festa,
                 e.event_date AS data_da_festa,
                 c.name AS nome_do_drink,
                 c.description AS descricao,
