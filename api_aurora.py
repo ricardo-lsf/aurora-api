@@ -1775,3 +1775,52 @@ def verificar_pedido_cliente(event_id: str, client_id: str):
     finally:
         cur.close()
         conn.close()
+
+# ==========================================
+# ROTA: KDS - LISTAR PEDIDOS ATIVOS DA FESTA
+# ==========================================
+@app.get("/kds/orders/{event_id}")
+def listar_pedidos_kds(event_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # 1. TRADUTOR: Acha o ID real da festa (mesmo se o barman usar o link "Festa-Teste")
+        cur.execute("""
+            SELECT id FROM events 
+            WHERE custom_url_slug = %s OR id::text = %s
+        """, (event_id, event_id))
+        evento = cur.fetchone()
+        
+        if not evento:
+            return [] # Se não achar a festa, devolve lista vazia pro KDS não bugar
+
+        id_verdadeiro = evento['id']
+
+        # 2. Busca os pedidos que estão na fila (Pendente ou Preparando)
+        cur.execute("""
+            SELECT id, client_name, status, created_at 
+            FROM event_orders
+            WHERE event_id = %s AND status IN ('Pendente', 'Preparando')
+            ORDER BY created_at ASC
+        """, (id_verdadeiro,))
+        
+        pedidos = cur.fetchall()
+
+        # 3. Para cada pedido, busca os drinks que o cliente escolheu
+        for p in pedidos:
+            cur.execute("""
+                SELECT c.name as nome, oi.quantity as qtd
+                FROM event_order_items oi
+                JOIN cocktails c ON oi.cocktail_id = c.id
+                WHERE oi.order_id = %s
+            """, (p['id'],))
+            p['itens'] = cur.fetchall()
+
+        return pedidos
+
+    except Exception as e:
+        print(f"Erro no KDS: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao buscar pedidos para o KDS")
+    finally:
+        cur.close()
+        conn.close()
