@@ -1112,45 +1112,50 @@ def listar_todos_drinks(account_id: str):
 # ==========================================
 # NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO EXATO DO EVENTO
 # ==========================================
-@app.get("/events/{event_id}/menu")
-def listar_menu_evento(event_id: str):
+@app.get("/events/{event_id}/menu") # (Se o seu original for /menu/{event_id}, pode manter o seu original aqui)
+def listar_menu_evento(event_id: str): 
     conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    cur = conn.cursor(cursor_factory=RealDictCursor) 
     
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # 1. TRADUTOR: Acha a festa pelo Slug amigável (ex: "Festa Teste") ou pelo UUID.
+        # A variável chama event_id, mas o FastAPI vai jogar o Slug aqui dentro e o SQL vai achar!
+        cur.execute("""
+            SELECT id FROM events 
+            WHERE custom_url_slug = %s OR id::text = %s
+        """, (event_id, event_id))
         
-        # O JOIN mágico: Pega só os drinks que estão na tabela event_menus para esta festa
-        # E já traz ordenado pelo 'display_order' que salvamos antes!
-        query = """
+        evento = cur.fetchone()
+        if not evento:
+            raise HTTPException(status_code=404, detail="Festa não encontrada.")
+
+        id_verdadeiro = evento['id'] # Pega o ID verdadeiro do Caixa Forte para buscar os drinks
+
+        # 2. Busca os drinks usando o ID verdadeiro e o preparation_steps
+        cur.execute("""
             SELECT 
                 c.id, 
                 c.name AS drink_nome, 
                 c.sale_price AS preco_venda, 
                 c.image_url,
+                c.preparation_steps AS descricao,
                 em.planned_quantity
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
             WHERE em.event_id = %s
             ORDER BY em.display_order;
-        """
+        """, (id_verdadeiro,))
         
-        cur.execute(query, (event_id,))
-        drinks_evento = cur.fetchall()
+        drinks = cur.fetchall()
         
+        return drinks
+
+    except Exception as e:
+        print(f"Erro na rota de menu: {e}") 
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
         cur.close()
         conn.close()
-        
-        return {
-            "status": "sucesso", 
-            "quantidade": len(drinks_evento), 
-            "dados": drinks_evento
-        }
-        
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=400, detail=str(e))
     
 # ==========================================
 # NOSSA DÉCIMA PRIMEIRA ROTA: BUSCAR RECEITA DO DRINK (FICHA TÉCNICA)
