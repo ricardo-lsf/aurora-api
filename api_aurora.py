@@ -1112,16 +1112,15 @@ def listar_todos_drinks(account_id: str):
 # ==========================================
 # NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO EXATO DO EVENTO
 # ==========================================
-@app.get("/events/{event_id}/menu") # (Se o seu original for /menu/{event_id}, pode manter o seu original aqui)
+@app.get("/events/{event_id}/menu") # Mantenha a rota que já existe no seu código
 def listar_menu_evento(event_id: str): 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor) 
     
     try:
-        # 1. TRADUTOR: Acha a festa pelo Slug amigável (ex: "Festa Teste") ou pelo UUID.
-        # A variável chama event_id, mas o FastAPI vai jogar o Slug aqui dentro e o SQL vai achar!
+        # 1. TRADUTOR: Acha a festa e JÁ PEGA O NOME DELA!
         cur.execute("""
-            SELECT id FROM events 
+            SELECT id, name FROM events 
             WHERE custom_url_slug = %s OR id::text = %s
         """, (event_id, event_id))
         
@@ -1129,9 +1128,10 @@ def listar_menu_evento(event_id: str):
         if not evento:
             raise HTTPException(status_code=404, detail="Festa não encontrada.")
 
-        id_verdadeiro = evento['id'] # Pega o ID verdadeiro do Caixa Forte para buscar os drinks
+        id_verdadeiro = evento['id']
+        nome_da_festa = evento['name'] # Pegamos o nome real da festa
 
-        # 2. Busca os drinks usando o ID verdadeiro e o preparation_steps
+        # 2. Busca os drinks com a receita (preparation_steps)
         cur.execute("""
             SELECT 
                 c.id, 
@@ -1148,7 +1148,11 @@ def listar_menu_evento(event_id: str):
         
         drinks = cur.fetchall()
         
-        return drinks
+        # 3. EMPACOTA IGUAL AO SEU ORIGINAL (O PDV e o Cardápio vão amar isso)
+        return {
+            "festa": nome_da_festa,
+            "drinks": drinks
+        }
 
     except Exception as e:
         print(f"Erro na rota de menu: {e}") 
