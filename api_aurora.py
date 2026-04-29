@@ -1824,3 +1824,35 @@ def listar_pedidos_kds(event_id: str):
     finally:
         cur.close()
         conn.close()
+
+# ==========================================
+# ROTA: KDS - ATUALIZAR STATUS DO PEDIDO
+# ==========================================
+@app.patch("/orders/{order_id}/status")
+def atualizar_status_pedido(order_id: str, payload: dict):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        novo_status = payload.get("status")
+        
+        # Opcional: Se quiser registrar o nome do bartender, pode pegar do payload aqui também
+        
+        cur.execute("""
+            UPDATE event_orders 
+            SET status = %s 
+            WHERE id = %s
+        """, (novo_status, order_id))
+        conn.commit()
+        
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado no banco")
+            
+        return {"status": "sucesso", "novo_status": novo_status}
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro no KDS PATCH: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
