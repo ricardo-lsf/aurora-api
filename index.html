@@ -146,7 +146,7 @@
             <div class="chart-wrapper"><canvas id="chart"></canvas></div>
             <button onclick="window.exportarCSV()" class="export-btn">Baixar Relatório</button>
         </div>
-        <div class="panel"><h3>HISTÓRICO</h3><ul id="log-list"></ul></div>
+        <div class="panel"><h3>HISTÓRICO</h3><ul id="lista-logs"></ul></div>
     </div>
 
     <div id="modalReceita" class="modal-overlay">
@@ -166,6 +166,36 @@
     </div>
 
     <script type="module">
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        doc, 
+        updateDoc, 
+        query, 
+        where, 
+        getDocs, 
+        serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // 2. CONFIGURAÇÃO (Sua chave que você enviou)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBu8y9RQMv9fbxORcRLAZN4OlA1IEXyZUU",
+        authDomain: "aurora-bar-system.firebaseapp.com",
+        projectId: "aurora-bar-system",
+        storageBucket: "aurora-bar-system.firebasestorage.app",
+        messagingSenderId: "380441809814",
+        appId: "1:380441809814:web:ad008f37d30a5b0abe03b7"
+    };
+
+    // 3. INICIALIZAÇÃO
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const API_BASE = "[https://aurora-api-zj8e.onrender.com](https://aurora-api-zj8e.onrender.com)";
+
         // --- FUNÇÃO PARA FORMATAR O TELEFONE NA TELA DE LOGIN ---
         window.mascaraTelefone = (input) => {
             let v = input.value.replace(/\D/g,"");
@@ -247,34 +277,49 @@
         // --- RADAR DE EVENTOS (SUBSTITUI O ONSNAPSHOT DO FIREBASE) ---
         let intervaloMonitoramento;
 
-        function monitorarEvento(idPostgres) {
-            // Limpa o radar antigo se houver
-            if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
-
-            // Cria um radar que pergunta o status da festa a cada 30 segundos
-            intervaloMonitoramento = setInterval(async () => {
+        // DENTRO DO SEU index.html (PDV)
+        window.monitorarEvento = () => {
+            setInterval(async () => {
+                // TROCADO DE eventoAtualID PARA eventoID
+                if (!eventoID) return; 
                 try {
-                    const res = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idPostgres}/status`);
-                    const dados = await res.json();
-
-                    if (dados.status === "sucesso") {
-                        eventoStatus = dados.evento.status || 'aberto';
-                        const ban = document.getElementById('evento-fechado-msg'); 
-                        const btns = document.querySelectorAll('.btn-circle');
-                        
-                        if (eventoStatus === 'fechado') { 
-                            ban.style.display = 'block'; 
-                            btns.forEach(b => b.disabled = true); 
-                        } else { 
-                            ban.style.display = 'none'; 
-                            btns.forEach(b => b.disabled = false); 
+                    const res = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.status === 'fechado') {
+                            alert("Atenção: O evento foi encerrado pelo Gerente!");
+                            location.reload(); 
                         }
                     }
                 } catch (e) {
-                    console.log("Radar de evento sem conexão no momento...");
+                    console.error("Erro ao monitorar evento:", e);
                 }
-            }, 30000); // 30.000 ms = 30 segundos
-        }
+            }, 5000); 
+        };
+
+        // --- RADAR DO KDS: BUSCA PEDIDOS FEITOS PELO CELULAR ---
+        window.atualizarFilaKDS = async () => {
+            if (!eventoID) return;
+            try {
+                const res = await fetch(`https://aurora-api-zj8e.onrender.com/kds/orders/${eventoID}`);
+                if (!res.ok) return;
+                
+                const pedidos = await res.json();
+                
+                // Se você tiver uma lista no HTML para mostrar os pedidos do KDS, 
+                // você pode renderizar aqui. Por enquanto, vamos dar um log para ver se chegam!
+                if (pedidos.length > 0) {
+                    console.log("🔔 Pedidos novos no KDS:", pedidos);
+                    // Aqui você chamaria uma função tipo: renderizarListaKDS(pedidos);
+                }
+            } catch (e) {
+                console.error("Erro ao buscar fila do KDS:", e);
+            }
+        };
+
+        // Inicia o monitoramento do KDS (bater na porta a cada 5 segundos)
+        setInterval(window.atualizarFilaKDS, 5000);
+
 
         // --- MOTOR DE RECEPÇÃO: BUSCAR FESTAS ABERTAS ---
         // Alterado para 'async function' para o navegador carregar primeiro!
@@ -352,9 +397,9 @@
         };
 
 
-        // --- FUNÇÃO MUDAR (ATUALIZADA COM BAIXA DE ESTOQUE) ---
-        // --- NOVO MOTOR DE VENDAS E ESTORNOS (POSTGRESQL + API PYTHON) ---
+        // --- MOTOR DE VENDAS ATUALIZADO E BLINDADO (POSTGRESQL + FIREBASE) ---
         window.mudar = async (id, q) => {
+            // 1. Bloqueios de segurança básicos
             if (!eventoID || eventoStatus === 'fechado') return;
             const d = drinks.find(x => x.id === id);
             if (!d) return;
@@ -362,22 +407,24 @@
             if (q > 0 && d.estoque <= 0) return navigator.vibrate(200); 
             if (q < 0 && (!counts[id] || counts[id] <= 0)) return;
 
-            // Atualiza a tela imediatamente (sensação de rapidez pro bartender)
+            // 2. Atualização visual otimista
             if (!counts[id]) counts[id] = 0;
             counts[id] += q;
-            localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
-            
+            localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts)); 
             renderizar();
             if (q > 0) navigator.vibrate(50);
             
             try {
                 if (q > 0) {
-                    // VENDA (+1): Chama a Rota Mestra que criamos no Python
+                    // --- REGISTRO DE VENDA ---
                     const payloadVenda = {
-                        event_id: ID_FESTA_POSTGRES,
+                        event_id: eventoID, 
                         cocktail_id: id,
-                        price: d.precoVenda || 0.00, // Se for Open Bar, manda 0 ou o preço do drink
-                        user_name: usuarioAtual
+                        drink_name: d.nome,              
+                        price: parseFloat(d.precoVenda || d.preco || 0),
+                        cost: parseFloat(d.precoCusto || d.custo || 0), 
+                        bartender_name: usuarioAtual || "Sistema",     
+                        client_name: "Balcão"
                     };
 
                     const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/`, { 
@@ -386,64 +433,69 @@
                         body: JSON.stringify(payloadVenda)
                     });
                     
-                    if (!resposta.ok) throw new Error("Erro ao registrar a venda.");
-                    
-                    // Adiciona no histórico de log da tela
-                    adicionarLog(d.nome, 1);
+                    const dadosVenda = await resposta.json();
+
+                    if (!resposta.ok) {
+                        throw new Error(dadosVenda.detail || "Erro ao registrar venda no servidor");
+                    }
+
+                    // Chamamos o log passando o ID que o banco acabou de gerar
+                    if (typeof adicionarLog === 'function') {
+                        adicionarLog(d.nome, 1, dadosVenda.venda_id); 
+                    }
 
                 } else {
-                    // ESTORNO (-1): Chama a Rota de Cancelamento
-                    const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/cancel`, { 
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            event_id: ID_FESTA_POSTGRES,
-                            cocktail_id: id,
-                            user_name: usuarioAtual
-                        })
-                    });
+                    // --- BLOCO DE ESTORNO (BOTÃO MENOS) ---
+                    // Revertemos a contagem visual que o clique inicial fez
+                    counts[id] += 1; 
+                    localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                    renderizar();
                     
-                    if (!resposta.ok) throw new Error("Erro ao registrar o estorno.");
-                    
-                    // Adiciona no histórico de log da tela
-                    adicionarLog(d.nome, -1);
+                    // Alerta pedagógico para o bartender usar o novo fluxo
+                    alert("Para estornar, clique no '×' ao lado do drink no Histórico (abaixo do gráfico).");
                 }
             } catch (e) {
-                console.error("Erro na API:", e);
-                // Se der erro de internet, desfaz a contagem na tela
+                console.error("Erro na operação:", e);
+                // Em caso de erro real no servidor, desfazemos o incremento/decremento
                 counts[id] -= q;
-                localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts)); 
                 renderizar();
-                alert("Erro de conexão. A venda não foi registrada no sistema.");
+                alert("🚨 Erro: " + e.message);
             }
         };
 
-// --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL VIA API PYTHON---
-async function carregarDrinks(id_firebase) {
-    try {
-        console.log(`Buscando cardápio no banco relacional...`);
-        
-        // Usando a Variável Mestra para buscar os drinks da festa certa!
-        const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${ID_FESTA_POSTGRES}/menu`);
-        const dadosApi = await resposta.json();
-        
-        if (dadosApi.status === "sucesso") {
-            drinks = [];
-            dadosApi.dados.forEach(item => {
-                drinks.push({
-                    id: item.id,
-                    nome: item.drink_nome,
-                    precoVenda: item.preco_venda,
-                    estoque: 999, 
-                    imagem: item.image_url || "./imagens/moscow.jpg" 
+    // --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL (VERSÃO GAVETA) ---
+    async function carregarDrinks(id_firebase) {
+        try {
+            console.log(`Buscando cardápio no banco relacional...`);
+            
+            // Chamada para a API
+            const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${ID_FESTA_POSTGRES}/menu`);
+            const dadosApi = await resposta.json();
+            
+            // Agora o Python manda { "festa": "Nome", "drinks": [...] }
+            // Se vier no formato novo, pegamos de dentro de .drinks. Se vier antigo, usa direto.
+            const listaDrinks = dadosApi.drinks ? dadosApi.drinks : (Array.isArray(dadosApi) ? dadosApi : []);
+
+            if (listaDrinks.length > 0) {
+                drinks = [];
+                listaDrinks.forEach(item => {
+                    drinks.push({
+                        id: item.id,
+                        nome: item.drink_nome,
+                        precoVenda: item.preco_venda,
+                        estoque: item.planned_quantity || 999, // Agora pega o estoque real do banco!
+                        imagem: item.image_url || "./imagens/moscow.jpg" 
+                    });
                 });
-            });
-            renderizar();
+                renderizar();
+            } else {
+                console.warn("Nenhum drink encontrado para esta festa.");
+            }
+        } catch (erro) {
+            console.error("Erro ao buscar cardápio:", erro);
         }
-    } catch (erro) {
-        console.error("Erro ao buscar cardápio:", erro);
     }
-}
 
 // --- FUNÇÃO QUE DESENHA OS DRINKS NA TELA (Sua original) ---
 		function renderizar(){
@@ -472,8 +524,7 @@ async function carregarDrinks(id_firebase) {
 			atualizarTotais();
 }
 
- // --- FUNÇÃO DE RECEITA (VERSÃO NOVA: POSTGRESQL + API RENDER) ---
-// --- FUNÇÃO DE RECEITA (VERSÃO BLINDADA) ---
+    // --- FUNÇÃO DE RECEITA (VERSÃO NOVA: POSTGRESQL + API RENDER) ---
     window.verReceita = async (drinkId) => {
     if(!drinkId) return;
     
@@ -514,9 +565,9 @@ async function carregarDrinks(id_firebase) {
 
             // Textos do Drink
             const info = dadosApi.drink;
-            // ATENÇÃO: Se os nomes das colunas no banco forem diferentes, troque o 'technique' e 'description' abaixo
+            // ATENÇÃO: Se os nomes das colunas no banco forem diferentes, troque o 'technique' e 'preparation' abaixo
             document.getElementById('recTecnica').innerText = info && info.technique ? info.technique : 'Técnica Padrão';
-            document.getElementById('recTexto').innerText = info && info.description ? info.description : 'Modo de preparo não informado.';
+            document.getElementById('recTexto').innerText = info && info.preparation_steps ? info.preparation_steps : 'Modo de preparo não informado.';
             
         } else {
             lista.innerHTML = '<li>Erro ao carregar dados.</li>';
@@ -561,16 +612,94 @@ async function carregarDrinks(id_firebase) {
             });
         }
 
-        function adicionarLog(n,q){const i={n,q,h:new Date().toLocaleTimeString().substring(0,5),u:usuarioAtual};localLogs.unshift(i);if(localLogs.length>30)localLogs.pop();localStorage.setItem('logs_ev_'+eventoID,JSON.stringify(localLogs));renderLog(i,true);}
-        function carregarLogsAntigos(){document.getElementById('log-list').innerHTML='';const s=localStorage.getItem('logs_ev_'+eventoID);if(s){localLogs=JSON.parse(s);localLogs.forEach(i=>renderLog(i,false));}}
-        
-        function renderLog(i,pre){
-            const li=document.createElement('li');
-            li.innerHTML=`<span class="log-time">${i.h}</span> <span class="log-msg"><span class="log-user">${i.u.split(' ')[0]}:</span> ${i.n}</span> <b style="color:${i.q>0?'#2ecc71':'#c0392b'}">${i.q>0?'+1':'-1'}</b>`;
-            const l=document.getElementById('log-list');
-            if(pre)l.prepend(li);else l.appendChild(li);
+        function adicionarLog(nome, qtd, vendaId = null) {
+            const lista = document.getElementById('lista-logs');
+            if (!lista) return;
+
+            // Se for apenas um informativo de estorno (qtd < 0)
+            if (qtd < 0) {
+                const liEstorno = document.createElement('li');
+                liEstorno.style.color = "#e74c3c";
+                liEstorno.style.fontSize = "0.85rem";
+                liEstorno.style.padding = "8px 0";
+                liEstorno.style.borderBottom = "1px solid #2a2a2a";
+                liEstorno.innerHTML = `<span style="grid-column: span 3;">↩️ Estornado: ${nome}</span>`;
+                lista.prepend(liEstorno);
+                return;
+            }
+
+            const li = document.createElement('li');
+            // Guardamos o ID único da venda na linha do HTML
+            if (vendaId) li.setAttribute('data-sale-id', vendaId);
+
+            const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            li.style.display = "grid";
+            li.style.gridTemplateColumns = "50px 1fr 40px"; 
+            li.style.alignItems = "center";
+            li.style.padding = "8px 0";
+            li.style.borderBottom = "1px solid #2a2a2a";
+
+            // Criamos o HTML com o botão de "X" passando o ID e o Nome
+            li.innerHTML = `
+                <span style="color:#666; font-size:0.8em;">${agora}</span> 
+                <span style="color:#fff; font-size:0.9rem;">${nome}</span>
+                <button onclick="estornarPeloLog('${vendaId}', '${nome}')" 
+                        style="background:none; border:none; color:#e74c3c; font-weight:bold; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">
+                    ×
+                </button>
+            `;
+
+            lista.prepend(li);
+
+            if (lista.children.length > 30) {
+                lista.removeChild(lista.lastChild);
+            }
         }
-        
+
+        window.estornarPeloLog = async (saleId, nomeDrink) => {
+            // Pedir confirmação para evitar cliques acidentais
+            if (!confirm(`Deseja estornar a venda de: ${nomeDrink}?`)) return;
+
+            try {
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/cancel`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sale_id: saleId,
+                        event_id: eventoID 
+                    })
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Falha ao comunicar com o servidor.");
+                }
+
+                // 1. Remove a linha do histórico visualmente
+                const itemLog = document.querySelector(`li[data-sale-id="${saleId}"]`);
+                if (itemLog) itemLog.remove();
+
+                // 2. Localiza o drink para atualizar os contadores e o gráfico
+                const drink = drinks.find(d => d.nome === nomeDrink);
+                if (drink && counts[drink.id] > 0) {
+                    counts[drink.id]--;
+                    localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                    renderizar(); // Re-desenha a tela para atualizar totais e estoque visual
+                }
+
+                // 3. Opcional: Adiciona um log avisando do estorno
+                adicionarLog(nomeDrink, -1);
+
+                console.log(`Venda ${saleId} estornada com sucesso.`);
+
+            } catch (e) {
+                console.error("Erro no estorno:", e);
+                alert("🚨 Erro ao estornar: " + e.message);
+            }
+        };
+
+
         window.exportarCSV=()=>{let c=`Evento: ${document.getElementById('nome-evento').innerText}\nBartender: ${usuarioAtual}\nData: ${new Date().toLocaleDateString()}\n\nBebida,Qtd,Total\n`;drinks.forEach(d=>{if(counts[d.id]>0)c+=`${d.nome},${counts[d.id]},${(counts[d.id]*parseFloat(d.precoVenda||0)).toFixed(2)}\n`;});c+=`\nTOTAL,,${document.getElementById('total-valor').innerText}`;const l=document.createElement("a");l.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8;'}));l.download=`fechamento_${usuarioAtual}.csv`;l.click();};
         if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 

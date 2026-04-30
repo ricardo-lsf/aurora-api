@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDS - Aurora Produção</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; background: #f4f6f8; color: #333; height: 100vh; overflow: hidden; }
+
+        /* TELA DE SELEÇÃO (O CADEADO) */
+        #tela-selecao { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; text-align: center; padding: 20px; }
+        .btn-evento-ativo { background: #27ae60; color: white; border: none; padding: 20px; margin: 10px; border-radius: 10px; font-size: 1.2em; font-weight: bold; cursor: pointer; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .btn-evento-ativo:hover { transform: translateY(-3px); background: #2ecc71; }
+
+        /* KDS HEADER */
+        .kds-topbar { background: #1a252f; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .btn-desvincular { background: #c0392b; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        /* KDS GRID */
+        .kds-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; height: calc(100vh - 70px); padding: 15px; }
+        @media (max-width: 900px) { .kds-container { grid-template-columns: 1fr; height: auto; overflow-y: auto; } body { overflow: auto; } }
+        
+        .kds-column { background: #eef2f7; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+        .kds-header { padding: 12px; color: white; font-weight: bold; text-align: center; font-size: 1.1em; }
+        .col-pendente .kds-header { background: #f39c12; }
+        .col-preparo .kds-header { background: #3498db; }
+        .col-pronto .kds-header { background: #27ae60; }
+        
+        .kds-body { flex: 1; padding: 10px; overflow-y: auto; }
+
+        /* CARDS DE PEDIDO */
+        .order-card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 5px solid transparent; animation: slideIn 0.3s; }
+        .order-card.new { border-left-color: #f39c12; }
+        .order-card.doing { border-left-color: #3498db; }
+        .order-card.done { border-left-color: #27ae60; opacity: 0.8; }
+
+        .order-meta { display: flex; justify-content: space-between; font-size: 0.85em; color: #7f8c8d; margin-bottom: 5px; }
+        .order-client { font-weight: bold; font-size: 1.2em; color: #2c3e50; }
+        .order-items { margin: 10px 0; border-top: 1px dashed #eee; padding-top: 8px; }
+        .order-item { font-size: 1.1em; padding: 3px 0; }
+        
+        .order-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .btn-kds { flex: 1; height: 40px; font-size: 0.95em; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+        .btn-kds:hover { opacity: 0.9; }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="tela-selecao">
+        <h1 style="margin-bottom: 5px;">📺 Configuração do KDS</h1>
+        <p style="color: #bdc3c7; margin-bottom: 30px;">A qual evento este tablet pertence hoje?</p>
+        <div id="lista-eventos-ativos">
+            <p>Buscando festas no radar...</p>
+        </div>
+    </div>
+
+    <div id="tela-kds" style="display: none;">
+        <div class="kds-topbar">
+            <div>
+                <span style="font-size: 1.2em; font-weight: bold;" id="kds-nome-evento">Carregando Evento...</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <select id="kdsOperador" style="padding: 8px; border-radius: 4px; font-weight: bold;">
+                    <option value="">Quem está operando?</option>
+                </select>
+                <button onclick="window.desvincularTablet()" class="btn-desvincular">🔌 Trocar Evento</button>
+            </div>
+        </div>
+
+        <div class="kds-container">
+            <div class="kds-column col-pendente">
+                <div class="kds-header">AGUARDANDO (<span id="count-pendente">0</span>)</div>
+                <div class="kds-body" id="list-pendente"></div>
+            </div>
+
+            <div class="kds-column col-preparo">
+                <div class="kds-header">PREPARANDO (<span id="count-preparo">0</span>)</div>
+                <div class="kds-body" id="list-preparo"></div>
+            </div>
+
+            <div class="kds-column col-pronto">
+                <div class="kds-header">PRONTOS (<span id="count-pronto">0</span>)</div>
+                <div class="kds-body" id="list-pronto"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. CONFIGURAÇÕES INICIAIS
+        // ==========================================
+        const API_BASE = "https://aurora-api-zj8e.onrender.com";
+        const CHAVE_MEMORIA = 'aurora_kds_evento_id';
+        const CHAVE_NOME = 'aurora_kds_evento_nome';
+        let eventoAtualID = localStorage.getItem(CHAVE_MEMORIA);
+
+        // ==========================================
+        // 2. LÓGICA DE INICIALIZAÇÃO (CADEADO)
+        // ==========================================
+        async function iniciarKDS() {
+            const nomeEvento = localStorage.getItem(CHAVE_NOME);
+
+            if (eventoAtualID) {
+                // Abre a cozinha se o evento já estiver vinculado
+                document.getElementById('tela-selecao').style.display = 'none';
+                document.getElementById('tela-kds').style.display = 'block';
+                document.getElementById('kds-nome-evento').innerText = `🍸 ${nomeEvento}`;
+                
+                // MÁGICA AQUI: Faltava chamar a função de carregar a equipe!
+                carregarOperadores();
+
+                // Inicia o motor de busca de pedidos (Polling)
+                setInterval(atualizarFilaKDS, 3000);
+                atualizarFilaKDS();
+            } else {
+                // Abre o radar de seleção de eventos
+                document.getElementById('tela-selecao').style.display = 'flex';
+                buscarEventosNoRadar();
+            }
+        }
+
+        // Busca equipe do Postgres
+        async function carregarOperadores() {
+            const sel = document.getElementById('kdsOperador');
+            try {
+                const res = await fetch(`${API_BASE}/team`); 
+                const data = await res.json();
+                if(data && data.length > 0) {
+                    data.forEach(d => {
+                        // Corrigido para d.nome garantindo o match com a tabela STAFF
+                        sel.innerHTML += `<option value="${d.name}">${d.name}</option>`;
+                    });
+                }
+            } catch(e) { sel.innerHTML += `<option value="Equipe Aurora">Equipe Aurora</option>`; }
+        }
+
+        async function buscarEventosNoRadar() {
+            const divLista = document.getElementById('lista-eventos-ativos');
+            try {
+                const res = await fetch(`${API_BASE}/events/active`);
+                const data = await res.json();
+                
+                if (data.status === "sucesso" && data.dados.length > 0) {
+                    divLista.innerHTML = data.dados.map(ev => `
+                        <button class="btn-evento-ativo" onclick="window.vincularTablet('${ev.id}', '${ev.event_name}')">
+                            📡 Conectar em:<br>${ev.event_name}
+                        </button>
+                    `).join('');
+                } else {
+                    divLista.innerHTML = "<h3>Nenhum evento ABERTO no momento.</h3>";
+                }
+            } catch (e) {
+                divLista.innerHTML = "<p>Erro ao conectar com o Servidor.</p>";
+            }
+        }
+
+        window.vincularTablet = (id, nome) => {
+            localStorage.setItem(CHAVE_MEMORIA, id);
+            localStorage.setItem(CHAVE_NOME, nome);
+            location.reload();
+        };
+
+        window.desvincularTablet = () => {
+            const pin = prompt("🔒 ÁREA RESTRITA\nDigite o PIN para trocar o evento:");
+            if (pin === "1234") { 
+                localStorage.removeItem(CHAVE_MEMORIA);
+                localStorage.removeItem(CHAVE_NOME);
+                location.reload();
+            } else if (pin !== null) {
+                alert("❌ PIN Incorreto.");
+            }
+        };
+
+        // ==========================================
+        // 3. MOTOR DO KDS (POLLING - PEDIDOS POSTGRES)
+        // ==========================================
+        async function atualizarFilaKDS() {
+            if (!eventoAtualID) return;
+            try {
+                const res = await fetch(`${API_BASE}/kds/orders/${eventoAtualID}`);
+                const pedidos = await res.json();
+
+                const cols = {
+                    'Pendente': document.getElementById('list-pendente'),
+                    'Preparando': document.getElementById('list-preparo'),
+                    'Pronto': document.getElementById('list-pronto')
+                };
+
+                // Limpa as colunas antes de desenhar os novos dados
+                Object.values(cols).forEach(c => c.innerHTML = '');
+                let counts = { 'Pendente': 0, 'Preparando': 0, 'Pronto': 0 };
+
+                pedidos.forEach(p => {
+                    if (counts[p.status] !== undefined) {
+                        counts[p.status]++;
+                        const card = criarCardKDS(p);
+                        if (cols[p.status]) cols[p.status].appendChild(card);
+                    }
+                });
+
+                document.getElementById('count-pendente').innerText = counts['Pendente'];
+                document.getElementById('count-preparo').innerText = counts['Preparando'];
+                document.getElementById('count-pronto').innerText = counts['Pronto'];
+            } catch (e) {
+                console.error("Erro ao atualizar fila KDS:", e);
+            }
+        }
+
+        function criarCardKDS(p) {
+            const div = document.createElement('div');
+            const classeStatus = p.status === 'Pendente' ? 'new' : p.status === 'Preparando' ? 'doing' : 'done';
+            div.className = `order-card ${classeStatus}`;
+
+            const hora = new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const itensHtml = p.itens.map(i => `<div class="order-item"><b>${i.qtd}x</b> ${i.nome}</div>`).join('');
+
+            let botoes = '';
+            if (p.status === 'Pendente') {
+                botoes = `<button onclick="window.moverPedido('${p.id}', 'Preparando')" class="btn-kds" style="background:#3498db; color:white;">🔥 PREPARAR</button>`;
+            } else if (p.status === 'Preparando') {
+                botoes = `<button onclick="window.moverPedido('${p.id}', 'Pronto')" class="btn-kds" style="background:#27ae60; color:white;">✅ PRONTO</button>`;
+            } else if (p.status === 'Pronto') {
+                botoes = `<button onclick="window.moverPedido('${p.id}', 'Entregue')" class="btn-kds" style="background:#7f8c8d; color:white;">🚀 FINALIZAR</button>`;
+            }
+
+            div.innerHTML = `
+                <div class="order-meta"><span>🕒 ${hora}</span><span>#${p.id.slice(-4).toUpperCase()}</span></div>
+                <div class="order-client">${p.client_name}</div>
+                <div class="order-items">${itensHtml}</div>
+                <div class="order-actions">${botoes}</div>
+            `;
+            return div;
+        }
+
+        window.moverPedido = async (id, novoStatus) => {
+            // TRAVA DE SEGURANÇA: Exige operador para preparar o drink
+            if (novoStatus === 'Preparando') {
+                const operador = document.getElementById('kdsOperador').value;
+                if (!operador) {
+                    alert("⚠️ Selecione QUEM ESTÁ OPERANDO no topo da tela antes de puxar um pedido!");
+                    return;
+                }
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/orders/${id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: novoStatus })
+                });
+                if (res.ok) {
+                    atualizarFilaKDS();
+                }
+            } catch (e) {
+                alert("Erro ao atualizar status do pedido.");
+            }
+        };
+
+        // Inicia o processo quando o HTML carregar
+        document.addEventListener('DOMContentLoaded', iniciarKDS);
+    </script>
+</body>
+</html>

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cardápio Digital - Aurora</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f6f8; color: #333; margin: 0; padding-bottom: 80px; }
+        .header { background: #2c3e50; color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .event-name { font-size: 1.2em; font-weight: bold; color: #f1c40f; text-transform: uppercase; letter-spacing: 1px; }
+        .user-info { font-size: 0.8em; color: #bdc3c7; margin-top: 2px; }
+        .view { display: none; padding: 20px; animation: fadeIn 0.3s; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+        .login-box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; margin-top: 50px; }
+        input[type="text"] { width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 1.1em; margin-bottom: 15px; text-align: center; }
+        .drink-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; align-items: center; padding: 10px; margin-bottom: 15px; border: 2px solid transparent; }
+        .drink-card.selected { border-color: #3498db; background: #eef7fc; }
+        .img-container { position: relative; width: 75px; height: 75px; border-radius: 8px; overflow: hidden; flex-shrink: 0; cursor: pointer; }
+        .drink-img { width: 100%; height: 100%; object-fit: cover; }
+        .drink-info { flex: 1; padding: 0 12px; }
+        .drink-name { font-weight: bold; font-size: 1.1em; }
+        .qty-control { display: flex; align-items: center; gap: 8px; }
+        .btn-qty { width: 32px; height: 32px; border-radius: 50%; border: none; background: #ecf0f1; font-weight: bold; cursor: pointer; }
+        .btn-qty.active { background: #3498db; color: white; }
+        .float-cart { position: fixed; bottom: 20px; left: 5%; width: 90%; background: #2c3e50; color: white; padding: 15px; border-radius: 50px; display: none; justify-content: space-between; align-items: center; z-index: 200; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .float-cart.visible { display: flex; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(5px); }
+        .modal-content { background: #fff; width: 90%; max-width: 400px; border-radius: 15px; overflow: hidden; position: relative; }
+        .modal-body { padding: 20px; }
+
+        /* Container do Status Animado */
+        .status-tracker {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 12px;
+        }
+
+        .status-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #555;
+            transition: all 0.4s ease;
+        }
+
+        .status-icon {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            filter: grayscale(100%);
+            opacity: 0.5;
+            transition: all 0.4s ease;
+        }
+
+        /* Status Ativo / Animado */
+        .status-step.active .status-icon {
+            filter: grayscale(0%);
+            opacity: 1;
+            transform: scale(1.2);
+        }
+
+        .status-step.active.pendente .status-icon { animation: girarAmpulheta 2s infinite; }
+        .status-step.active.preparando .status-icon { animation: baterCoqueteleira 0.5s infinite alternate; }
+        .status-step.active.pronto .status-icon { animation: puloSucesso 1s ease-out; }
+
+        .status-text { font-size: 0.75rem; font-weight: bold; }
+        .status-step.active .status-text { color: #f1c40f; } /* Amarelo Aurora */
+
+        /* Animações */
+        @keyframes girarAmpulheta { 0% { transform: rotate(0deg); } 50% { transform: rotate(180deg); } 100% { transform: rotate(180deg); } }
+        @keyframes baterCoqueteleira { 0% { transform: rotate(-15deg); } 100% { transform: rotate(15deg); } }
+        @keyframes puloSucesso { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="event-name" id="headerEventName">Carregando...</div>
+        <div class="user-info" id="headerUserInfo"></div>
+    </div>
+
+    <!-- TELA DE LOGIN (NOME DO CLIENTE) -->
+    <div id="view-login" class="view active">
+        <div class="login-box">
+            <h3>🍹 Seja bem-vindo!</h3>
+            <p style="color:#666;">Como devemos chamar você no balcão?</p>
+            <input type="text" id="inputNome" placeholder="Seu Nome">
+            <button class="btn-qty active" style="width:100%; height: 50px; border-radius: 10px;" onclick="entrar()">Entrar no Evento</button>
+        </div>
+    </div>
+
+    <!-- TELA DO CARDÁPIO -->
+    <div id="view-menu" class="view">
+        <div id="menu-list"></div>
+    </div>
+
+    <!-- TELA DE STATUS DO PEDIDO -->
+    <div id="view-status" class="view">
+        <div style="text-align:center; margin-top:50px;">
+            <h2 id="statusTitle">...</h2>
+            <p id="statusDesc">Aguardando atualização do bar...</p>
+                <div class="status-tracker" id="tracker-pedido">
+                    <div class="status-step" id="step-pendente">
+                        <div class="status-icon">⏳</div>
+                        <div class="status-text">Aguardando</div>
+                    </div>
+                    <div class="status-step" id="step-preparando">
+                        <div class="status-icon">🍸</div>
+                        <div class="status-text">Preparando</div>
+                    </div>
+                    <div class="status-step" id="step-pronto">
+                        <div class="status-icon">✅</div>
+                        <div class="status-text">Pronto!</div>
+                    </div>
+                </div>
+            <div id="statusItems" style="background:white; padding:15px; border-radius:10px; margin-top:20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);"></div>
+        </div>
+    </div>
+
+
+    <!-- BOTÃO FLUTUANTE (CARRINHO) -->
+    <div class="float-cart" id="floatCart" onclick="enviarPedido()">
+        <span>🛒 <span id="cartCount">0</span> itens selecionados</span>
+        <button style="background:#f1c40f; color:#2c3e50; border:none; padding:8px 20px; border-radius:20px; font-weight:bold; cursor: pointer;">PEDIR AGORA</button>
+    </div>
+
+    <!-- MODAL DE DETALHES DA RECEITA -->
+    <div id="modal-detalhes" class="modal-overlay" onclick="fecharDetalhes(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <img id="modal-img" src="" style="width:100%; height:200px; object-fit:cover;">
+            <div class="modal-body">
+                <h2 id="modal-titulo" style="margin-top: 0;"></h2>
+                <p style="color:#e67e22; font-weight:bold; font-size:0.9em;">DETALHES:</p>
+                <ul id="modal-lista" style="padding-left:20px; color:#555;"></ul>
+                <button onclick="fecharDetalhesManual()" style="width:100%; padding:12px; margin-top:15px; background: #3498db; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ==========================================
+    // CONFIGURAÇÕES GERAIS E ESTADO (API PYTHON)
+    // ==========================================
+    const API_BASE = "https://aurora-api-zj8e.onrender.com";
+
+    let eventoID = null; 
+    let urlSlug = new URLSearchParams(window.location.search).get('festa');
+    let usuario = { nome: localStorage.getItem('aurora_user_nome'), id: localStorage.getItem('aurora_user_id') };
+    let carrinho = {};
+    let cacheDrinks = [];
+    let pollInterval = null; 
+
+    window.onload = async () => {
+        if (!urlSlug || urlSlug === 'null') {
+            document.getElementById('headerEventName').innerText = "Erro no QR Code";
+            document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px; color:#c0392b;'>QR Code inválido.<br>Por favor, escaneie novamente.</h2>";
+            return;
+        }
+        await carregarConfiguracoesEvento();
+    };
+
+    // 1. CARREGA O CARDÁPIO (POSTGRES via FASTAPI)
+    async function carregarConfiguracoesEvento() {
+        try {
+            // Voltamos para a SUA rota original que funciona!
+            const res = await fetch(`${API_BASE}/events/${urlSlug}/menu`);
+            if (!res.ok) throw new Error("Falha ao buscar dados da API");
+            
+            const data = await res.json();
+
+            eventoID = urlSlug; 
+            document.getElementById('headerEventName').innerText = data.festa || "Evento Aurora";
+            cacheDrinks = data.drinks || [];
+
+            if (usuario.nome && usuario.id) {
+                document.getElementById('headerUserInfo').innerText = `Olá, ${usuario.nome}`;
+                verificarStatusPedido(); 
+            } else {
+                mostrarView('view-login');
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Erro ao carregar o cardápio. Verifique sua conexão com a internet.");
+        }
+    }
+
+        // Quando você receber o status do Python ("Pendente", "Preparando", "Pronto")
+        function atualizarVisorStatus(statusReal) {
+            // 1. Apaga tudo
+            document.querySelectorAll('.status-step').forEach(el => el.classList.remove('active', 'pendente', 'preparando', 'pronto'));
+            
+            // 2. Acende o status correto com animação
+            if (statusReal === 'Pendente') {
+                document.getElementById('step-pendente').classList.add('active', 'pendente');
+            } else if (statusReal === 'Preparando') {
+                document.getElementById('step-preparando').classList.add('active', 'preparando');
+            } else if (statusReal === 'Pronto') {
+                document.getElementById('step-pronto').classList.add('active', 'pronto');
+            }
+        }
+
+    // REGISTRO DO CLIENTE
+    window.entrar = () => {
+        const nome = document.getElementById('inputNome').value.trim();
+        if (!nome) return alert("Diga-nos seu nome para chamarmos no balcão!");
+        
+        usuario.nome = nome.toUpperCase();
+        usuario.id = 'cli_' + Math.random().toString(36).substr(2, 9);
+        
+        localStorage.setItem('aurora_user_nome', usuario.nome);
+        localStorage.setItem('aurora_user_id', usuario.id);
+        
+        document.getElementById('headerUserInfo').innerText = `Olá, ${usuario.nome}`;
+        verificarStatusPedido();
+    };
+
+    // 2. RENDERIZA CARDÁPIO E CONTROLA CARRINHO
+    function renderizarCardapio() {
+        const lista = document.getElementById('menu-list');
+        lista.innerHTML = '';
+        
+        cacheDrinks.forEach((d, index) => {
+            // Usando 'd.drink_nome' conforme o seu banco PostgreSQL
+            const nomeDoDrink = d.drink_nome || "Drink Sem Nome";
+            const qtdNoCarrinho = carrinho[nomeDoDrink]?.qtd || 0;
+            
+            const div = document.createElement('div');
+            div.className = `drink-card ${qtdNoCarrinho > 0 ? 'selected' : ''}`;
+            
+            // Usando 'd.image_url' conforme o seu banco
+            div.innerHTML = `
+                <div class="img-container" style="position: relative;" onclick="verDetalhes(${index})">
+                    <img src="${d.image_url || 'https://via.placeholder.com/150?text=Drink'}" class="drink-img">
+                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.6); color: white; text-align: center; font-size: 0.65em; padding: 4px 0; letter-spacing: 1px; text-transform: uppercase; backdrop-filter: blur(2px);">
+                        🔍 Ver
+                    </div>
+                </div>
+                <div class="drink-info">
+                    <div class="drink-name">${nomeDoDrink}</div>
+                    <small style="color:#e67e22; font-weight: bold;">Disponível: ${d.planned_quantity || '0'}</small>
+                </div>
+                <div class="qty-control">
+                    <button class="btn-qty" onclick="alterarQtd('${nomeDoDrink}', '${d.id}', -1)">-</button>
+                    <span class="qty-val">${qtdNoCarrinho}</span>
+                    <button class="btn-qty active" onclick="alterarQtd('${nomeDoDrink}', '${d.id}', 1)">+</button>
+                </div>
+            `;
+            lista.appendChild(div);
+        });
+        mostrarView('view-menu');
+    }
+
+    window.alterarQtd = (nome, drinkId, delta) => {
+        const totalNoCarrinho = Object.values(carrinho).reduce((a, b) => a + b.qtd, 0);
+        
+        // Trava 1: Se já tem 2 e o cara quer adicionar mais, barra IMEDIATAMENTE.
+        if (delta > 0 && totalNoCarrinho >= 2) {
+            alert("🍹 Calma lá! Para não travar o bar, o máximo são 2 drinks por pedido.");
+            return;
+        }
+
+        // Se o drink não existe no carrinho e o cara clica em "-", não faz nada.
+        if (!carrinho[nome] && delta <= 0) return;
+
+        // Se não existe, cria a estrutura inicial
+        if (!carrinho[nome]) {
+            carrinho[nome] = { nome: nome, id: drinkId, qtd: 0 };
+        }
+
+        // Aplica a soma ou subtração
+        carrinho[nome].qtd += delta;
+        
+        // O EXORCISMO: Se a quantidade for 0 ou menor, DELETA o drink do carrinho inteiro
+        if (carrinho[nome].qtd <= 0) {
+            delete carrinho[nome];
+        }
+        
+        renderizarCardapio();
+        atualizarBotaoCarrinho();
+    };
+
+    function atualizarBotaoCarrinho() {
+        const total = Object.values(carrinho).reduce((a, b) => a + b.qtd, 0);
+        document.getElementById('cartCount').innerText = total;
+        document.getElementById('floatCart').style.display = total > 0 ? 'flex' : 'none';
+    }
+
+    // 3. ENVIA PEDIDO
+    window.enviarPedido = async () => {
+        // EXORCISMO PARTE 2: Filtramos (.filter) qualquer drink com qtd menor ou igual a zero ANTES de mandar
+        const itensReq = Object.values(carrinho)
+            .filter(i => i.qtd > 0)
+            .map(i => ({ id: i.id, qty: i.qtd, nome: i.nome }));
+            
+        // Se a lista ficar vazia após o filtro, cancela a requisição
+        if (itensReq.length === 0) {
+            alert("Seu carrinho está vazio!");
+            return;
+        }
+
+        document.getElementById('floatCart').style.opacity = '0.5';
+
+        try {
+            const res = await fetch(`${API_BASE}/orders/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    event_id: eventoID,
+                    client_name: usuario.nome,
+                    client_id: usuario.id,
+                    items: itensReq
+                })
+            });
+            
+            if (res.ok) {
+                carrinho = {};
+                atualizarBotaoCarrinho();
+                verificarStatusPedido(); 
+            } else {
+                const data = await res.json();
+                alert(data.detail || "Erro ao fazer pedido. Tente novamente.");
+                document.getElementById('floatCart').style.opacity = '1';
+            }
+        } catch (e) {
+            alert("Falha na conexão com o Bar. Tente novamente.");
+            document.getElementById('floatCart').style.opacity = '1';
+        }
+    };
+
+    // 4. MOTOR DE POLLING (Substitui onSnapshot)
+    function verificarStatusPedido() {
+        if (!eventoID || eventoID === 'null') return;
+        if (pollInterval) clearInterval(pollInterval);
+        
+        const checarServidor = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/orders/active?event_id=${eventoID}&client_id=${usuario.id}`);
+                const data = await res.json();
+
+                if (data.has_active_order) {
+                    const p = data.order;
+                    
+                    document.getElementById('statusTitle').innerText = p.status.toUpperCase();
+                    document.getElementById('statusDesc').innerText = p.status === 'Pronto' ? 'Vem buscar no balcão! 🍹' : 'Estamos preparando...';
+                    
+                    const statusItems = document.getElementById('statusItems');
+                    statusItems.innerHTML = p.itens.map(i => `<b style="font-size: 1.2em;">${i.qtd}x</b> ${i.nome}`).join('<br><br>');
+                    
+                    mostrarView('view-status');
+                    atualizarVisorStatus(p.status); // <--- A MÁGICA ENTRA AQUI!
+                    
+                    if (p.status === 'Pronto' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                } else {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                    renderizarCardapio();
+                }
+            } catch (e) {
+                console.log("Aguardando servidor do bar...");
+            }
+        };
+
+        checarServidor(); 
+        pollInterval = setInterval(checarServidor, 3000); 
+    }
+
+    // 5. O SEU MODAL DE DETALHES (INSUMOS)
+    window.verDetalhes = (idx) => {
+        const d = cacheDrinks[idx];
+        document.getElementById('modal-img').src = d.image_url || 'https://via.placeholder.com/400x200?text=Aurora+Bartenders';
+        document.getElementById('modal-titulo').innerText = d.drink_nome || 'Drink';
+        
+        const infoInsumos = d.descricao || 'Detalhes da receita não disponíveis.';
+        
+        // Mágica aqui: Fatiar por vírgula e criar os <li> elegantes
+        const listaHTML = infoInsumos.split(',')
+            .map(item => `<li style="padding: 8px 0; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 0.95em;">🍹 ${item.trim()}</li>`)
+            .join('');
+            
+        document.getElementById('modal-lista').innerHTML = listaHTML;
+        
+        document.getElementById('modal-detalhes').style.display = 'flex';
+    };
+
+    window.fecharDetalhes = (e) => {
+        if(e.target.id === 'modal-detalhes') document.getElementById('modal-detalhes').style.display = 'none';
+    };
+
+    window.fecharDetalhesManual = () => {
+        document.getElementById('modal-detalhes').style.display = 'none';
+    };
+
+    function mostrarView(id) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+</script>
+</body>
+</html>
