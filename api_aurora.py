@@ -1856,3 +1856,21 @@ def atualizar_status_pedido(order_id: str, payload: dict):
     finally:
         cur.close()
         conn.close()
+
+# ==========================================
+# ROTA: LISTAR EQUIPE (STAFF)
+# ==========================================
+@app.get("/staff")
+def listar_equipe():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Troque 'equipe' pelo nome real da sua tabela de usuários/bartenders
+        cur.execute("SELECT name FROM staff ORDER BY name ASC")
+        return cur.fetchall()
+    except Exception as e:
+        print(f"Erro ao buscar equipe: {e}")
+        return []
+    finally:
+        cur.close()
+        conn.close()
