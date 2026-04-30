@@ -6,6 +6,9 @@ from psycopg2.extras import RealDictCursor
 import uuid
 from typing import Optional, List  # Aqui já resolve todos os tipos
 from datetime import date, time
+from fastapi.responses import FileResponse
+
+
 
 app = FastAPI(title="Aurora Bartenders API")
 
@@ -37,6 +40,26 @@ class EventoUpdate(BaseModel):
 
 
 # ... (suas configurações de app e rotas antigas) ...
+
+
+# ==========================================
+# ROTAS DE FRONTEND (TELAS HTML)
+# ==========================================
+@app.get("/kds.html")
+def tela_kds():
+    return FileResponse("kds.html")
+
+@app.get("/index.html")
+def tela_pdv():
+    return FileResponse("index.html")
+
+@app.get("/cardapio.html")
+def tela_cardapio():
+    return FileResponse("cardapio.html")
+
+@app.get("/admin.html")
+def tela_admin():
+    return FileResponse("admin.html")
 
 # ==========================================
 # ROTA MESTRA (NO TOPO!): LISTAR EVENTOS ATIVOS
