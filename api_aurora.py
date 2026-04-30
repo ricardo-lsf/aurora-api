@@ -94,6 +94,14 @@ def service_worker():
 def manifest():
     return FileResponse("manifest.json")
 
+@app.get("/icon-192.png")
+def icon_192():
+    return FileResponse("icon-192.png")
+
+@app.get("/icon-512.png")
+def icon_512():
+    return FileResponse("icon-512.png")
+
 # ==========================================
 # ROTA MESTRA (NO TOPO!): LISTAR EVENTOS ATIVOS
 # ==========================================
