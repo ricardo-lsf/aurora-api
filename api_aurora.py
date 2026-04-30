@@ -8,7 +8,7 @@ from typing import Optional, List  # Aqui já resolve todos os tipos
 from datetime import date, time
 from fastapi.responses import FileResponse
 import os
-
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI(title="Aurora Bartenders API")
@@ -21,6 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Libera a pasta de imagens para acesso público
+app.mount("/imagens", StaticFiles(directory="imagens"), name="imagens")
 
 class EventoUpdate(BaseModel):
     responsavel: Optional[str] = ""
