@@ -7,6 +7,7 @@ import uuid
 from typing import Optional, List  # Aqui já resolve todos os tipos
 from datetime import date, time
 from fastapi.responses import FileResponse
+import os
 
 
 
@@ -334,11 +335,12 @@ class EdicaoInsumo(BaseModel):
     current_cost_price: float
 
 
-# Função para conectar no banco local
+# Função para conectar no banco (Agora segura!)
 def get_db_connection():
     try:
-        # Apontando o motor para a nuvem do Supabase!
-        conn = psycopg2.connect("postgresql://postgres.xnvznbmwxvflavmnmxxx:AennUoVaXZ16EG5g@aws-1-sa-east-1.pooler.supabase.com:5432/postgres")
+        # Puxando a variável de ambiente segura do Render
+        db_url = os.environ.get("DATABASE_URL")
+        conn = psycopg2.connect(db_url)
         return conn
     except Exception as e:
         print(f"Erro ao conectar no banco: {e}")
