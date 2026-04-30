@@ -1796,11 +1796,11 @@ def listar_pedidos_kds(event_id: str):
 
         id_verdadeiro = evento['id']
 
-        # 2. Busca os pedidos que estão na fila (Pendente ou Preparando)
+# 2. Busca os pedidos que estão na fila (Pendente, Preparando ou Pronto)
         cur.execute("""
             SELECT id, client_name, status, created_at 
             FROM event_orders
-            WHERE event_id = %s AND status IN ('Pendente', 'Preparando')
+            WHERE event_id = %s AND status IN ('Pendente', 'Preparando', 'Pronto')
             ORDER BY created_at ASC
         """, (id_verdadeiro,))
         
