@@ -342,7 +342,7 @@ def ver_cardapio_publico(url_slug: str):
                 e.name AS nome_da_festa,
                 e.event_date AS data_da_festa,
                 c.name AS nome_do_drink,
-                c.description AS descricao,
+                c.preparation_steps AS descricao,
                 c.image_url AS foto,
                 em.display_order AS ordem
             FROM events e
@@ -1181,7 +1181,7 @@ def ver_receita(cocktail_id: str):
         
         # 1. Busca os textos de preparo do próprio drink (1 linha)
         # VERIFIQUE: Se os nomes das colunas forem diferentes no seu banco, altere aqui!
-        cur.execute("SELECT technique, description FROM cocktails WHERE id = %s;", (cocktail_id,))
+        cur.execute("SELECT technique, preparation_steps FROM cocktails WHERE id = %s;", (cocktail_id,))
         drink_info = cur.fetchone()
         
         # 2. Busca a lista de ingredientes (várias linhas) com a coluna corrigida
