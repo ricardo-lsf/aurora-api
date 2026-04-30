@@ -1860,16 +1860,17 @@ def atualizar_status_pedido(order_id: str, payload: dict):
 # ==========================================
 # ROTA: LISTAR EQUIPE (STAFF)
 # ==========================================
-@app.get("/staff")
+@app.get("/team")
 def listar_equipe():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Troque 'equipe' pelo nome real da sua tabela de usuários/bartenders
-        cur.execute("SELECT name FROM staff ORDER BY name ASC")
+        # ATENÇÃO AQUI: Verifique se a coluna do nome na tabela STAFF se chama 'name', 'nome', etc.
+        # Vou assumir 'name' como padrão do Supabase, mas ajuste se for 'nome'.
+        cur.execute("SELECT name FROM STAFF ORDER BY name ASC")
         return cur.fetchall()
     except Exception as e:
-        print(f"Erro ao buscar equipe: {e}")
+        print(f"Erro ao buscar equipe (STAFF): {e}")
         return []
     finally:
         cur.close()
