@@ -41,9 +41,33 @@ class EventoUpdate(BaseModel):
 
 # ... (suas configurações de app e rotas antigas) ...
 
+# ==========================================
+# ROTA: VERIFICAR STATUS DO EVENTO (GET)
+# Para o PDV parar de dar erro 405
+# ==========================================
+@app.get("/events/{event_id}/status")
+def checar_status_evento(event_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Busca o status na tabela events
+        cur.execute("SELECT status FROM events WHERE id::text = %s OR custom_url_slug = %s", (event_id, event_id))
+        evento = cur.fetchone()
+        
+        if evento:
+            return {"status": "sucesso", "evento_status": evento['status']}
+        else:
+            raise HTTPException(status_code=404, detail="Evento não encontrado")
+            
+    except Exception as e:
+        print(f"Erro ao checar status do evento: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno")
+    finally:
+        cur.close()
+        conn.close()
 
 # ==========================================
-# ROTAS DE FRONTEND (TELAS HTML)
+# ROTAS DE FRONTEND (TELAS HTML E PWA)
 # ==========================================
 @app.get("/kds.html")
 def tela_kds():
@@ -60,6 +84,15 @@ def tela_cardapio():
 @app.get("/admin.html")
 def tela_admin():
     return FileResponse("admin.html")
+
+# --- Adicione estes dois para parar de dar erro 404 no console ---
+@app.get("/sw.js")
+def service_worker():
+    return FileResponse("sw.js")
+
+@app.get("/manifest.json")
+def manifest():
+    return FileResponse("manifest.json")
 
 # ==========================================
 # ROTA MESTRA (NO TOPO!): LISTAR EVENTOS ATIVOS
