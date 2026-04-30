@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Admin V72 (Estoque Fisico)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f6f8; color: #333; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 260px; background: #2c3e50; color: white; display: flex; flex-direction: column; flex-shrink: 0; transition: transform 0.3s ease; z-index: 1000; }
+        .logo-area { padding: 20px; font-size: 1.5em; font-weight: bold; text-align: center; background: #1a252f; border-bottom: 1px solid #34495e; }
+        .logo-area span { color: #2ecc71; }
+        .menu { flex: 1; padding-top: 10px; overflow-y: auto; }
+        .menu-label { padding: 10px 20px; font-size: 0.75em; text-transform: uppercase; color: #7f8c8d; font-weight: bold; margin-top: 10px; }
+        .menu-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; transition: 0.2s; color: #bdc3c7; text-decoration: none; }
+        .menu-item:hover { background: #34495e; color: white; }
+        .menu-item.active { background: #2980b9; color: white; border-left: 4px solid #3498db; }
+        .menu-icon { width: 25px; text-align: center; margin-right: 10px; }
+
+        /* HEADER MOBILE */
+        .mobile-header { display: none; background: #2c3e50; color: white; padding: 15px; align-items: center; justify-content: space-between; position: fixed; top: 0; left: 0; width: 100%; z-index: 999; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 998; }
+        .content { flex: 1; padding: 20px; overflow-y: auto; position: relative; }
+        .view-section { display: none; max-width: 1400px; margin: 0 auto; height: 100%; } /* Height 100% para o KDS */
+        .view-section.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(5px); } to { opacity:1; transform: translateY(0); } }
+
+        /* CARDS & INPUTS */
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e1e4e8; }
+        .card-header { background: #f8f9fa; margin: -20px -20px 20px -20px; padding: 10px 20px; border-bottom: 1px solid #e1e4e8; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        h2 { border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-top: 0; color: #2c3e50; }
+        
+        input, select, textarea { padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; width: 100%; height: 38px; margin-bottom: 5px; font-family: inherit; }
+        
+    /* CORREÇÃO: Altura automática para áreas de texto (Modo de Preparo) */
+        textarea {
+            height: auto !important;       /* Libera a altura para crescer */
+            min-height: 120px;             /* Garante uma altura mínima boa (aprox 5 linhas) */
+            padding: 10px;                 /* Espaçamento interno para o texto não colar na borda */
+            resize: vertical;              /* Permite que o usuário puxe a pontinha para aumentar se quiser */
+            line-height: 1.5;              /* Espaçamento entre as linhas para facilitar leitura */
+            font-family: inherit;          /* Mantém a mesma fonte do resto */
+        }
+
+
+
+        /* BOTÕES */
+        button { cursor: pointer; padding: 0 15px; border: none; border-radius: 4px; font-weight: bold; transition: 0.2s; height: 38px; }
+        button:hover { opacity: 0.9; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; font-size: 0.8em; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #95a5a6; color: white; font-size: 0.8em; padding: 0 10px; }
+        .btn-edit { background: #f39c12; color: white; font-size: 0.9em; padding: 0 8px; height: 30px; }
+        .btn-trash { background: transparent; color: #c0392b; border: 1px solid #eccscs; font-size: 1.2em; padding: 0 8px; height: 30px; }
+        .btn-save-details { background: #27ae60; color: white; width: 100%; margin-top: 10px; }
+        .btn-delete-event { background: #c0392b; color: white; width: 100%; padding: 15px; }
+        .btn-purple { background: #9b59b6; color: white; }
+        .btn-save-main { background: linear-gradient(45deg, #2980b9, #3498db); color: white; width: 100%; margin-top: 15px; }
+        .btn-update-main { background: linear-gradient(45deg, #27ae60, #2ecc71); color: white; width: 100%; margin-top: 15px; }
+        .btn-shopping { background: #34495e; color: white; width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-pdf { background: #e67e22; color: white; width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.9em; }
+
+        .header-actions { display: flex; gap: 8px; }
+        .cmd-btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 0.9em; display: flex; align-items: center; gap: 5px; }
+        .btn-live { background: #8e44ad; } .btn-reset { background: #f1c40f; color: #333; } .btn-lock { background: #c0392b; } .btn-unlock { background: #27ae60; }
+
+        /* LAYOUT GERAL */
+        .grid-3 { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+        .grid-form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .event-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .time-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #e8f4fd; padding: 15px; border-radius: 6px; margin-bottom: 15px; align-items: end; }
+        .split-input { display: flex; gap: 5px; align-items: center; }
+        .grid-row-custom { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+
+        .img-preview-box { width: 100%; height: 150px; background: #eee; border-radius: 6px; overflow: hidden; margin-top: 5px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; }
+        .img-preview-box img { width: 100%; height: 100%; object-fit: cover; display: none; }
+
+        /* TABELAS & OUTROS */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; min-width: 600px; }
+        th { background: #ecf0f1; color: #2c3e50; padding: 10px; text-align: left; }
+        td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        img.thumb { width: 40px !important; height: 40px !important; object-fit: cover; border-radius: 4px; }
+        .input-table { border: 1px solid transparent; background: #f9f9f9; width: 100%; padding: 5px; height: 30px; }
+        .input-table:focus { border: 1px solid #3498db; background: white; }
+
+        .event-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; border-left: 4px solid transparent; }
+        .event-item:hover { background: #f0f4f8; }
+        .event-item.active { background: #e8f0fe !important; border-left: 4px solid #3498db; }
+        
+        .badge-live { background: #27ae60; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.7em; margin-left: 5px; }
+        .badge-closed { background: #7f8c8d; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.7em; }
+        .checkbox-container { max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background: #fff; padding: 0; border-radius: 4px; margin-bottom: 10px; }
+        .chk-item { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
+        .chk-item:hover { background: #f9f9f9; }
+        .chk-item input { width: 18px; height: 18px; margin: 0 12px 0 0; }
+        .chk-item.disabled { background-color: #f0f0f0; opacity: 0.6; pointer-events: none; }
+
+    /* ESTILOS DA TABELA DE ESTOQUE (LAYOUT MELHORADO) */
+    .tabela-estoque {
+        width: 100%;
+        border-collapse: separate; /* Permite bordas arredondadas e melhor espaçamento */
+        border-spacing: 0;
+    }
+
+    .tabela-estoque th {
+        cursor: pointer;
+        user-select: none;
+        background-color: #f8f9fa;
+        color: #555;
+        font-weight: bold;
+        transition: background 0.2s;
+        font-size: 0.85em;
+        white-space: nowrap;
+        
+        /* CORREÇÃO DO CORTE E ESPAÇAMENTO SUPERIOR */
+        padding: 12px 10px; /* Mais altura (12px) e largura (10px) */
+        border-bottom: 2px solid #ddd; /* Linha de separação mais forte */
+        text-align: left; /* Garante alinhamento à esquerda */
+    }
+
+    /* Dá um respiro extra apenas na primeira coluna para não cortar a letra */
+    .tabela-estoque th:first-child {
+        padding-left: 15px;
+        border-top-left-radius: 6px;
+    }
+    
+    .tabela-estoque th:last-child {
+        padding-right: 15px;
+        border-top-right-radius: 6px;
+    }
+
+    /* Efeito Hover no Cabeçalho */
+    .tabela-estoque th:hover {
+        background-color: #e9ecef;
+        color: #2c3e50;
+    }
+
+    /* Células do corpo da tabela */
+    .tabela-estoque td {
+        font-size: 0.85em;
+        padding: 10px 10px; /* Mais espaço vertical nas linhas */
+        border-bottom: 1px solid #eee;
+        vertical-align: middle;
+        color: #333;
+    }
+
+    /* Linha Zebrada (Opcional, melhora leitura) */
+    .tabela-estoque tr:nth-child(even) {
+        background-color: #fafbfc;
+    }
+
+    /* Sticky Header (Mantém o topo fixo ao rolar) */
+    .tabela-estoque thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Sombra suave para separar */
+    }
+
+        /* ESTILOS KDS (NOVO V64) */
+        .kds-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; height: calc(100vh - 140px); }
+        .kds-column { background: #eef2f7; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+        .kds-header { padding: 10px; color: white; font-weight: bold; text-align: center; }
+        .col-pendente .kds-header { background: #f39c12; }
+        .col-preparo .kds-header { background: #3498db; }
+        .col-pronto .kds-header { background: #27ae60; }
+        
+        .kds-body { flex: 1; padding: 10px; overflow-y: auto; }
+        
+        .order-card { background: white; border-radius: 6px; padding: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 5px solid transparent; animation: slideIn 0.3s; }
+        .order-card.new { border-left-color: #f39c12; }
+        .order-card.doing { border-left-color: #3498db; }
+        .order-card.done { border-left-color: #27ae60; opacity: 0.8; }
+        
+        .order-meta { display: flex; justify-content: space-between; font-size: 0.8em; color: #7f8c8d; margin-bottom: 5px; }
+        .order-client { font-weight: bold; font-size: 1.1em; color: #2c3e50; }
+        .order-items { margin: 10px 0; border-top: 1px dashed #eee; padding-top: 5px; }
+        .order-item { display: flex; justify-content: space-between; padding: 2px 0; }
+        .order-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .btn-kds { flex: 1; height: 35px; font-size: 0.9em; }
+
+        @keyframes slideIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+
+        /* KPI & MODAIS */
+        .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 20px; }
+        .kpi-card { background: white; padding: 15px 5px; border-radius: 8px; text-align: center; border-bottom: 4px solid #ddd; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+        .kpi-val { font-size: 1.2em; font-weight: bold; color: #2c3e50; display: block; word-wrap: break-word; }
+        .recipe-box { background: #f9f9f9; padding: 10px; border: 1px dashed #ccc; border-radius: 4px; }
+        .danger-zone { margin-top: 30px; border-top: 2px dashed #e74c3c; padding-top: 20px; }
+        .stock-tag { font-size: 0.7em; background: #eee; padding: 2px 6px; border-radius: 4px; color: #555; display: inline-block; margin-bottom: 2px; font-weight: bold; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .modal { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 95vh; overflow-y: auto; }
+        .close-modal { float: right; cursor: pointer; font-size: 1.5em; color: #999; }
+        .orcamento-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; }
+        .orcamento-item:hover { background: #f0f4f8; }
+        .orc-id { font-weight: bold; color: #3498db; font-size: 0.9em; background: #e8f4fd; padding: 2px 5px; border-radius: 4px; margin-right: 5px; }
+
+        @media (max-width: 900px) {
+            body { flex-direction: column; }
+            .sidebar { position: fixed; top: 0; left: 0; height: 100%; transform: translateX(-100%); width: 280px; }
+            .sidebar.active { transform: translateX(0); }
+            .mobile-header { display: flex; }
+            .content { padding: 80px 15px 20px 15px; }
+            .grid-3, .grid-2, .event-details-grid, .time-grid, .grid-form-row, .kpi-grid, .grid-4, .grid-financeiro-row2, .finance-sinal, .kds-container { grid-template-columns: 1fr !important; }
+            .kds-container { height: auto; } /* KDS rola na vertical no mobile */
+            .sidebar-overlay.active { display: block; }
+        }
+        /* ESTILO DO CATÁLOGO (Refinado) */
+        .catalog-item { 
+            padding: 12px 15px; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: pointer; 
+            transition: all 0.2s ease; /* Animação suave */
+            background: white;
+            border-left: 5px solid transparent; /* Prepara a borda */
+        }
+        
+        /* O EFEITO AO PASSAR O MOUSE */
+        .catalog-item:hover { 
+            background-color: #e8f4fd; 
+            padding-left: 20px; /* Pulo para a direita */
+            border-left: 5px solid #3498db; /* Faixa Azul */
+        }
+
+        /* Destacar o texto ao passar o mouse */
+        .catalog-item:hover b {
+            color: #2980b9;
+        }
+        
+        /* CORREÇÃO DO CATÁLOGO E CHECKBOXES */
+        .catalog-row {
+            display: flex; 
+            align-items: center; 
+            padding: 8px 10px; 
+            border-bottom: 1px solid #eee;
+            gap: 10px; /* Espaço entre os elementos */
+        }
+        
+        /* Força o checkbox a ter tamanho normal, ignorando o global 100% */
+        input[type="checkbox"].check-custom {
+            width: auto !important;
+            height: auto !important;
+            margin: 0;
+            cursor: pointer;
+            transform: scale(1.3); /* Um pouquinho maior para facilitar o clique */
+        }
+
+        /* O texto ocupa o espaço que sobrar */
+        .catalog-info-box {
+            flex: 1; 
+            line-height: 1.2;
+            min-width: 0; /* Evita que o texto empurre o layout */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="mobile-header">
+        <button class="btn-hamburger" onclick="toggleMenu()">☰</button>
+        <span style="font-weight:bold; font-size:1.2em;">Aurora Admin</span>
+        <span style="width:24px"></span>
+    </div>
+    <div class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+    <nav class="sidebar" id="mainSidebar">
+        <div class="logo-area">🍸 Aurora <span>Admin</span></div>
+        <div class="menu">
+            <div class="menu-label">Gestão Principal</div>
+            <a onclick="showView('view-eventos', this)" class="menu-item active"><span class="menu-icon">📅</span> Eventos</a>
+			<a onclick="showView('view-kds', this); iniciarKDS()" class="menu-item"><span class="menu-icon">🖥️</span> KDS / Produção</a> <a onclick="showView('view-orcamentos', this)" class="menu-item"><span class="menu-icon">📑</span> Orçamentos</a>
+            <a onclick="showView('view-equipe', this)" class="menu-item"><span class="menu-icon">👥</span> Equipe</a>
+            <div class="menu-label">Cadastros</div>
+            <a onclick="showView('view-biblioteca', this)" class="menu-item"><span class="menu-icon">🍹</span> Biblioteca & Ficha Técnica</a>
+            <a onclick="showView('view-estoque', this)" class="menu-item"><span class="menu-icon">📦</span> Estoque</a>
+            <div class="menu-label">Inteligência</div>
+            <a onclick="showView('view-analytics', this)" class="menu-item"><span class="menu-icon">📈</span> Estatísticas</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div id="view-eventos" class="view-section active">
+            <h2>📅 Gestão de Eventos</h2>
+            <div class="grid-3">
+                <div class="card">
+                    <h3>Meus Eventos</h3>
+                    <button onclick="abrirModalNovo()" class="btn-primary" style="width:100%; margin-bottom:15px;">+ NOVO EVENTO</button>
+                    <div id="lista-eventos" style="max-height:400px; overflow-y:auto;">Carregando...</div>
+                </div>
+
+                <div class="card" id="painel-detalhes" style="display:none;">
+                    <div class="card-header">
+                        <h3 id="titulo-evento" style="margin:0">Evento</h3>
+                        <div class="header-actions">
+                            <button onclick="ativarEvento()" class="cmd-btn btn-live">🚀 ATIVAR NO APP</button>
+                            <button onclick="reiniciarEvento()" class="cmd-btn btn-reset">🔄 ZERAR</button>
+                            <div id="controles-status"></div>
+                        </div>
+                    </div>
+
+                    <div class="details-box" style="margin-top:15px; padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:4px;">
+                        <h4 style="margin:0 0 10px 0;">📝 Dados do Evento</h4>
+                        <div class="event-details-grid">
+                            <div><label>Responsável</label><input type="text" id="detResp"></div>
+                            <div><label>Telefone</label><input type="text" id="detTel" onkeyup="mascaraTelefone(this)"></div>
+                            <div><label>Data</label><input type="date" id="detData"></div>
+                            <div><label>Local</label><input type="text" id="detLocal"></div>
+                        </div>
+                        <div class="time-grid">
+                            <div><label>Início</label><input type="time" id="detHora" onchange="calcTermino('det')"></div>
+                            <div><label>Duração</label><div class="split-input"><input type="number" id="detDurH" placeholder="H" value="4" onchange="calcTermino('det')"><span>:</span><input type="number" id="detDurM" placeholder="M" value="0" step="15" onchange="calcTermino('det')"></div></div>
+                            <div><label>Extra</label><div class="split-input"><input type="number" id="detExtH" placeholder="H" value="0" onchange="calcTermino('det'); calcContrato()"><span>:</span><input type="number" id="detExtM" placeholder="M" value="0" step="15" onchange="calcTermino('det'); calcContrato()"></div></div>
+                            <div><label>Término</label><input type="time" id="detTermino" readonly></div>
+                        </div>
+                        
+                        <div class="finance-panel">
+                            <h4 style="margin:0 0 10px 0; color:#f57f17;">💰 Fechamento do Contrato</h4>
+                            <div class="grid-4">
+                                <div><label>Valor Contratado (R$)</label><input type="text" id="finContrato" placeholder="0,00" onkeyup="mascaraMoeda(this); calcContrato()"></div>
+                                <div><label>Sinal de Negócio (%)</label><input type="number" id="finSinalPerc" placeholder="Ex: 30" oninput="calcContrato()"></div>
+                                <div><label>Valor do Sinal (R$)</label><input type="text" id="finSinalValor" readonly style="background:#fff; color:#2980b9; font-weight:bold;"></div>
+                                <div><label>Tempo Adicional (R$)</label><input type="text" id="finAdicional" readonly style="color:#c0392b; font-weight:bold; background:#fff;"></div>
+                            </div>
+                            <div class="grid-financeiro-row2">
+                                <div><label>Hora Extra (R$)</label><input type="text" id="finValorExtra" placeholder="0,00" onkeyup="mascaraMoeda(this); calcContrato()"></div>
+                                <div><label>Custos Adicionais (R$)</label><input type="text" id="finCustoExtra" placeholder="0,00" onkeyup="mascaraMoeda(this); calcContrato()"></div>
+                                <div><label>Descrição dos Custos Adicionais</label><input type="text" id="finDescCustoExtra" placeholder="Ex: Gelo extra, Quebra de taça..."></div>
+                            </div>
+                            <div class="finance-total">Total Final: <span id="finTotal">R$ 0,00</span></div>
+                            <button onclick="gerarNotaServico()" class="btn-pdf">📄 Gerar Nota de Serviço (PDF)</button>
+                        </div>
+                        <button onclick="atualizarDadosEvento()" class="btn-save-details">💾 Salvar Alterações</button>
+                    </div>
+
+                    <div style="background:#eef2f7; padding:15px; border-radius:6px; margin:20px 0;">
+                        <h4>📥 Montar Cardápio</h4>
+                        <div class="checkbox-container" id="lista-global-checkboxes"></div>
+                        <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                            <button onclick="marcarTodos(true)" style="background:none; color:#3498db; text-decoration:underline;">Marcar Todos</button>
+                            <button onclick="adicionarMuitos()" class="btn-primary">⬇️ Importar Selecionados</button>
+                        </div>
+                    </div>
+					
+					<div style="display:flex; gap:10px; align-items:center; background:#e8f6f3; padding:10px; border-radius:4px; margin-bottom:5px; border:1px solid #a2d9ce;">
+                        <span style="font-weight:bold; color:#16a085;">⚡ Ação em Massa:</span>
+                        <input type="number" id="estoqueMassa" value="25" style="width:60px; text-align:center;">
+                        <button onclick="aplicarEstoqueMassa()" class="btn-info" style="height:32px; font-size:0.85em;">Aplicar Estoque a Todos</button>
+                    </div>
+
+                    <h4>📋 Cardápio Confirmado</h4>
+                    <div class="table-responsive">
+                        <table><thead><tr><th width="40">Img</th><th>Nome</th><th>Venda</th><th>Custo</th><th>Est</th><th></th></tr></thead><tbody id="tabela-evento"></tbody></table>
+                    </div>
+                    
+                    <button onclick="gerarListaCompras()" class="btn-shopping">🛒 GERAR LISTA DE COMPRAS</button>
+
+                    <div class="danger-zone">
+                        <h4 style="color:#c0392b; margin-top:0;">⚠️ Zona de Perigo</h4>
+                        <button onclick="excluirEventoAtual()" class="btn-delete-event">🗑️ EXCLUIR EVENTO PERMANENTEMENTE</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-kds" class="view-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="margin:0; border:none;">🖥️ Fila de Produção</h2>
+                <div>
+                    <span style="font-weight:bold;">Quem está operando?</span>
+                    <select id="kdsOperador" style="padding:5px; border:1px solid #3498db; border-radius:4px; font-weight:bold; color:#2c3e50;">
+                        <option value="">Selecione...</option>
+                        </select>
+                </div>
+            </div>
+            
+            <div class="kds-container">
+                <div class="kds-column col-pendente">
+                    <div class="kds-header">AGUARDANDO (<span id="count-pendente">0</span>)</div>
+                    <div class="kds-body" id="list-pendente"></div>
+                </div>
+
+                <div class="kds-column col-preparo">
+                    <div class="kds-header">PREPARANDO (<span id="count-preparo">0</span>)</div>
+                    <div class="kds-body" id="list-preparo"></div>
+                </div>
+
+                <div class="kds-column col-pronto">
+                    <div class="kds-header">PRONTOS / ENTREGUES</div>
+                    <div class="kds-body" id="list-pronto"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-orcamentos" class="view-section">
+            <h2>📑 Gerador de Propostas</h2>
+            <div class="grid-3">
+                <div class="card">
+                    <h3>1. Dados do Cliente</h3>
+                    <div style="display:grid; gap:10px;">
+                        <input type="hidden" id="orcIdHidden"> 
+                        <div style="display:flex; justify-content:space-between;">
+                            <label>Nº Orçamento</label>
+                            <span id="orcNumeroDisplay" style="color:#3498db; font-weight:bold;">Novo</span>
+                        </div>
+                        <div><label>Nome do Cliente / Empresa</label><input type="text" id="orcCliente"></div>
+                        <div><label>Data do Evento</label><input type="date" id="orcData"></div>
+                        <div><label>Local / Cidade</label><input type="text" id="orcLocal"></div>
+                        <hr style="width:100%; border:0; border-top:1px dashed #ccc;">
+                        
+                        <h4 style="margin:5px 0;">💰 Precificação</h4>
+                        <div class="grid-2">
+                            <div><label style="white-space: nowrap;">Nº Convidados</label><input type="number" id="orcQtdPessoas" placeholder="0" oninput="calcOrcamento()"></div>
+                            <div><label style="white-space: nowrap;">Valor por Pessoa (R$)</label><input type="number" id="orcValorPessoa" placeholder="0.00" oninput="calcOrcamento()"></div>
+                        </div>
+                        <div><label>Taxa Deslocamento / Extra (R$)</label><input type="number" id="orcExtras" placeholder="0.00" oninput="calcOrcamento()"></div>
+                        
+                        <div style="background:#e8f5e9; padding:15px; border-radius:6px; margin-top:10px; border:1px solid #a5d6a7;">
+                            <label style="color:#2e7d32;">VALOR TOTAL ESTIMADO:</label>
+                            <div id="orcTotalDisplay" style="font-size:1.8em; font-weight:bold; color:#1b5e20;">R$ 0,00</div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; margin-top:15px;">
+                            <button onclick="salvarOrcamento()" class="btn-success" style="flex:1;">💾 SALVAR</button>
+                            <button onclick="gerarPDFOrcamento()" class="btn-primary" style="flex:1;">📄 PDF</button>
+                        </div>
+                        <button onclick="limparOrcamento()" class="btn-info" style="margin-top:10px; width:100%;">Limpar / Novo</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>2. Seleção de Cardápio</h3>
+                    <p style="font-size:0.9em; color:#666;">Selecione os drinks da proposta:</p>
+                    <div class="checkbox-container" id="orcamento-lista-drinks" style="height:300px;"></div>
+                    <div style="margin-top:10px; background:#f9f9f9; padding:10px; border-radius:4px; font-size:0.9em;">
+                        <b>Selecionados:</b> <span id="orcCountDrinks">0</span> drinks.
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>3. Orçamentos Salvos</h3>
+                    <div id="lista-orcamentos-salvos" style="max-height:400px; overflow-y:auto;">
+                        <p style="text-align:center; color:#999;">Carregando...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-equipe" class="view-section">
+            <h2>👥 Gestão de Equipe</h2>
+            <div class="card">
+                <div class="card-header">
+                    <h3 style="margin:0; font-size:1.1em;">Equipe de Profissionais (Staff)</h3>
+                    <button onclick="abrirModalEquipe()" class="btn-success">+ NOVO MEMBRO</button>
+                </div>
+                <div class="table-responsive" style="margin-top:15px;">
+                    <table><thead><tr><th>Nome</th><th>Login (Celular)</th><th>Função</th><th>Taxa</th><th>Adicional</th><th style="text-align:right">Ações</th></tr></thead><tbody id="lista-equipe"></tbody></table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-biblioteca" class="view-section">
+            <h2>🍹 Biblioteca</h2>
+            <div class="grid-2">
+                <div class="card" style="border-top: 4px solid #f39c12;">
+                    <div class="card-header" style="background:white; padding:0 0 10px 0;">
+                        <h3 style="margin:0; color:#34495e;">1. Editor de Drinks</h3>
+                        <button onclick="limparFormDrink()" class="btn-info" style="padding:5px 10px; height:30px; font-size:0.8em;">Limpar / Novo</button>
+                    </div>
+                    
+                    <input type="hidden" id="drinkId">
+
+                    <div class="grid-row-custom">
+                        <div><label>Nome do Drink</label><input type="text" id="globalName" placeholder="Ex: Negroni"></div>
+                        <div><label>Técnica</label><select id="globalTecnica"><option value="Montado">Montado</option><option value="Mexido">Mexido</option><option value="Batido">Batido</option><option value="Blender">Blender</option></select></div>
+                    </div>
+
+                    <div class="grid-2" style="margin-top:5px;">
+                        <div>
+                            <label>Categoria</label>
+                            <select id="globalTipoAlcool">
+                                <option value="Cocktail">🍸 Cocktail (Com Álcool)</option>
+                                <option value="Mocktail">🥤 Mocktail (Sem Álcool)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Classificação</label>
+                            <select id="globalClassificacao">
+                                <option value="Inesquecíveis">Inesquecíveis</option>
+                                <option value="Clássicos Contemporâneos">Clássicos Contemporâneos</option>
+                                <option value="Drinks da Nova Era">Drinks da Nova Era</option>
+                                <option value="Autorais">Autorais</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label style="margin-top:10px;">Imagem (URL)</label><input type="text" id="globalImg" placeholder="./imagens/foto.jpg" onchange="atualizarPreview(this.value)">
+                    <div class="img-preview-box"><img id="previewImg" src="" alt="Preview"><span id="previewText">Pré-visualização</span></div>
+
+                    <div style="display:flex; gap:10px; margin-top:10px;">
+                        <div style="flex:1"><label style="color:#27ae60">Venda (R$)</label><input type="number" id="globalPrice" oninput="calcCMV()" style="border-color:#27ae60;"></div>
+                        <div style="flex:1"><label style="color:#e74c3c">Custo (R$)</label><input type="number" id="globalCusto" readonly style="background:#fff0f0; color:#e74c3c;"></div>
+                    </div>
+                    <div id="cmv-display" style="text-align:center; font-weight:bold; color:#7f8c8d; margin:5px 0;">CMV: 0%</div>
+
+                    <div class="recipe-box" style="margin-top:15px; padding:10px; border:1px dashed #ccc;">
+                        <h4 style="margin:0 0 5px 0;">📝 Ficha Técnica</h4>
+                        <div style="display:flex; gap:5px;">
+                            <select id="selInsumo" style="flex:2"><option>Carregando...</option></select>
+                            <input type="number" id="qtdInsumo" placeholder="Qtd" style="width:60px;"><button onclick="addIngrediente()" class="btn-purple">+</button>
+                        </div>
+                            <div id="lista-ingredientes" style="background:white; border:1px solid #ddd; min-height:80px; max-height:200px; overflow-y:auto; padding:5px;">
+                                </div>
+                            
+                            <div style="margin-top:10px; border-top:1px solid #eee; padding-top:10px;">
+                                
+                            </div>
+
+                        <label>Modo de Preparo (Max 500)</label>
+                        <textarea id="globalPreparo" rows="4" maxlength="500" placeholder="Descreva o passo a passo..." style="width:100%; box-sizing:border-box;"></textarea>
+                    </div>
+
+                    <button onclick="salvarDrinkGlobal()" id="btnSalvarDrink" class="btn-save-main">💾 SALVAR NOVO</button>
+                </div>
+
+                <div class="card"><h3 style="margin: 0 0 5px 0; color: #246caf; line-height: 1; font-size: 1.3em;padding-left: 5px;">2. Lista de Drinks</h3><div id="lista-biblioteca-visual" style="max-height:500px; overflow-y:auto;"></div></div>
+            </div>
+        </div>
+
+        <div id="view-estoque" class="view-section">
+                    <h2>📦 Gestão de Estoque</h2>
+                    
+                    <div class="grid-2" style="grid-template-columns: 35% 1fr;">
+                    <div class="card" style="display:flex; flex-direction:column; max-height:85vh; padding:0; overflow:hidden; border-top: 5px solid #e67e22;">
+                    
+                    <div style="padding:15px; border-bottom:1px solid #eee;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <h3 style="margin:0; color:#34495e;">1. Catálogo Geral</h3>
+                            <div style="display:flex; gap:5px;">
+                                <input type="file" id="fileExcel" accept=".xlsx, .xls" style="display:none;" onchange="importarExcelInsumos(this)">
+                                
+                                <button onclick="document.getElementById('fileExcel').click()" class="btn-info" style="font-size:0.8em; background:#27ae60; color:white;">
+                                    📊 Importar Excel
+                                </button>
+                                
+                                <button onclick="toggleNovoItem()" class="btn-info" style="font-size:0.8em;">+ Novo</button>
+                            </div>
+                        </div>
+
+                        <div id="form-novo-insumo" style="display:none; background:#f0f3f6; padding:10px; border-radius:6px; margin-bottom:10px; border:1px solid #ddd;">
+                            <h4 style="margin:0 0 8px 0; color:#2980b9; font-size:0.9em;">Cadastrar Produto</h4>
+                            
+                            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                                <input type="text" id="insProd" placeholder="Produto (Ex: Gin)" style="flex: 2; padding:5px; font-size:0.85em;">
+                                <input type="text" id="insMarca" placeholder="Marca (Ex: Tanqueray)" style="flex: 1.5; padding:5px; font-size:0.85em;">
+                            </div>
+
+                            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                                <div style="flex: 1.8; display:flex;">
+                                    <select id="insTipo" style="width:100%; height:30px; border:1px solid #ccc; border-right:none; border-radius:4px 0 0 4px; font-size:0.8em; padding:0 2px;"></select>
+                                    <button onclick="adicionarNovoTipo()" style="width:25px; height:30px; background:#2ecc71; color:white; border:none; border-radius:0 4px 4px 0; font-weight:bold;">+</button>
+                                </div>
+                                <select id="insUnMed" style="flex: 1.2; height:30px; border:1px solid #ccc; border-radius:4px; font-size:0.8em; padding:0 2px;">
+                                    <option value="ml">ml (Líquido)</option>
+                                    <option value="g">g (Peso)</option>
+                                    <option value="un">un (Unidade)</option>
+                                </select>
+                            </div>
+
+                            <div style="background:white; padding:6px; border:1px dashed #aaa; border-radius:4px;">
+                                <small style="display:block; margin-bottom:3px; color:#e67e22; font-weight:bold; font-size:0.75em;">Ref. de Compra (Custo Estimado)</small>
+                                <div style="display:flex; gap:5px;">
+                                    <input type="number" id="insVolRef" placeholder="Vol (Ex: 750)" style="flex:1; padding:4px; font-size:0.85em;">
+                                    <input type="number" id="insPrecoRef" placeholder="Preço (Ex: 120)" style="flex:1; padding:4px; font-size:0.85em;">
+                                </div>
+                            </div>
+
+                            <button onclick="salvarCatalogo()" class="btn-success" style="width:100%; margin-top:8px; padding:5px; font-size:0.9em;">Salvar</button>
+                        </div>
+
+                        <input type="text" id="busca-catalogo" placeholder="🔍 Buscar item..." onkeyup="renderizarCatalogo()" style="width:100%; padding:6px 12px; border-radius:20px; border:1px solid #ccc; outline:none; font-size:0.9em;">
+                    </div>
+
+                    <div style="background:#f9f9f9; padding:8px 15px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <label style="cursor:pointer; font-size:0.85em; font-weight:bold; display:flex; align-items:center; gap:6px;">
+                            <input type="checkbox" id="check-all-catalogo" onchange="toggleSelecionarTudo(this)" style="width: auto !important; height: auto !important; transform: scale(1.1); margin: 0;"> 
+                            Selecionar Tudo
+                        </label>
+                        <button id="btn-excluir-massa" onclick="excluirSelecionados()" class="btn-trash" style="display:none; font-size:0.8em; padding:2px 8px;">🗑️ Excluir</button>
+                    </div>
+
+                    <div id="lista-catalogo" style="overflow-y:auto; flex:1; background:white;"></div>
+                </div>
+
+                <div class="card" style="display:flex; flex-direction:column; max-height:85vh; padding:0; overflow:hidden; border-top: 5px solid #246caf;">
+                    
+                    <div class="card-header" style="padding: 20px 20px 15px 20px; border-bottom: 1px solid #eee; background-color: #fff;">
+                        <h3 style="margin: 0 0 5px 0; color: #246caf; line-height: 3; font-size: 1.3em;padding-left: 15px;">
+                            2. Itens em Estoque (Físico)
+                        </h3>
+                        <small style="color: #7f8c8d;">
+                            Clique nos títulos da tabela para ordenar
+                        </small>
+                    </div>
+                    
+                    <div class="table-responsive" style="overflow-y:auto; flex:1;">
+                        <table class="tabela-estoque" style="width:100%; border-collapse:separate; border-spacing:0;">
+                            <thead style="position:sticky; top:0; background:#f8f9fa; z-index:5; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                <tr>
+                                    <th onclick="ordenarEstoque('produto')" style="padding-left: 20px;">Produto ↕</th>
+                                    <th onclick="ordenarEstoque('marca')">Marca ↕</th>
+                                    <th onclick="ordenarEstoque('tipo')">Tipo ↕</th>
+                                    <th onclick="ordenarEstoque('estoqueAtual')">Saldo ↕</th>
+                                    <th onclick="ordenarEstoque('custoPorVol')" title="Custo Unitário">Custo Unit. ↕</th>
+                                    <th onclick="ordenarEstoque('custoTotal')" title="Valor Total">Custo Total ↕</th>
+                                    <th style="width: 80px; text-align:center;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-estoque-fisico">
+                                </tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="padding:10px; background:#e8f5e9; text-align:right; font-weight:bold; color:#27ae60; border-top:1px solid #c8e6c9;">
+                        <span style="color:#2c3e50; font-size:0.9em;">Valor Total em Estoque:</span> 
+                        <strong id="total-valor-estoque" style="color:#27ae60; font-size:0.9em; margin-left:10px;">R$ 0,00</strong>
+                    </div>
+                </div>
+                           
+                        </div>
+                    </div>
+                </div>
+
+        <div id="modalEntradaEstoque" class="modal-overlay">
+            <div class="modal" style="max-width: 500px;">
+                <span class="close-modal" onclick="fecharModalEntrada()">×</span>
+                <h3 style="border-bottom: 2px solid #2ecc71; padding-bottom:10px; color:#27ae60;">📥 Entrada de Estoque</h3>
+                
+                <h4 id="titulo-entrada-item" style="margin: 0 0 15px 0; color:#555;">Produto Selecionado</h4>
+                <input type="hidden" id="id-entrada-item">
+
+                <div style="background:#e8f5e9; padding:15px; border-radius:8px; border:1px solid #c8e6c9;">
+                    
+                    <label>Como você comprou?</label>
+                    <select id="calc-tipo" onchange="toggleCalcMode()" style="margin-bottom:10px; font-weight:bold;">
+                        <option value="fardo">📦 Embalagem Fechada (Fardo/Caixa)</option>
+                        <option value="unidade">🍾 Unidade Avulsa (Garrafa Única)</option>
+                    </select>
+
+                    <div class="grid-2">
+                        <div>
+                            <label id="lbl-qtd-emb">Qtd. Caixas/Fardos</label>
+                            <input type="number" id="calc-qtd-emb" value="1" oninput="calcularPrevia()">
+                        </div>
+                        <div id="div-und-emb">
+                            <label>Unidades por Caixa</label>
+                            <input type="number" id="calc-und-emb" value="6" placeholder="Ex: 6, 12, 24" oninput="calcularPrevia()">
+                        </div>
+                    </div>
+
+                    <div class="grid-2">
+                        <div>
+                            <label>Volume Unitário</label>
+                            <div class="split-input">
+                                <input type="number" id="calc-vol-und" placeholder="Ex: 350" oninput="calcularPrevia()">
+                                <select id="calc-un-med" style="width:70px;" onchange="calcularPrevia()">
+                                    <option value="ml">ml</option>
+                                    <option value="g">g</option>
+                                    <option value="un">un</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Valor Total da Nota (R$)</label>
+                            <input type="number" id="calc-valor-total" placeholder="0.00" oninput="calcularPrevia()">
+                        </div>
+                    </div>
+
+                    <div style="margin-top:15px; border-top:1px dashed #aaa; padding-top:10px; text-align:right;">
+                        <div style="font-size:0.9em; color:#555;">Volume Total a Adicionar: <b id="res-vol-total" style="color:#2980b9; font-size:1.2em;">0 ml</b></div>
+                        <div style="font-size:0.8em; color:#888;">Custo Calculado: <span id="res-custo-ml">R$ 0,000 / ml</span></div>
+                    </div>
+                </div>
+
+                <button onclick="confirmarEntradaEstoque()" class="btn-success" style="width:100%; margin-top:15px; padding:12px; font-size:1.1em;">CONFIRMAR ENTRADA</button>
+            </div>
+        </div>
+
+        <div id="view-analytics" class="view-section">
+            <h2>📈 Analytics</h2>
+            <div class="card" style="display:flex; gap:10px; flex-wrap:wrap;">
+                <select id="select-evento-analise" style="flex:1;" onchange="carregarBartenders(this.value)"><option>Carregando...</option></select>
+                <select id="filterBartender" style="width:auto; min-width:140px;"><option value="all">Todos os Bartenders</option></select>
+                <select id="chartPeriod" style="width:auto; min-width:140px;"><option value="60">Visão: Hora</option><option value="10">Visão: 10 min</option></select>
+                <button onclick="gerarRelatorio()" class="btn-primary">Analisar</button>
+                <button onclick="baixarExtratoVendas()" class="btn-success">📑 Extrato</button>
+				<button onclick="exportarRelatorioCSV()" class="btn-success"> 📥 Baixar Relatório Completo (CSV) </button>				
+                <div style="border-left: 2px solid #ddd; padding-left: 10px; display:flex; gap:5px; align-items:center;">
+                    <label for="csvRestore" style="font-size:0.8em; cursor:pointer; color:#e67e22; font-weight:bold;">📂 Restaurar CSV</label>
+                    <input type="file" id="csvRestore" accept=".csv" style="display:none" onchange="importarBackupVendas()">
+                </div>
+            </div>
+			
+            <div class="kpi-grid" style="margin-top:20px;">
+                <div class="kpi-card" style="border-color:gold"><small>Faturamento</small><span class="kpi-val" id="kpi-fat">0</span></div>
+                <div class="kpi-card" style="border-color:red"><small>Custo</small><span class="kpi-val" id="kpi-custo">0</span></div>
+                <div class="kpi-card" style="border-color:green"><small>Lucro</small><span class="kpi-val" id="kpi-lucro">0</span></div>
+                <div class="kpi-card" style="border-color:purple"><small>CMV</small><span class="kpi-val" id="kpi-cmv">0%</span></div>
+                <div class="kpi-card" style="border-color:#3498db"><small>Qtd Drinks</small><span class="kpi-val" id="kpi-qtd">0</span></div>
+                <div class="kpi-card" style="border-color:#e67e22"><small>Ticket Médio</small><span class="kpi-val" id="kpi-ticket">0</span></div>
+            </div>
+
+			<div class="card" style="margin-top:20px;">
+                <h3>🏆 Top Convidados / Consumo</h3>
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Pos</th>
+                                <th>Nome do Convidado</th>
+                                <th>Qtd Drinks</th>
+                                <th>Total Gasto (Est.)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-top-clientes">
+                            <tr><td colspan="4" style="text-align:center">Carregando dados...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>		
+						
+            <div class="grid-2" style="margin-top:20px;">
+                <div class="card" style="height:300px"><canvas id="chartDrinks"></canvas></div>
+                <div class="card" style="height:300px"><canvas id="chartHorario"></canvas></div>
+            </div>
+        </div>
+    </main>
+	
+	<div id="modalRevisaoCompras" class="modal-overlay">
+        <div class="modal" style="max-width: 500px;">
+            <span class="close-modal" onclick="document.getElementById('modalRevisaoCompras').style.display='none'">×</span>
+            <h3 style="color:#2c3e50; border-bottom:2px solid #f1c40f; padding-bottom:10px;">🛒 Revisão de Estoque</h3>
+            <p style="font-size:0.9em; color:#666;">O sistema calculou o necessário. Marque abaixo o que você <b>JÁ POSSUI</b>:</p>
+            <div id="lista-revisao-items" style="max-height: 400px; overflow-y: auto; margin: 15px 0; border: 1px solid #ddd; background:#f9f9f9; padding: 10px; border-radius:4px;"></div>
+            <button onclick="imprimirListaFinal()" class="btn-primary" style="width:100%; padding:15px; font-size:1.1em;">🖨️ GERAR LISTA FINAL</button>
+        </div>
+    </div>
+
+    <div id="modalNovoEvento" class="modal-overlay"><div class="modal"><span class="close-modal" onclick="fecharModal()">×</span><h3>✨ Novo Evento</h3><div style="display:grid; gap: 10px;"><div><label>Nome</label><input type="text" id="mNome"></div><div><label>Responsável</label><input type="text" id="mResp"></div><div><label>Telefone</label><input type="text" id="mTel" onkeyup="mascaraTelefone(this)"></div><div class="grid-2"><div><label>Data</label><input type="date" id="mData"></div><div><label>Local</label><input type="text" id="mLocal"></div></div><div class="time-grid"><div><label>Início</label><input type="time" id="mHora" onchange="calcTermino('m')"></div><div><label>Dur</label><div class="split-input"><input type="number" id="mDurH" value="4" onchange="calcTermino('m')">:<input type="number" id="mDurM" value="0" step="15" onchange="calcTermino('m')"></div></div><div><label>Ext</label><div class="split-input"><input type="number" id="mExtH" value="0" onchange="calcTermino('m')">:<input type="number" id="mExtM" value="0" step="15" onchange="calcTermino('m')"></div></div><div><label>Fim</label><input type="time" id="mTermino" readonly></div></div><button onclick="salvarNovoEvento()" class="btn-primary" style="margin-top:10px; padding:12px; width:100%">CRIAR EVENTO</button></div></div></div>
+    
+    <div id="modalEquipe" class="modal-overlay"><div class="modal"><span class="close-modal" onclick="fecharModalEquipe()">×</span><h3 id="eqTitulo">👤 Membro</h3><div style="display:grid; gap:10px"><input type="hidden" id="eqId"><div><label>Nome</label><input type="text" id="eqNome"></div><div class="grid-2"><div><label>Telefone</label><input type="text" id="eqTel" onkeyup="mascaraTelefone(this)"></div><div><label>CPF</label><input type="text" id="eqCPF" onkeyup="mascaraCPF(this)"></div></div><div class="grid-2"><div><label>Data Nasc</label><input type="date" id="eqData" onchange="calcIdade()"></div><div><label>Idade</label><input type="text" id="eqIdade" readonly></div></div><div class="grid-2"><select id="eqSexo"><option value="M">M</option><option value="F">F</option></select><select id="eqFuncao"><option>Bartender</option><option>Barback</option><option>Chefe de Bar</option><option>Garçom</option><option>Copeiro</option><option>Gerente</option></select></div><div class="grid-2"><input type="number" id="eqTaxa" placeholder="Taxa"><input type="number" id="eqAdicional" placeholder="Add"></div><button onclick="salvarEquipe()" class="btn-success" style="margin-top:10px;padding:12px">SALVAR</button></div></div></div>
+
+<script type="module">
+	import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy, writeBatch, where, getDocs, limit, getDoc, serverTimestamp, increment, collectionGroup } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // ⚠️ COLE SUA CONFIG AQUI ⚠️
+	const firebaseConfig = {
+	  apiKey: "AIzaSyBu8y9RQMv9fbxORcRLAZN4OlA1IEXyZUU",
+	  authDomain: "aurora-bar-system.firebaseapp.com",
+	  projectId: "aurora-bar-system",
+	  storageBucket: "aurora-bar-system.firebasestorage.app",
+	  messagingSenderId: "380441809814",
+	  appId: "1:380441809814:web:ad008f37d30a5b0abe03b7"
+	};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // --- UTILS ---
+    window.toggleMenu = () => { document.getElementById('mainSidebar').classList.toggle('active'); document.querySelector('.sidebar-overlay').style.display = document.getElementById('mainSidebar').classList.contains('active') ? 'block' : 'none'; };
+    window.showView = (id, el) => { document.querySelectorAll('.view-section').forEach(e=>e.classList.remove('active')); document.getElementById(id).classList.add('active'); document.querySelectorAll('.menu-item').forEach(e=>e.classList.remove('active')); el.classList.add('active'); if(window.innerWidth<=900)window.toggleMenu(); };
+    window.mascaraTelefone = (i) => { let v=i.value.replace(/\D/g,"").replace(/^(\d{2})(\d)/g,"($1) $2").replace(/(\d)(\d{4})$/,"$1-$2"); i.value=v; };
+    window.mascaraCPF = (i) => { let v=i.value.replace(/\D/g,"").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2"); i.value=v; };
+    window.calcIdade = () => { const d=document.getElementById('eqData').value; if(d) document.getElementById('eqIdade').value = (new Date().getFullYear() - new Date(d).getFullYear()) + " anos"; };
+    
+    // FORMATADORES
+    window.mascaraMoeda = (i) => { let v = i.value.replace(/\D/g,''); v = (v/100).toFixed(2) + ''; v = v.replace(".", ","); v = v.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.'); i.value = 'R$ ' + v; window.calcContrato(); };
+    const parseCurrencyInput = (val) => { if(!val) return 0; if(typeof val === 'number') return val; return parseFloat(val.toString().replace(/[R$\s.]/g, '').replace(',', '.')) || 0; };
+    const formatCurrency = (val) => { return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
+
+    // CALCULADORA
+    window.calcTermino = (p) => { 
+        const i=document.getElementById(p+'Hora').value, dH=parseInt(document.getElementById(p+'DurH').value)||0, dM=parseInt(document.getElementById(p+'DurM').value)||0, eH=parseInt(document.getElementById(p+'ExtH').value)||0, eM=parseInt(document.getElementById(p+'ExtM').value)||0; 
+        if(i){ const [h,m]=i.split(':').map(Number); let t=(h*60)+m+(dH*60)+dM+(eH*60)+eM; document.getElementById(p+'Termino').value=`${String(Math.floor(t/60)%24).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+        if(p === 'det') window.calcContrato();
+    };
+
+    window.calcContrato = () => {
+        const vContrato = parseCurrencyInput(document.getElementById('finContrato').value);
+        const vHora = parseCurrencyInput(document.getElementById('finValorExtra').value);
+        const vCustoExtra = parseCurrencyInput(document.getElementById('finCustoExtra').value);
+        const sinalPerc = parseFloat(document.getElementById('finSinalPerc').value) || 0;
+        
+        const extH = parseInt(document.getElementById('detExtH').value) || 0;
+        const extM = parseInt(document.getElementById('detExtM').value) || 0;
+        const minutosExtras = (extH * 60) + extM;
+        const valorPorMinuto = vHora > 0 ? (vHora / 60) : 0;
+        const adicional = minutosExtras * valorPorMinuto;
+        const totalFinal = vContrato + adicional + vCustoExtra;
+        const sinalValor = vContrato * (sinalPerc / 100);
+
+        document.getElementById('finAdicional').value = formatCurrency(adicional);
+        document.getElementById('finTotal').innerText = formatCurrency(totalFinal);
+        document.getElementById('finSinalValor').value = formatCurrency(sinalValor);
+    };
+
+    window.atualizarPreview = (u) => { const i=document.getElementById('previewImg'),t=document.getElementById('previewText'); if(u&&u.length>10){i.src=u;i.style.display='block';t.style.display='none'}else{i.style.display='none';t.style.display='block'} };
+
+    let eventoID=null, bibliotecaGlobal=[], insumosCache=[], receitaAtual=[], idsNoEvento=[], eventoAtivoID=null;
+    let chartD = null, chartH = null;
+    let listaComprasCache = []; 
+
+    // ============================================================
+    // 3. GESTÃO DE ESTOQUE (CÓDIGO ÚNICO E OFICIAL)
+    // ============================================================
+    
+    const TIPOS_PADRAO = ["Aperitivo", "Destilado", "Xarope", "Frutas", "Soft drink", "Outros"];
+    window.catalogoGeral = [];
+    let listaTiposCache = [];
+    
+    // Variáveis de Ordenação (Trazidas do bloco antigo)
+    let estoqueSortCol = 'produto';
+    let estoqueSortAsc = true;
+
+    // --- CARREGAMENTO DO BANCO ---
+    onSnapshot(collection(db, "insumos"), (snap) => {
+        window.catalogoGeral = [];
+        snap.forEach(doc => {
+            window.catalogoGeral.push({ ...doc.data(), id: doc.id });
+        });
+        
+        // Renderiza catálogo (cima)
+        if(document.getElementById('lista-catalogo')) renderizarCatalogo();
+        
+        // Renderiza estoque (baixo)
+        renderizarEstoqueFisico();
+        
+        if(window.atualizarSelectFichaTecnica) window.atualizarSelectFichaTecnica();
+    });
+
+    // --- 1. RENDERIZAR CATÁLOGO (CIMA - CARDS) ---
+    window.renderizarCatalogo = () => {
+        const inputBusca = document.getElementById('busca-catalogo');
+        const lista = document.getElementById('lista-catalogo');
+        if (!inputBusca || !lista) return;
+
+        const termo = inputBusca.value.toLowerCase();
+        lista.innerHTML = '';
+
+        const filtrados = window.catalogoGeral
+            .filter(i => (i.produto + ' ' + (i.marca||'')).toLowerCase().includes(termo))
+            .sort((a,b) => a.produto.localeCompare(b.produto));
+
+        filtrados.forEach(item => {
+            const nomeCompleto = `${item.produto} ${item.marca || ''}`;
+            lista.innerHTML += `
+                <div class="catalog-row" style="display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee; gap:10px;">
+                    <input type="checkbox" class="check-item-catalogo check-custom" value="${item.id}">
+                    <div class="catalog-info-box" style="flex:1; min-width:0;">
+                        <b style="color:#2c3e50;">${item.produto}</b> <small>${item.marca||''}</small>
+                        <br><span class="catalog-badge" style="font-size:0.7em; background:#eee; padding:1px 4px; border-radius:4px;">${item.tipo}</span>
+                    </div>
+                    <div style="display:flex; gap:2px;">
+                        <button onclick="abrirModalEntrada('${item.id}', '${nomeCompleto}')" class="btn-success" style="padding:2px 8px; font-size:0.75em;">➕</button>
+                        <button onclick="excluirDoSistema('${item.id}')" style="border:none; background:transparent; color:#c0392b; cursor:pointer; padding:0 5px;" title="Excluir Definitivamente">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+    };
+
+    // --- 2. RENDERIZAR ESTOQUE FÍSICO (BAIXO - TABELA COM BOTÃO!) ---
+    window.renderizarEstoqueFisico = () => {
+        // Procura a tabela pelo ID que está no seu HTML
+        const tbody = document.getElementById('lista-estoque-fisico');
+        const spanTotal = document.getElementById('total-valor-estoque');
+        
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        // 1. Filtra saldo positivo
+        let itensComEstoque = window.catalogoGeral.filter(i => (i.estoqueAtual || i.estoque) > 0);
+
+        // 2. Prepara para ordenação (Cálculo do Total)
+        itensComEstoque = itensComEstoque.map(item => {
+            const qtd = parseFloat(item.estoqueAtual || item.estoque || 0);
+            return {
+                ...item,
+                estoqueFinal: qtd,
+                valorTotalEstoque: qtd * (item.custoPorVol || 0)
+            };
+        });
+
+        // 3. Ordenação Dinâmica
+        itensComEstoque.sort((a, b) => {
+            let valA = a[estoqueSortCol];
+            let valB = b[estoqueSortCol];
+
+            if (estoqueSortCol === 'custoTotal') { valA = a.valorTotalEstoque; valB = b.valorTotalEstoque; }
+            else if (estoqueSortCol === 'estoqueAtual') { valA = a.estoqueFinal; valB = b.estoqueFinal; }
+            else if (estoqueSortCol === 'custoPorVol') { valA = a.custoPorVol || 0; valB = b.custoPorVol || 0; }
+
+            if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
+
+            if (valA < valB) return estoqueSortAsc ? -1 : 1;
+            if (valA > valB) return estoqueSortAsc ? 1 : -1;
+            return 0;
+        });
+
+        let somaGeral = 0;
+
+        // 4. Renderiza (COM A COLUNA DE AÇÕES)
+        itensComEstoque.forEach(item => {
+            const estoque = item.estoqueFinal;
+            const custoUnit = item.custoPorVol || 0;
+            const custoTotal = item.valorTotalEstoque;
+            somaGeral += custoTotal;
+
+            // Formatação do Volume
+            let volDisplay = `${estoque} ${item.unMedida}`;
+            if(item.unMedida === 'ml' && estoque >= 1000) volDisplay = `${(estoque/1000).toFixed(2)} L`;
+            if(item.unMedida === 'g' && estoque >= 1000) volDisplay = `${(estoque/1000).toFixed(2)} Kg`;
+
+            tbody.innerHTML += `
+                <tr style="border-bottom: 1px solid #eee; height: 45px;">
+                    <td style="padding:10px;"><b>${item.produto}</b></td>
+                    <td style="padding:10px;">${item.marca || '-'}</td>
+                    <td style="padding:10px;"><span class="catalog-badge">${item.tipo}</span></td>
+                    <td style="padding:10px; font-weight:bold; color:#27ae60">${volDisplay}</td>
+                    <td style="padding:10px;">R$ ${custoUnit.toFixed(2)}</td>
+                    <td style="padding:10px;">R$ ${custoTotal.toFixed(2)}</td>
+                    
+                    <td style="padding:10px; text-align:center;">
+                        <button onclick="zerarItemEstoque('${item.id}')" title="Remover do Estoque Físico" style="border:none; background:transparent; color:#c0392b; cursor:pointer; font-size:1.4em; display:block; margin:0 auto;">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        // Atualiza Total
+        if(spanTotal) spanTotal.innerText = `R$ ${somaGeral.toFixed(2)}`;
+    };
+
+    // --- FUNÇÃO DE ORDENAÇÃO (CLIQUE NO CABEÇALHO) ---
+    window.ordenarEstoque = (coluna) => {
+        if (estoqueSortCol === coluna) {
+            estoqueSortAsc = !estoqueSortAsc; 
+        } else {
+            estoqueSortCol = coluna;
+            estoqueSortAsc = true; 
+        }
+        renderizarEstoqueFisico(); 
+    };
+
+    // --- AÇÃO: ZERAR SALDO ---
+    window.zerarItemEstoque = async (id) => {
+        if(confirm("Deseja remover este item do estoque físico?\n(O saldo será zerado, mas o item continua no catálogo)")) {
+            try {
+                await updateDoc(doc(db, "insumos", id), { estoque: 0, estoqueAtual: 0 });
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+        }
+    };
+
+    // --- AÇÃO: EXCLUIR DO SISTEMA ---
+    window.excluirDoSistema = async (id) => {
+        if(confirm("⚠️ PERIGO: Excluir do CATÁLOGO GERAL?\nIsso apaga o item de todas as receitas e do estoque.")) {
+            try {
+                await deleteDoc(doc(db, "insumos", id));
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+        }
+    };
+</script>
