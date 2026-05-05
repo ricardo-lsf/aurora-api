@@ -621,12 +621,14 @@ def salvar_cardapio(event_id: str, menu: NovoMenu):
         else:
             cur.execute("DELETE FROM event_menus WHERE event_id = %s", (event_id,))
 
-        # 2. Inserimos os novos, mas usamos ON CONFLICT para não zerar o que já existe
+        # 2. Inserimos os novos e ATUALIZAMOS a ordem dos que já existem
         # Nota: Para isso funcionar, sua tabela event_menus precisa de uma constraint UNIQUE(event_id, cocktail_id)
+
         query_upsert = """
             INSERT INTO event_menus (event_id, cocktail_id, display_order)
             VALUES (%s, %s, %s)
-            ON CONFLICT (event_id, cocktail_id) DO NOTHING;
+            ON CONFLICT (event_id, cocktail_id) 
+            DO UPDATE SET display_order = EXCLUDED.display_order;
         """
         
         for posicao, drink_id in enumerate(menu.drinks, start=1):
@@ -655,7 +657,7 @@ def buscar_cardapio_evento_admin(event_id: str):
         # RealDictCursor garante que o Python devolva no formato JSON que o JS adora
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        query = """
+query = """
             SELECT 
                 c.id, 
                 c.name AS drink_nome, 
@@ -669,6 +671,7 @@ def buscar_cardapio_evento_admin(event_id: str):
             WHERE em.event_id = %s
             ORDER BY em.display_order;
         """
+
         cur.execute(query, (event_id,))
         drinks_do_evento = cur.fetchall()
         
