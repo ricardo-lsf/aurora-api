@@ -464,31 +464,35 @@
             }
         };
 
-    // --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL (VERSÃO GAVETA) ---
-    async function carregarDrinks(id_firebase) {
+    / --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL ---
+    async function carregarDrinks(id_evento) { // <-- Nome limpo e correto!
         try {
-            console.log(`Buscando cardápio no banco relacional...`);
+            console.log(`Buscando cardápio no banco relacional para o evento:`, id_evento);
             
-            // Chamada para a API
-            const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${ID_FESTA_POSTGRES}/menu`);
+            // 1. A chamada correta para a API (usando a variável que passamos pra função)
+            const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id_evento}/menu`);
             const dadosApi = await resposta.json();
             
-            // Agora o Python manda { "festa": "Nome", "drinks": [...] }
-            // Se vier no formato novo, pegamos de dentro de .drinks. Se vier antigo, usa direto.
-            const listaDrinks = dadosApi.drinks ? dadosApi.drinks : (Array.isArray(dadosApi) ? dadosApi : []);
+            // 2. O X-9: Vai imprimir no seu F12 EXATAMENTE o que o Python devolveu
+            console.log("🕵️ Resposta da API:", dadosApi);
+            
+            // 3. Pega a lista, esteja ela na gaveta "dados" ou solta no Array
+            const listaDrinks = dadosApi.dados ? dadosApi.dados : (Array.isArray(dadosApi) ? dadosApi : []);
 
             if (listaDrinks.length > 0) {
                 drinks = [];
                 listaDrinks.forEach(item => {
                     drinks.push({
                         id: item.id,
-                        nome: item.drink_nome,
-                        precoVenda: item.preco_venda,
-                        estoque: item.planned_quantity || 999, // Agora pega o estoque real do banco!
+                        // 4. A BLINDAGEM: Lê o nome e o preço, seja do jeito novo ou do jeito velho!
+                        nome: item.drink_nome || item.name,
+                        precoVenda: item.preco_venda || item.sale_price,
+                        estoque: item.planned_quantity || 999,
                         imagem: item.image_url || "./imagens/moscow.jpg" 
                     });
                 });
                 renderizar();
+                console.log("✅ Drinks renderizados com sucesso no PDV!");
             } else {
                 console.warn("Nenhum drink encontrado para esta festa.");
             }
