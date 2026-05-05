@@ -656,7 +656,14 @@ def buscar_cardapio_evento_admin(event_id: str):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
         query = """
-            SELECT c.id, c.name, c.category, c.image_url, em.display_order, em.planned_quantity
+            SELECT 
+                c.id, 
+                c.name AS drink_nome, 
+                c.category AS categoria, 
+                c.image_url, 
+                c.sale_price AS preco_venda,
+                em.display_order, 
+                em.planned_quantity
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
             WHERE em.event_id = %s
