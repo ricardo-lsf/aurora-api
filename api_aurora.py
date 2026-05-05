@@ -666,7 +666,7 @@ def buscar_cardapio_evento_admin(event_id: str):
         drinks_do_evento = cur.fetchall()
         
         # Devolvemos a lista direta para o forEach do JavaScript brilhar
-        return drinks_do_evento
+        return {"status": "sucesso", "dados": drinks_do_evento}
         
     except Exception as e:
         print("Erro ao carregar menu admin:", e)
