@@ -641,6 +641,40 @@ def salvar_cardapio(event_id: str, menu: NovoMenu):
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
         
+# ==========================================
+# ROTA: BUSCAR O CARDÁPIO DO EVENTO (PARA O ADMIN)
+# Resolve o erro "undefined (reading 'forEach')"
+# ==========================================
+@app.get("/events/{event_id}/menu")
+def buscar_cardapio_evento_admin(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão")
+    
+    try:
+        # RealDictCursor garante que o Python devolva no formato JSON que o JS adora
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = """
+            SELECT c.id, c.name, c.category, c.image_url, em.display_order, em.planned_quantity
+            FROM event_menus em
+            JOIN cocktails c ON em.cocktail_id = c.id
+            WHERE em.event_id = %s
+            ORDER BY em.display_order;
+        """
+        cur.execute(query, (event_id,))
+        drinks_do_evento = cur.fetchall()
+        
+        # Devolvemos a lista direta para o forEach do JavaScript brilhar
+        return drinks_do_evento
+        
+    except Exception as e:
+        print("Erro ao carregar menu admin:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
 
 # ==========================================
 # NOSSA QUINTA ROTA: CADASTRAR NOVO INSUMO
@@ -1034,7 +1068,7 @@ def relatorio_estoque(account_id: str):
         conn.close()
         raise HTTPException(status_code=400, detail=str(e))
         
-# ==========================================
+
 # ==========================================
 # NOSSA OITAVA ROTA: CRIAR DRINK COM FICHA TÉCNICA (POST)
 # ==========================================
