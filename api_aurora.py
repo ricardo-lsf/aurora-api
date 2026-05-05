@@ -657,7 +657,7 @@ def buscar_cardapio_evento_admin(event_id: str):
         # RealDictCursor garante que o Python devolva no formato JSON que o JS adora
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-query = """
+        query = """
             SELECT 
                 c.id, 
                 c.name AS drink_nome, 
