@@ -299,17 +299,53 @@ class NovoEvento(BaseModel):
 # ==========================================
 class NovoInsumo(BaseModel):
     account_id: str
-    type_id: str  # Mudamos de category_id para type_id
     name: str
-    brand: str
+    brand: Optional[str] = ""
+    type_name: str
     measurement_unit: str
     package_quantity: float
+    current_cost_price: float # Adicionado para salvar o preço inicial
 
 class NovaCompra(BaseModel):
     ingredient_id: str
     packages_bought: float
     total_paid: float
     supplier_name: Optional[str] = "Não informado"
+
+
+@app.post("/ingredients/")
+def criar_insumo(insumo: NovoInsumo):
+    conn = get_db_connection()
+    if not conn: raise HTTPException(status_code=500, detail="Erro de conexão")
+    
+    try:
+        cur = conn.cursor()
+        
+        # 1. Busca o ID do tipo pelo nome (ex: "Destilado")
+        cur.execute("SELECT id FROM ingredient_types WHERE name = %s", (insumo.type_name,))
+        tipo_row = cur.fetchone()
+        tipo_id = tipo_row[0] if tipo_row else None 
+
+        # 2. Insere o insumo
+        query = """
+            INSERT INTO ingredients 
+            (account_id, name, brand, type_id, measurement_unit, package_quantity, current_cost_price, current_stock)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 0)
+            RETURNING id;
+        """
+        cur.execute(query, (
+            insumo.account_id, insumo.name, insumo.brand, tipo_id, 
+            insumo.measurement_unit, insumo.package_quantity, insumo.current_cost_price
+        ))
+        
+        conn.commit()
+        return {"status": "sucesso", "mensagem": "Insumo cadastrado!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
 
 # ==========================================
 # NOVOS MOLDES: A FICHA TÉCNICA DO DRINK
