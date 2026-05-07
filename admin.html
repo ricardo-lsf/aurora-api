@@ -1848,10 +1848,10 @@
     </div>
 
 
-    <script type="module">
+<script type="module">
 
 
-function showView(viewId, element) {
+    function showView(viewId, element) {
     // 1. Esconde todas as seções de conteúdo
     document.querySelectorAll('.view-section').forEach(view => {
         view.style.display = 'none';
@@ -2379,9 +2379,8 @@ function showView(viewId, element) {
         };
 
 
-        // ============================================================
-        // --- SALVAR NOVO PRODUTO (COM CÁLCULO DE CUSTO) ---
-        // 1.4 SALVAR MANUALMENTE (COM BLOQUEIO DE DUPLICADOS)
+// ============================================================
+        // --- SALVAR NOVO PRODUTO (REDIRECIONADO PARA POSTGRESQL) ---
         // ============================================================
         window.salvarCatalogo = async () => {
             const prod = document.getElementById('insProd').value.trim();
@@ -2395,8 +2394,8 @@ function showView(viewId, element) {
             if (!prod) return alert("Nome do produto é obrigatório!");
             if (volRef <= 0 || precoRef <= 0) return alert("Preencha Volume e Preço para cálculo de custo!");
 
-            // 1.4.1 CHECAGEM DE DUPLICIDADE RIGOROSA (Igual ao Excel)
-            const duplicado = catalogoGeral.some(i =>
+            // Mantendo sua checagem de duplicidade rigorosa local
+            const duplicado = window.catalogoGeral.some(i =>
                 i.produto.toLowerCase() === prod.toLowerCase() &&
                 i.marca.toLowerCase() === marca.toLowerCase()
             );
@@ -2405,32 +2404,45 @@ function showView(viewId, element) {
                 return alert(`⛔ ERRO: O produto "${prod} ${marca}" já existe no catálogo!`);
             }
 
-            // Calcula Custo Base
-            const custoCalculado = precoRef / volRef;
+            // Montando o pacote para o Python
+            const payload = {
+                account_id: ACCOUNT_ID, // Certifique-se que ACCOUNT_ID está definido no seu admin.html
+                name: prod,
+                brand: marca,
+                type_name: tipo, 
+                measurement_unit: unMed,
+                package_quantity: volRef,
+                current_cost_price: precoRef // Enviamos o preço cheio, o Python cuida do resto
+            };
 
             try {
-                await addDoc(collection(db, "insumos"), {
-                    produto: prod,
-                    marca: marca,
-                    tipo: tipo,
-                    unMedida: unMed,
-                    estoqueAtual: 0,
-                    custoPorVol: custoCalculado,
-                    refVolume: volRef,
-                    refPreco: precoRef,
-                    dataCadastro: new Date()
+                const res = await fetch(`${API_BASE}/ingredients/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
 
-                // Limpa form
-                document.getElementById('insProd').value = '';
-                document.getElementById('insMarca').value = '';
-                document.getElementById('insVolRef').value = '';
-                document.getElementById('insPrecoRef').value = '';
-                window.toggleNovoItem();
-                alert("✅ Produto salvo com sucesso!");
+                const result = await res.json();
+
+                if (res.ok || result.status === "sucesso") {
+                    // Limpa form (Seu código original)
+                    document.getElementById('insProd').value = '';
+                    document.getElementById('insMarca').value = '';
+                    document.getElementById('insVolRef').value = '';
+                    document.getElementById('insPrecoRef').value = '';
+                    
+                    if(typeof window.toggleNovoItem === 'function') window.toggleNovoItem();
+                    
+                    // Recarrega a lista para mostrar o novo item
+                    window.carregarEstoqueDaAPI(); 
+                    
+                    alert("✅ Produto salvo com sucesso no PostgreSQL!");
+                } else {
+                    alert("Erro ao salvar no servidor: " + (result.detail || "Erro desconhecido"));
+                }
             } catch (error) {
-                console.error(error);
-                alert("Erro ao salvar.");
+                console.error("Erro na conexão:", error);
+                alert("Erro de conexão com a API.");
             }
         };
 
