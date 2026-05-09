@@ -1051,7 +1051,7 @@
                         style="background:#8e44ad; color:white; border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size: 0.9em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         🔲 Gerar QR Code</button>
 
-                    <button onclick="window.abrirModalLogistica('c5f6924b-898c-41f5-87b0-2f945d4120e7')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                    <button onclick="window.abrirModalLogistica('${eventoID}')" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
                         🚚 Carregar Caminhão
                     </button>
 
@@ -3731,11 +3731,9 @@
         }
     };
 
+
     // ==========================================
-    // 4. EXCLUIR EVENTO PERMANENTEMENTE (Delete API)
-    // ==========================================
-// ==========================================
-    // EXCLUIR EVENTO PERMANENTEMENTE (Com trava de segurança nominal)
+    // 4. EXCLUIR EVENTO PERMANENTEMENTE (Com trava de segurança nominal)
     // ==========================================
     window.excluirEventoAtual = async () => {
         if (!eventoID) return;
