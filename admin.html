@@ -1051,7 +1051,7 @@
                         style="background:#8e44ad; color:white; border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size: 0.9em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         🔲 Gerar QR Code</button>
 
-                    <button onclick="window.abrirModalLogistica(eventoID)" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                    <button onclick="window.abrirModalLogistica(window.eventoID)" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
                         🚚 Carregar Caminhão
                     </button>
 
@@ -3265,7 +3265,7 @@
     // ============================================================
     window.carregarEvento = async (id) => {
         console.log("Selecionando evento ID:", id);
-        eventoID = id; 
+        window.eventoID = id;
         
         document.querySelectorAll('.event-card-item').forEach(el => el.style.border = '1px solid #ddd');
         if(event && event.currentTarget) event.currentTarget.style.border = '2px solid #2980b9';
