@@ -3265,7 +3265,8 @@
     // ============================================================
     window.carregarEvento = async (id) => {
         console.log("Selecionando evento ID:", id);
-        window.eventoID = id;
+        eventoID = id;          // 1. Alimenta a variável interna (Conserta o Menu!)
+        window.eventoID = id;   // 2. Alimenta a variável pública (Conserta o Botão de Carga!)
         
         document.querySelectorAll('.event-card-item').forEach(el => el.style.border = '1px solid #ddd');
         if(event && event.currentTarget) event.currentTarget.style.border = '2px solid #2980b9';
