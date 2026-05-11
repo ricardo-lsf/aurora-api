@@ -623,27 +623,28 @@ def carregar_estoque_evento(payload: CargaEvento):
         erros_estoque = []
         
         for item in payload.itens:
-            # Busca o nome e o saldo atual do insumo no Galpão
             cur.execute("SELECT name, current_stock FROM ingredients WHERE id = %s", (item.ingredient_id,))
             resultado = cur.fetchone()
             
             if not resultado:
-                erros_estoque.append(f"Insumo ID {item.ingredient_id} não encontrado.")
+                erros_estoque.append({"insumo": f"ID {item.ingredient_id}", "pedido": item.quantity, "disponivel": 0})
                 continue
                 
             nome_insumo = resultado[0]
             estoque_atual = float(resultado[1] or 0)
             qtd_solicitada = float(item.quantity)
             
-            # Se o que foi pedido for maior do que o que tem na prateleira, anota o erro
             if qtd_solicitada > estoque_atual:
-                erros_estoque.append(f"Falta '{nome_insumo}': Pedido {qtd_solicitada}, Disponível {estoque_atual}")
+                # Agora guardamos como um dicionário, não como um texto corrido
+                erros_estoque.append({
+                    "insumo": nome_insumo,
+                    "pedido": qtd_solicitada,
+                    "disponivel": estoque_atual
+                })
         
-        # Se a lista de erros não estiver vazia, aborta tudo!
         if erros_estoque:
-            # Junta os erros e dispara o alarme (o frontend vai receber isso)
-            mensagem_erro = " | ".join(erros_estoque)
-            raise Exception(mensagem_erro)
+            # O FastAPI entende essa lista e transforma num JSON bonitinho pro JavaScript ler
+            raise HTTPException(status_code=400, detail=erros_estoque)
 
         # ==========================================
         # 2. SE PASSOU NO TESTE, FAZ A TRANSFERÊNCIA

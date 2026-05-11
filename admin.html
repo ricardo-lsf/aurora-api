@@ -1838,6 +1838,8 @@
                     </table>
                 </div>
 
+                <div id="div-mensagens-carga"></div>
+
                 <div style="margin-top:20px; display:flex; gap:10px;">
                     <button onclick="confirmarCargaEvento()" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
                         CONFIRMAR SAÍDA DO GALPÃO
@@ -5250,6 +5252,10 @@
             const inputs = document.querySelectorAll('.input-carga-insumo');
             const itensParaCarga = [];
 
+            // 1. Limpa mensagens de erro antigas sempre que tenta salvar de novo
+            const divErros = document.getElementById('div-mensagens-carga');
+            if (divErros) divErros.innerHTML = '';
+
             inputs.forEach(input => {
                 const qtd = parseFloat(input.value);
                 if (qtd > 0) {
@@ -5279,7 +5285,36 @@
                     alert("🚚 SUCESSO! Caminhão carregado e PDV liberado.");
                     window.fecharModalLogistica();
                 } else {
-                    alert("Erro: " + (result.detail || "Erro ao processar carga."));
+                    // ==========================================
+                    // NOVO BLOCO: Tratamento elegante de erro de estoque
+                    // ==========================================
+                    if (Array.isArray(result.detail)) {
+                        let htmlErro = `
+                            <div style="background-color: #fee2e2; border-left: 5px solid #ef4444; color: #b91c1c; padding: 15px; border-radius: 4px; margin-top: 15px; margin-bottom: 15px; text-align: left;">
+                                <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                                    ⚠️ Não foi possível carregar o caminhão
+                                </h4>
+                                <p style="margin-bottom: 10px; font-size: 14px;">Os seguintes insumos não possuem saldo suficiente no Galpão:</p>
+                                <ul style="margin-bottom: 0; padding-left: 20px; font-size: 14px;">
+                        `;
+                        
+                        result.detail.forEach(erro => {
+                            htmlErro += `<li style="margin-bottom: 5px;">
+                                <b>${erro.insumo}</b>: Tentou carregar <b>${erro.pedido}</b> | Saldo atual: <b>${erro.disponivel}</b>
+                            </li>`;
+                        });
+                        
+                        htmlErro += `</ul></div>`;
+                        
+                        if (divErros) {
+                            divErros.innerHTML = htmlErro;
+                        } else {
+                            alert("Crie a div 'div-mensagens-carga' no seu HTML para ver os detalhes do erro.");
+                        }
+                    } else {
+                        // Se for um erro diferente (ex: banco de dados fora do ar)
+                        alert("Erro: " + (result.detail || "Erro ao processar carga."));
+                    }
                 }
             } catch (error) {
                 alert("Erro de conexão com o servidor.");
