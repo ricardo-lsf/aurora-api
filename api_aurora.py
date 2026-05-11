@@ -666,10 +666,16 @@ def carregar_estoque_evento(payload: CargaEvento):
         conn.commit() 
         return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
         
-    except Exception as e:
+    except HTTPException as he:
+        # 1. Se for o nosso erro de estoque, repassa o JSON perfeito pro JavaScript ler!
         if conn: conn.rollback()
-        # Esse HTTP 400 vai acionar aquele seu 'alert("Erro: " + result.detail)' no JavaScript
+        raise he 
+        
+    except Exception as e:
+        # 2. Se for erro de servidor/banco de dados, converte pra texto e avisa
+        if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+        
     finally:
         if conn:
             cur.close()
