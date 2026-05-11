@@ -611,14 +611,49 @@ class CargaEvento(BaseModel):
 @app.post("/inventory/load-event")
 def carregar_estoque_evento(payload: CargaEvento):
     conn = get_db_connection()
-    cur = conn.cursor()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
     try:
+        cur = conn.cursor()
+        
+        # ==========================================
+        # 1. CHECAGEM PRÉ-VOO (VALIDAÇÃO DE SALDO)
+        # ==========================================
+        erros_estoque = []
+        
         for item in payload.itens:
-            # 1. Tira do estoque central
+            # Busca o nome e o saldo atual do insumo no Galpão
+            cur.execute("SELECT name, current_stock FROM ingredients WHERE id = %s", (item.ingredient_id,))
+            resultado = cur.fetchone()
+            
+            if not resultado:
+                erros_estoque.append(f"Insumo ID {item.ingredient_id} não encontrado.")
+                continue
+                
+            nome_insumo = resultado[0]
+            estoque_atual = float(resultado[1] or 0)
+            qtd_solicitada = float(item.quantity)
+            
+            # Se o que foi pedido for maior do que o que tem na prateleira, anota o erro
+            if qtd_solicitada > estoque_atual:
+                erros_estoque.append(f"Falta '{nome_insumo}': Pedido {qtd_solicitada}, Disponível {estoque_atual}")
+        
+        # Se a lista de erros não estiver vazia, aborta tudo!
+        if erros_estoque:
+            # Junta os erros e dispara o alarme (o frontend vai receber isso)
+            mensagem_erro = " | ".join(erros_estoque)
+            raise Exception(mensagem_erro)
+
+        # ==========================================
+        # 2. SE PASSOU NO TESTE, FAZ A TRANSFERÊNCIA
+        # ==========================================
+        for item in payload.itens:
+            # Tira do Galpão
             cur.execute("UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s", 
                         (item.quantity, item.ingredient_id))
             
-            # 2. Aloca no estoque do evento
+            # Coloca no Caminhão
             query_upsert = """
                 INSERT INTO event_stocks (event_id, ingredient_id, quantity_sent)
                 VALUES (%s, %s, %s)
@@ -627,14 +662,17 @@ def carregar_estoque_evento(payload: CargaEvento):
             """
             cur.execute(query_upsert, (payload.event_id, item.ingredient_id, item.quantity))
         
-        conn.commit()
+        conn.commit() 
         return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
+        
     except Exception as e:
         if conn: conn.rollback()
+        # Esse HTTP 400 vai acionar aquele seu 'alert("Erro: " + result.detail)' no JavaScript
         raise HTTPException(status_code=400, detail=str(e))
     finally:
-        cur.close()
-        conn.close()
+        if conn:
+            cur.close()
+            conn.close()
 
 
 # ==========================================
