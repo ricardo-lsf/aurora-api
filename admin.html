@@ -1051,10 +1051,6 @@
                         style="background:#8e44ad; color:white; border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size: 0.9em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         🔲 Gerar QR Code</button>
 
-                    <button onclick="window.abrirModalLogistica(window.eventoID, window.nomeEvento)" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
-                        🚚 Carregar Caminhão
-                    </button>
-
                     <button onclick="abrirModalNovo()" class="btn-primary" style="width:100%; margin-bottom:15px;">+
                         NOVO EVENTO</button>
                     <div id="lista-eventos" style="max-height:400px; overflow-y:auto;">Carregando...</div>
@@ -5210,14 +5206,14 @@
         // --- FUNÇÕES DE LOGÍSTICA (AURORA V3) ---
         window.eventoSendoCarregado = null;
 
-        window.abrirModalLogistica = async function(eventId, nomeEvento) {
+        window.abrirModalLogistica = async function(eventId, nomeEventoLimpo) {
             console.log("🚚 Tentando abrir logística para o evento:", eventId);
             window.eventoSendoCarregado = eventId;
             
             // ATUALIZA O TÍTULO DO MODAL
             const tituloModal = document.getElementById('titulo-modal-logistica');
             if (tituloModal) {
-                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
+                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEventoLimpo}</b>`;
             }
 
             const corpoTabela = document.getElementById('listaCargaCorpo');
