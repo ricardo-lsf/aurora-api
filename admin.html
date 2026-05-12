@@ -1813,7 +1813,7 @@
     <div id="modalLogistica" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(5px);">
         <div style="background:white; width:90%; max-width:600px; border-radius:15px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
             <div style="background:#2c3e50; color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0;">🚚 Carregamento de Estoque</h3>
+                <h3 id="titulo-modal-logistica" style="margin:0;">🚚 Carregamento de Estoque</h3>
                 <button onclick="fecharModalLogistica()" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
             </div>
             
@@ -5206,14 +5206,14 @@
         // --- FUNÇÕES DE LOGÍSTICA (AURORA V3) ---
         window.eventoSendoCarregado = null;
 
-        window.abrirModalLogistica = async function(eventId, nomeEventoLimpo) {
+        window.abrirModalLogistica = async function(eventId, nomeEvento) {
             console.log("🚚 Tentando abrir logística para o evento:", eventId);
             window.eventoSendoCarregado = eventId;
             
             // ATUALIZA O TÍTULO DO MODAL
             const tituloModal = document.getElementById('titulo-modal-logistica');
             if (tituloModal) {
-                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEventoLimpo}</b>`;
+                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
             }
 
             const corpoTabela = document.getElementById('listaCargaCorpo');
