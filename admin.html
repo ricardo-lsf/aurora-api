@@ -1837,7 +1837,7 @@
                 <div id="div-mensagens-carga"></div>
 
                 <div style="margin-top:20px; display:flex; gap:10px;">
-                    <button onclick="confirmarCargaEvento(this)" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
+                    <button id="btn-confirmar-carga" onclick="confirmarCargaEvento(this)" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
                         CONFIRMAR SAÍDA DO GALPÃO
                     </button>
                 </div>
@@ -5216,8 +5216,21 @@
                 tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
             }
 
+            // ==========================================
+            // CORREÇÃO DO FANTASMA: Limpa erros antigos ao abrir
+            // ==========================================
+            const divErros = document.getElementById('div-mensagens-carga');
+            if (divErros) divErros.innerHTML = '';
+            
+            // RESSUSCITA O BOTÃO: Garante que o botão volte a aparecer se tiver sido escondido antes
+            const btnConfirmar = document.getElementById('btn-confirmar-carga');
+            if (btnConfirmar) {
+                btnConfirmar.style.display = 'block'; // ou 'inline-block', dependendo do seu layout
+            }
+            // ==========================================
+
             const corpoTabela = document.getElementById('listaCargaCorpo');
-            if (!corpoTabela) return console.error("Erro: Elemento listaCargaCorpo não encontrado no HTML!");
+            if (!corpoTabela) return console.error("Erro: Elemento listaCargaCorpo não encontrado!");
 
             corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Calculando logística... ⏳</td></tr>';
             document.getElementById('modalLogistica').style.display = 'flex';
@@ -5336,11 +5349,16 @@
                         
                         if (divErros) {
                             divErros.innerHTML = htmlErro;
-                        } else {
-                            alert("Crie a div 'div-mensagens-carga' no seu HTML para ver os detalhes do erro.");
+                        } 
+                        
+                        // ==========================================
+                        // CORREÇÃO DO LOOP: Esconde o botão para forçar o usuário a fechar a tela
+                        // ==========================================
+                        if (botaoElement) {
+                            botaoElement.style.display = 'none';
                         }
                     } else {
-                        // Se for um erro diferente (ex: banco de dados fora do ar)
+                        // Se for um erro diferente
                         alert("Erro: " + (result.detail || "Erro ao processar carga."));
                     }
                 }
