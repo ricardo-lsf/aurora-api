@@ -1811,14 +1811,18 @@
     </div>
 
     <div id="modalLogistica" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center; backdrop-filter: blur(5px);">
-        <div style="background:white; width:90%; max-width:600px; border-radius:15px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
-            <div style="background:#2c3e50; color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
+        
+        <div id="caixa-branca-logistica" style="background:white; width:90%; max-width:600px; border-radius:15px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5); position:relative;">
+            
+            <div id="cabecalho-modal-logistica" style="background:#2c3e50; color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
                 <h3 id="titulo-modal-logistica" style="margin:0;">🚚 Carregamento de Estoque</h3>
                 <button onclick="fecharModalLogistica()" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
             </div>
             
             <div style="padding:20px;">
                 <p style="color:#666; font-size:0.9em; margin-bottom:15px;">Abaixo estão os insumos calculados com base no cardápio e quantidade planejada do evento.</p>
+                
+                <div id="div-mensagens-carga"></div>
                 
                 <div style="max-height:350px; overflow-y:auto; border:1px solid #eee; border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; text-align:left;" id="tabelaCarga">
@@ -1830,11 +1834,9 @@
                             </tr>
                         </thead>
                         <tbody id="listaCargaCorpo">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
-
-                <div id="div-mensagens-carga"></div>
 
                 <div style="margin-top:20px; display:flex; gap:10px;">
                     <button id="btn-confirmar-carga" onclick="confirmarCargaEvento(this)" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
@@ -5216,16 +5218,21 @@
                 tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
             }
 
+            window.tornarArrastavel('caixa-branca-logistica', 'titulo-modal-logistica');
+
             // ==========================================
             // CORREÇÃO DO FANTASMA: Limpa erros antigos ao abrir
             // ==========================================
             const divErros = document.getElementById('div-mensagens-carga');
             if (divErros) divErros.innerHTML = '';
             
-            // RESSUSCITA O BOTÃO: Garante que o botão volte a aparecer se tiver sido escondido antes
+            // RESET DO BOTÃO MUTANTE: Volta a ser o botão verde de Confirmar
             const btnConfirmar = document.getElementById('btn-confirmar-carga');
             if (btnConfirmar) {
-                btnConfirmar.style.display = 'block'; // ou 'inline-block', dependendo do seu layout
+                btnConfirmar.style.display = 'block'; 
+                btnConfirmar.innerText = "Confirmar Carga";
+                btnConfirmar.style.backgroundColor = "#27ae60"; // Ou a cor original que você usava
+                btnConfirmar.onclick = function() { window.confirmarCargaEvento(this); };
             }
             // ==========================================
 
@@ -5276,9 +5283,13 @@
 
         window.confirmarCargaEvento = async function(botaoElement) {
             // 1. TRAVA DE SEGURANÇA: Desabilita o botão e muda o texto
+            // ==========================================
+            // O BOTÃO MUTANTE: Vira um botão de fechar vermelho
+            // ==========================================            
             if (botaoElement) {
-                botaoElement.disabled = true;
-                botaoElement.innerText = "Processando... ⏳";
+                botaoElement.innerText = "Fechar (Carga não realizada)";
+                botaoElement.style.backgroundColor = "#c0392b"; // Vermelho
+                botaoElement.onclick = function() { window.fecharModalLogistica(); };
             }
 
             const inputs = document.querySelectorAll('.input-carga-insumo');
@@ -5372,6 +5383,53 @@
                 }
             }
         };
+
+        // ============================================================
+        // SISTEMA DE ARRASTAR MODAIS (DRAGGABLE)
+        // ============================================================
+        window.tornarArrastavel = function(idModalCaixaBranca, idCabecalho) {
+            const caixaBranca = document.getElementById(idModalCaixaBranca);
+            const cabecalho = document.getElementById(idCabecalho);
+            
+            if (!caixaBranca || !cabecalho) return;
+
+            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+            
+            // Muda o cursor para a "mãozinha" para o usuário saber que pode puxar
+            cabecalho.style.cursor = 'grab';
+
+            cabecalho.onmousedown = function(e) {
+                e.preventDefault();
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                document.onmouseup = pararArrasto;
+                document.onmousemove = arrastarMouse;
+                cabecalho.style.cursor = 'grabbing'; // Mão fechada segurando
+            };
+
+            function arrastarMouse(e) {
+                e.preventDefault();
+                pos1 = pos3 - e.clientX;
+                pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                
+                // Transforma a posição em relativa para poder mover solto na tela
+                if (window.getComputedStyle(caixaBranca).position === 'static') {
+                    caixaBranca.style.position = 'relative';
+                }
+                
+                caixaBranca.style.top = (caixaBranca.offsetTop - pos2) + "px";
+                caixaBranca.style.left = (caixaBranca.offsetLeft - pos1) + "px";
+            }
+
+            function pararArrasto() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                cabecalho.style.cursor = 'grab';
+            }
+        };
+
 
     </script>
         
