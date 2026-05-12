@@ -1814,8 +1814,8 @@
         
         <div id="caixa-branca-logistica" style="background:white; width:90%; max-width:600px; border-radius:15px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.5); position:relative;">
             
-            <div id="cabecalho-modal-logistica" style="background:#2c3e50; color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
-                <h3 id="titulo-modal-logistica" style="margin:0;">🚚 Carregamento de Estoque</h3>
+            <div id="cabecalho-modal-logistica" style="background:#8e44ad; color:white; padding:20px; display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="titulo-modal-logistica" style="margin:0;">🚚 Carregamento de Estoque [V3.1]</h3>
                 <button onclick="fecharModalLogistica()" style="background:none; border:none; color:white; font-size:24px; cursor:pointer;">&times;</button>
             </div>
             
@@ -5212,29 +5212,36 @@
             console.log("🚚 Tentando abrir logística para o evento:", eventId);
             window.eventoSendoCarregado = eventId;
             
-            // ATUALIZA O TÍTULO DO MODAL
+            // 1. ATUALIZA O TÍTULO DO MODAL
             const tituloModal = document.getElementById('titulo-modal-logistica');
             if (tituloModal) {
                 tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
             }
 
-            window.tornarArrastavel('caixa-branca-logistica', 'titulo-modal-logistica');
-
-            // ==========================================
-            // CORREÇÃO DO FANTASMA: Limpa erros antigos ao abrir
-            // ==========================================
+            // 2. CORREÇÃO DO FANTASMA: Limpa erros antigos ao abrir
             const divErros = document.getElementById('div-mensagens-carga');
             if (divErros) divErros.innerHTML = '';
             
-            // RESET DO BOTÃO MUTANTE: Volta a ser o botão verde de Confirmar
+            // 3. RESET DO BOTÃO MUTANTE: Volta a ser o botão verde de Confirmar
             const btnConfirmar = document.getElementById('btn-confirmar-carga');
             if (btnConfirmar) {
                 btnConfirmar.style.display = 'block'; 
-                btnConfirmar.innerText = "Confirmar Carga";
-                btnConfirmar.style.backgroundColor = "#27ae60"; // Ou a cor original que você usava
+                btnConfirmar.disabled = false;
+                btnConfirmar.innerText = "CONFIRMAR SAÍDA DO GALPÃO";
+                btnConfirmar.style.backgroundColor = "#27ae60"; 
+                // Removemos qualquer marcação de erro anterior
+                btnConfirmar.removeAttribute('data-erro');
                 btnConfirmar.onclick = function() { window.confirmarCargaEvento(this); };
             }
-            // ==========================================
+
+            // 4. RESET DA POSIÇÃO: Garante que o modal abra no centro, caso tenha sido arrastado antes
+            const caixaBranca = document.getElementById('caixa-branca-logistica');
+            if (caixaBranca) {
+                caixaBranca.style.transform = 'translate(0px, 0px)';
+            }
+
+            // 5. ATIVA A FUNÇÃO DE ARRASTAR
+            window.tornarArrastavel('caixa-branca-logistica', 'cabecalho-modal-logistica');
 
             const corpoTabela = document.getElementById('listaCargaCorpo');
             if (!corpoTabela) return console.error("Erro: Elemento listaCargaCorpo não encontrado!");
@@ -5282,14 +5289,10 @@
         };
 
         window.confirmarCargaEvento = async function(botaoElement) {
-            // 1. TRAVA DE SEGURANÇA: Desabilita o botão e muda o texto
-            // ==========================================
-            // O BOTÃO MUTANTE: Vira um botão de fechar vermelho
-            // ==========================================            
+            // TRAVA DE SEGURANÇA VISUAL
             if (botaoElement) {
-                botaoElement.innerText = "Fechar (Carga não realizada)";
-                botaoElement.style.backgroundColor = "#c0392b"; // Vermelho
-                botaoElement.onclick = function() { window.fecharModalLogistica(); };
+                botaoElement.disabled = true;
+                botaoElement.innerText = "Processando... ⏳";
             }
 
             const inputs = document.querySelectorAll('.input-carga-insumo');
@@ -5310,14 +5313,18 @@
 
             if (itensParaCarga.length === 0) {
                 alert("Informe as quantidades para carregar!");
-                // Destrava se der erro
-                if (botaoElement) { botaoElement.disabled = false; botaoElement.innerText = "Confirmar Carga"; }
+                if (botaoElement) { 
+                    botaoElement.disabled = false; 
+                    botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO"; 
+                }
                 return;
             }
             
             if (!confirm(`Confirmar saída de ${itensParaCarga.length} itens do galpão?`)) {
-                // Destrava se o usuário cancelar
-                if (botaoElement) { botaoElement.disabled = false; botaoElement.innerText = "Confirmar Carga"; }
+                if (botaoElement) { 
+                    botaoElement.disabled = false; 
+                    botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO"; 
+                }
                 return;
             }
 
@@ -5337,9 +5344,6 @@
                     alert("🚚 SUCESSO! Caminhão carregado e PDV liberado.");
                     window.fecharModalLogistica();
                 } else {
-                    // ==========================================
-                    // NOVO BLOCO: Tratamento elegante de erro de estoque
-                    // ==========================================
                     if (Array.isArray(result.detail)) {
                         let htmlErro = `
                             <div style="background-color: #fee2e2; border-left: 5px solid #ef4444; color: #b91c1c; padding: 15px; border-radius: 4px; margin-top: 15px; margin-bottom: 15px; text-align: left;">
@@ -5362,77 +5366,84 @@
                             divErros.innerHTML = htmlErro;
                         } 
                         
-                        // ==========================================
-                        // CORREÇÃO DO LOOP: Esconde o botão para forçar o usuário a fechar a tela
-                        // ==========================================
+                        // O BOTÃO MUTANTE: Vira um botão de fechar vermelho
                         if (botaoElement) {
-                            botaoElement.style.display = 'none';
+                            botaoElement.disabled = false;
+                            botaoElement.innerText = "Fechar (Carga não realizada)";
+                            botaoElement.style.backgroundColor = "#c0392b"; // Vermelho
+                            botaoElement.setAttribute('data-erro', 'true'); // Marca que deu erro para o finally ignorar
+                            botaoElement.onclick = function() { window.fecharModalLogistica(); };
                         }
                     } else {
-                        // Se for um erro diferente
                         alert("Erro: " + (result.detail || "Erro ao processar carga."));
                     }
                 }
             } catch (error) {
                 alert("Erro de conexão com o servidor.");
             } finally {
-                // DESTRAVA O BOTÃO NO FINAL DE TUDO, DANDO CERTO OU ERRADO
-                if (botaoElement) {
+                // Só devolve o botão pro estado verde se NÃO for o erro de estoque
+                if (botaoElement && !botaoElement.getAttribute('data-erro')) {
                     botaoElement.disabled = false;
-                    botaoElement.innerText = "Confirmar Carga"; // ou o texto original que você usa
+                    botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO";
                 }
             }
         };
 
-        // ============================================================
-        // SISTEMA DE ARRASTAR MODAIS (DRAGGABLE)
+            // ============================================================
+        // SISTEMA DE ARRASTAR MODAIS (NOVA VERSÃO BLINDADA)
         // ============================================================
         window.tornarArrastavel = function(idModalCaixaBranca, idCabecalho) {
-            const caixaBranca = document.getElementById(idModalCaixaBranca);
+            const caixa = document.getElementById(idModalCaixaBranca);
             const cabecalho = document.getElementById(idCabecalho);
-            
-            if (!caixaBranca || !cabecalho) return;
+            if (!caixa || !cabecalho) return;
 
-            let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-            
-            // Muda o cursor para a "mãozinha" para o usuário saber que pode puxar
+            let currentX = 0, currentY = 0, initialX = 0, initialY = 0;
+            let xOffset = 0, yOffset = 0;
+
             cabecalho.style.cursor = 'grab';
+            cabecalho.onmousedown = dragStart;
 
-            cabecalho.onmousedown = function(e) {
+            function dragStart(e) {
                 e.preventDefault();
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                document.onmouseup = pararArrasto;
-                document.onmousemove = arrastarMouse;
-                cabecalho.style.cursor = 'grabbing'; // Mão fechada segurando
-            };
-
-            function arrastarMouse(e) {
-                e.preventDefault();
-                pos1 = pos3 - e.clientX;
-                pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
                 
-                // Transforma a posição em relativa para poder mover solto na tela
-                if (window.getComputedStyle(caixaBranca).position === 'static') {
-                    caixaBranca.style.position = 'relative';
+                // Lê a posição atual da transformação para continuar de onde parou
+                const style = window.getComputedStyle(caixa);
+                const transform = style.getPropertyValue('transform');
+                
+                if (transform !== 'none') {
+                    const matrix = new DOMMatrixReadOnly(transform);
+                    xOffset = matrix.m41;
+                    yOffset = matrix.m42;
+                } else {
+                    xOffset = 0;
+                    yOffset = 0;
                 }
-                
-                caixaBranca.style.top = (caixaBranca.offsetTop - pos2) + "px";
-                caixaBranca.style.left = (caixaBranca.offsetLeft - pos1) + "px";
+
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+
+                document.onmouseup = dragEnd;
+                document.onmousemove = drag;
+                cabecalho.style.cursor = 'grabbing';
             }
 
-            function pararArrasto() {
+            function drag(e) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                // Move usando transform, que não quebra a centralização do modal
+                caixa.style.transform = `translate(${currentX}px, ${currentY}px)`;
+            }
+
+            function dragEnd() {
                 document.onmouseup = null;
                 document.onmousemove = null;
                 cabecalho.style.cursor = 'grab';
             }
         };
 
-
     </script>
-        
+
 </body>
 
 </html>
