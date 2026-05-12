@@ -1051,7 +1051,7 @@
                         style="background:#8e44ad; color:white; border:none; padding:8px 15px; border-radius:6px; font-weight:bold; cursor:pointer; font-size: 0.9em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         🔲 Gerar QR Code</button>
 
-                    <button onclick="window.abrirModalLogistica(window.eventoID)" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                    <button onclick="window.abrirModalLogistica(window.eventoID, window.nomeEvento)" style="background:#f39c12; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
                         🚚 Carregar Caminhão
                     </button>
 
@@ -1841,7 +1841,7 @@
                 <div id="div-mensagens-carga"></div>
 
                 <div style="margin-top:20px; display:flex; gap:10px;">
-                    <button onclick="confirmarCargaEvento()" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
+                    <button onclick="confirmarCargaEvento(this)" style="flex:1; background:#27ae60; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1em;">
                         CONFIRMAR SAÍDA DO GALPÃO
                     </button>
                 </div>
@@ -3143,6 +3143,16 @@
                         ? `<span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 8px; box-shadow: 0 0 5px #e74c3c; animation: pulse 2s infinite;">🔴 NO AR</span>` 
                         : '';
 
+                    // ==========================================
+                    // AJUSTE 3: BOTÃO DE CARGA CONDICIONAL
+                    // Só aparece se o evento estiver "No Ar" (Ativo e Aberto)
+                    // ==========================================
+                    let isNoAr = (ev.is_active === true && ev.status === 'aberto');
+                    let botaoCargaHTML = isNoAr 
+                        ? `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="margin-top: 10px; width: 100%; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">🚚 CARREGAR CAMINHÃO</button>`
+                        : ''; 
+                    // Obs: o event.stopPropagation() impede que o clique no botão abra os detalhes do evento por baixo.
+
                     if (listaDiv) {
                         listaDiv.innerHTML += `
                             <div class="event-card-item" style="border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; border-left: 5px solid ${corStatus}; background: #fff;" onclick="window.carregarEvento('${ev.id}')">
@@ -3153,6 +3163,7 @@
                                 <div style="margin-top: 8px;">
                                     <span style="background: ${corStatus}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase;">${ev.status}</span>
                                 </div>
+                                ${botaoCargaHTML}
                             </div>
                         `;
                     }
@@ -5199,10 +5210,16 @@
         // --- FUNÇÕES DE LOGÍSTICA (AURORA V3) ---
         window.eventoSendoCarregado = null;
 
-        window.abrirModalLogistica = async function(eventId) {
+        window.abrirModalLogistica = async function(eventId, nomeEvento) {
             console.log("🚚 Tentando abrir logística para o evento:", eventId);
             window.eventoSendoCarregado = eventId;
             
+            // ATUALIZA O TÍTULO DO MODAL
+            const tituloModal = document.getElementById('titulo-modal-logistica');
+            if (tituloModal) {
+                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
+            }
+
             const corpoTabela = document.getElementById('listaCargaCorpo');
             if (!corpoTabela) return console.error("Erro: Elemento listaCargaCorpo não encontrado no HTML!");
 
@@ -5248,11 +5265,16 @@
             document.getElementById('modalLogistica').style.display = 'none';
         };
 
-        window.confirmarCargaEvento = async function() {
+        window.confirmarCargaEvento = async function(botaoElement) {
+            // 1. TRAVA DE SEGURANÇA: Desabilita o botão e muda o texto
+            if (botaoElement) {
+                botaoElement.disabled = true;
+                botaoElement.innerText = "Processando... ⏳";
+            }
+
             const inputs = document.querySelectorAll('.input-carga-insumo');
             const itensParaCarga = [];
 
-            // 1. Limpa mensagens de erro antigas sempre que tenta salvar de novo
             const divErros = document.getElementById('div-mensagens-carga');
             if (divErros) divErros.innerHTML = '';
 
@@ -5266,8 +5288,18 @@
                 }
             });
 
-            if (itensParaCarga.length === 0) return alert("Informe as quantidades para carregar!");
-            if (!confirm(`Confirmar saída de ${itensParaCarga.length} itens do galpão?`)) return;
+            if (itensParaCarga.length === 0) {
+                alert("Informe as quantidades para carregar!");
+                // Destrava se der erro
+                if (botaoElement) { botaoElement.disabled = false; botaoElement.innerText = "Confirmar Carga"; }
+                return;
+            }
+            
+            if (!confirm(`Confirmar saída de ${itensParaCarga.length} itens do galpão?`)) {
+                // Destrava se o usuário cancelar
+                if (botaoElement) { botaoElement.disabled = false; botaoElement.innerText = "Confirmar Carga"; }
+                return;
+            }
 
             try {
                 const response = await fetch('https://aurora-api-zj8e.onrender.com/inventory/load-event', {
@@ -5318,6 +5350,12 @@
                 }
             } catch (error) {
                 alert("Erro de conexão com o servidor.");
+            } finally {
+                // DESTRAVA O BOTÃO NO FINAL DE TUDO, DANDO CERTO OU ERRADO
+                if (botaoElement) {
+                    botaoElement.disabled = false;
+                    botaoElement.innerText = "Confirmar Carga"; // ou o texto original que você usa
+                }
             }
         };
 
