@@ -521,8 +521,8 @@
                 const d = drinks.find(x => x.nome === drink_nome);
                 
                 if (d) {
-                    // DEVOLVE O ESTOQUE: Soma +1 na caixinha de estoque (Badge)
-                    d.estoque += 1;
+                    // DEVOLVE O ESTOQUE: Força a conversão para Número antes de somar!
+                    d.estoque = parseInt(d.estoque, 10) + 1;
                     
                     // RETIRA DA VENDA: Tira -1 da caixa central de vendidos
                     if (counts[d.id] && counts[d.id] > 0) {
