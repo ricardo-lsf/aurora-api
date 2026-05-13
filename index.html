@@ -410,6 +410,14 @@
             // 2. Atualização visual otimista
             if (!counts[id]) counts[id] = 0;
             counts[id] += q;
+            
+            // ==========================================
+            // FIX DA BOLINHA DE ESTOQUE: Reduz o saldo na tela
+            // ==========================================
+            if (q > 0) {
+                d.estoque -= q; 
+            }
+
             localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts)); 
             renderizar();
             if (q > 0) navigator.vibrate(50);
@@ -423,7 +431,10 @@
                         drink_name: d.nome,              
                         price: parseFloat(d.precoVenda || d.preco || 0),
                         cost: parseFloat(d.precoCusto || d.custo || 0), 
-                        bartender_name: usuarioAtual || "Sistema",     
+                        // ==========================================
+                        // FIX DO NOME FANTASMA: Trocado para user_name
+                        // ==========================================
+                        user_name: usuarioAtual || "Sistema",     
                         client_name: "Balcão"
                     };
 
@@ -458,9 +469,83 @@
                 console.error("Erro na operação:", e);
                 // Em caso de erro real no servidor, desfazemos o incremento/decremento
                 counts[id] -= q;
+                
+                // Devolvemos a bolinha de estoque para o valor original se a venda falhou
+                if (q > 0) {
+                    d.estoque += q;
+                }
+                
                 localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts)); 
                 renderizar();
                 alert("🚨 Erro: " + e.message);
+            }
+        };
+
+        // ============================================================
+        // --- MOTOR DE ESTORNO PELO HISTÓRICO (O botão "×") ---
+        // ============================================================
+        window.estornarVenda = async (venda_id, drink_nome, elementoLi) => {
+            // 1. Bloqueios e Confirmação de Segurança
+            if (!eventoID) return;
+            
+            if (!confirm(`Deseja realmente estornar a venda do drink ${drink_nome}? Os insumos voltarão para o estoque.`)) {
+                return;
+            }
+
+            // 2. Feedback visual (Deixa a linha do histórico meio transparente enquanto processa)
+            if (elementoLi) elementoLi.style.opacity = "0.5";
+
+            try {
+                // 3. Ordem de estorno para o Servidor (PostgreSQL)
+                const payloadEstorno = {
+                    sale_id: venda_id,
+                    event_id: eventoID
+                };
+
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadEstorno)
+                });
+
+                const dados = await resposta.json();
+
+                if (!resposta.ok) {
+                    throw new Error(dados.detail || "Erro ao estornar venda no servidor");
+                }
+
+                // ==========================================
+                // 4. SUCESSO! HORA DE AJUSTAR AS CAIXINHAS NA TELA
+                // ==========================================
+                // Localiza qual é o drink pelo nome que veio do histórico
+                const d = drinks.find(x => x.nome === drink_nome);
+                
+                if (d) {
+                    // DEVOLVE O ESTOQUE: Soma +1 na caixinha de estoque (Badge)
+                    d.estoque += 1;
+                    
+                    // RETIRA DA VENDA: Tira -1 da caixa central de vendidos
+                    if (counts[d.id] && counts[d.id] > 0) {
+                        counts[d.id] -= 1;
+                    }
+                    
+                    // Salva a nova contagem na memória e redesenha os cards
+                    localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                    renderizar();
+                }
+
+                // 5. Remove a linha do histórico definitivamente da tela
+                if (elementoLi && elementoLi.parentNode) {
+                    elementoLi.parentNode.removeChild(elementoLi);
+                }
+
+                alert(`✅ Venda estornada!`);
+
+            } catch (e) {
+                console.error("Erro no estorno:", e);
+                // Restaura o visual da linha do log caso dê erro na internet/servidor
+                if (elementoLi) elementoLi.style.opacity = "1";
+                alert("🚨 Erro ao estornar: " + e.message);
             }
         };
 
