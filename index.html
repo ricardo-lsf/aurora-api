@@ -397,23 +397,28 @@
         };
 
 
-        // --- MOTOR DE VENDAS ATUALIZADO E BLINDADO (POSTGRESQL + FIREBASE) ---
+        // ============================================================
+        // --- MOTOR DE VENDAS ATUALIZADO E BLINDADO ---
+        // ============================================================
         window.mudar = async (id, q) => {
             // 1. Bloqueios de segurança básicos
             if (!eventoID || eventoStatus === 'fechado') return;
             const d = drinks.find(x => x.id === id);
             if (!d) return;
 
-            if (q > 0 && d.estoque <= 0) return navigator.vibrate(200); 
+            // 🛑 AJUSTE VISUAL 1: Alerta escandaloso de estoque zerado
+            if (q > 0 && d.estoque <= 0) {
+                alert(`🚨 ATENÇÃO: Insumos esgotados para preparar o drink ${d.nome}!`);
+                navigator.vibrate(200);
+                return;
+            }
             if (q < 0 && (!counts[id] || counts[id] <= 0)) return;
 
             // 2. Atualização visual otimista
             if (!counts[id]) counts[id] = 0;
             counts[id] += q;
             
-            // ==========================================
-            // FIX DA BOLINHA DE ESTOQUE: Reduz o saldo na tela
-            // ==========================================
+            // Reduz o saldo na tela
             if (q > 0) {
                 d.estoque -= q; 
             }
@@ -431,9 +436,6 @@
                         drink_name: d.nome,              
                         price: parseFloat(d.precoVenda || d.preco || 0),
                         cost: parseFloat(d.precoCusto || d.custo || 0), 
-                        // ==========================================
-                        // FIX DO NOME FANTASMA: Trocado para user_name
-                        // ==========================================
                         user_name: usuarioAtual || "Sistema",     
                         client_name: "Balcão"
                     };
@@ -450,31 +452,25 @@
                         throw new Error(dadosVenda.detail || "Erro ao registrar venda no servidor");
                     }
 
-                    // Chamamos o log passando o ID que o banco acabou de gerar
+                    // 🛑 AJUSTE VISUAL 2: Mandamos o ID do drink para o Log (Crucial para o estorno)
                     if (typeof adicionarLog === 'function') {
-                        adicionarLog(d.nome, 1, dadosVenda.venda_id); 
+                        adicionarLog(d.nome, 1, dadosVenda.venda_id, d.id); 
                     }
 
                 } else {
                     // --- BLOCO DE ESTORNO (BOTÃO MENOS) ---
-                    // Revertemos a contagem visual que o clique inicial fez
                     counts[id] += 1; 
                     localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
                     renderizar();
-                    
-                    // Alerta pedagógico para o bartender usar o novo fluxo
                     alert("Para estornar, clique no '×' ao lado do drink no Histórico (abaixo do gráfico).");
                 }
             } catch (e) {
                 console.error("Erro na operação:", e);
-                // Em caso de erro real no servidor, desfazemos o incremento/decremento
+                // Rollback visual em caso de erro
                 counts[id] -= q;
-                
-                // Devolvemos a bolinha de estoque para o valor original se a venda falhou
                 if (q > 0) {
                     d.estoque += q;
                 }
-                
                 localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts)); 
                 renderizar();
                 alert("🚨 Erro: " + e.message);
@@ -484,19 +480,21 @@
         // ============================================================
         // --- MOTOR DE ESTORNO PELO HISTÓRICO (O botão "×") ---
         // ============================================================
-        window.estornarVenda = async (venda_id, drink_nome, elementoLi) => {
-            // 1. Bloqueios e Confirmação de Segurança
+        // 🛑 AJUSTE VISUAL 3: Agora a função recebe drink_id ao invés de drink_nome
+        window.estornarVenda = async (venda_id, drink_id, elementoLi) => {
             if (!eventoID) return;
             
-            if (!confirm(`Deseja realmente estornar a venda do drink ${drink_nome}? Os insumos voltarão para o estoque.`)) {
+            // Busca infalível pelo ID
+            const d = drinks.find(x => x.id === drink_id); 
+            const nomeDoDrink = d ? d.nome : "este drink";
+            
+            if (!confirm(`Deseja realmente estornar a venda do drink ${nomeDoDrink}? Os insumos voltarão para o estoque.`)) {
                 return;
             }
 
-            // 2. Feedback visual (Deixa a linha do histórico meio transparente enquanto processa)
             if (elementoLi) elementoLi.style.opacity = "0.5";
 
             try {
-                // 3. Ordem de estorno para o Servidor (PostgreSQL)
                 const payloadEstorno = {
                     sale_id: venda_id,
                     event_id: eventoID
@@ -514,27 +512,19 @@
                     throw new Error(dados.detail || "Erro ao estornar venda no servidor");
                 }
 
-                // ==========================================
-                // 4. SUCESSO! HORA DE AJUSTAR AS CAIXINHAS NA TELA
-                // ==========================================
-                // Localiza qual é o drink pelo nome que veio do histórico
-                const d = drinks.find(x => x.nome === drink_nome);
-                
+                // SUCESSO! HORA DE AJUSTAR AS CAIXINHAS NA TELA
                 if (d) {
-                    // DEVOLVE O ESTOQUE: Força a conversão para Número antes de somar!
+                    // 🛑 AJUSTE VISUAL 4: Forçamos a matemática. A caixinha sobe e a foto "Esgotado" acende!
                     d.estoque = parseInt(d.estoque, 10) + 1;
                     
-                    // RETIRA DA VENDA: Tira -1 da caixa central de vendidos
                     if (counts[d.id] && counts[d.id] > 0) {
                         counts[d.id] -= 1;
                     }
                     
-                    // Salva a nova contagem na memória e redesenha os cards
                     localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
                     renderizar();
                 }
 
-                // 5. Remove a linha do histórico definitivamente da tela
                 if (elementoLi && elementoLi.parentNode) {
                     elementoLi.parentNode.removeChild(elementoLi);
                 }
@@ -543,7 +533,6 @@
 
             } catch (e) {
                 console.error("Erro no estorno:", e);
-                // Restaura o visual da linha do log caso dê erro na internet/servidor
                 if (elementoLi) elementoLi.style.opacity = "1";
                 alert("🚨 Erro ao estornar: " + e.message);
             }
@@ -701,7 +690,7 @@
             });
         }
 
-        function adicionarLog(nome, qtd, vendaId = null) {
+        function adicionarLog(nome, qtd, vendaId = null, drinkId = null) {
             const lista = document.getElementById('lista-logs');
             if (!lista) return;
 
@@ -729,11 +718,11 @@
             li.style.padding = "8px 0";
             li.style.borderBottom = "1px solid #2a2a2a";
 
-            // Criamos o HTML com o botão de "X" passando o ID e o Nome
+            // Criamos o HTML com o botão de "X" passando o ID da VENDA e o ID do DRINK
             li.innerHTML = `
                 <span style="color:#666; font-size:0.8em;">${agora}</span> 
                 <span style="color:#fff; font-size:0.9rem;">${nome}</span>
-                <button onclick="estornarPeloLog('${vendaId}', '${nome}')" 
+                <button onclick="estornarPeloLog('${vendaId}', '${drinkId}')" 
                         style="background:none; border:none; color:#e74c3c; font-weight:bold; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">
                     ×
                 </button>
@@ -746,9 +735,13 @@
             }
         }
 
-        window.estornarPeloLog = async (saleId, nomeDrink) => {
+        window.estornarPeloLog = async (saleId, drinkId) => {
+            // 1. Busca infalível pelo ID na memória
+            const drink = drinks.find(d => d.id === drinkId);
+            const nomeParaAlerta = drink ? drink.nome : "este drink";
+
             // Pedir confirmação para evitar cliques acidentais
-            if (!confirm(`Deseja estornar a venda de: ${nomeDrink}?`)) return;
+            if (!confirm(`Deseja estornar a venda de: ${nomeParaAlerta}?`)) return;
 
             try {
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/cancel`, { 
@@ -765,20 +758,24 @@
                     throw new Error(erro.detail || "Falha ao comunicar com o servidor.");
                 }
 
-                // 1. Remove a linha do histórico visualmente
+                // 2. Remove a linha do histórico visualmente
                 const itemLog = document.querySelector(`li[data-sale-id="${saleId}"]`);
                 if (itemLog) itemLog.remove();
 
-                // 2. Localiza o drink para atualizar os contadores e o gráfico
-                const drink = drinks.find(d => d.nome === nomeDrink);
-                if (drink && counts[drink.id] > 0) {
-                    counts[drink.id]--;
+                // 3. ATUALIZA A TELA (Caixinha, Foto e Gráfico)
+                if (drink) {
+                    // A MÁGICA AQUI: Força a soma para voltar o estoque pra caixinha e acender a foto!
+                    drink.estoque = parseInt(drink.estoque, 10) + 1;
+
+                    if (counts[drink.id] > 0) {
+                        counts[drink.id]--;
+                    }
                     localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
                     renderizar(); // Re-desenha a tela para atualizar totais e estoque visual
                 }
 
-                // 3. Opcional: Adiciona um log avisando do estorno
-                adicionarLog(nomeDrink, -1);
+                // 4. Opcional: Adiciona um log avisando do estorno
+                adicionarLog(nomeParaAlerta, -1);
 
                 console.log(`Venda ${saleId} estornada com sucesso.`);
 
