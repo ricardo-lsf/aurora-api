@@ -273,6 +273,90 @@
             }
         };
 
+        // ============================================================
+        // --- ESCUDO ANTI-F5 E INICIALIZAÇÃO PERSISTENTE ---
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', async () => {
+            // 1. Olha para a memória do navegador para ver se já tem alguém logado
+            const usuarioSalvo = localStorage.getItem('usuarioLogado'); // Usando a chave exata do seu código
+            const eventoSalvo = localStorage.getItem('eventoID'); // Puxa o ID do evento, se o cara já estava dentro de um
+
+            if (usuarioSalvo) {
+                console.log("🔄 Sessão recuperada para:", usuarioSalvo);
+                usuarioAtual = usuarioSalvo;
+                
+                // Atualiza a tela e esconde o login
+                const userDisplay = document.getElementById('user-display');
+                if (userDisplay) userDisplay.innerText = "👤 " + usuarioAtual;
+                
+                const loginOverlay = document.getElementById('login-overlay');
+                if (loginOverlay) loginOverlay.style.display = 'none';
+
+                // 2. O cara já estava dentro de um evento antes de dar F5?
+                if (eventoSalvo) {
+                    eventoID = eventoSalvo;
+                    console.log("🔄 Retornando ao evento:", eventoID);
+                    
+                    // IMPORTANTE: Aqui você deve chamar a função que carrega os drinks do evento.
+                    // Exemplo: await carregarDrinksDoEvento(eventoID); 
+                    
+                    // Depois que os drinks carregarem, puxamos o histórico do banco!
+                    setTimeout(() => {
+                        sincronizarDadosDoBanco();
+                    }, 500); // Um leve atraso só para garantir que os cards dos drinks já desenharam
+                    
+                } else {
+                    // Se não estava em nenhum evento, manda ele pra tela de escolher evento (Recepção VIP)
+                    if (typeof buscarEventosAtivos === 'function') {
+                        buscarEventosAtivos();
+                    }
+                }
+            }
+        });
+
+        // ============================================================
+        // --- MÁQUINA DO TEMPO: RESGATE DE HISTÓRICO DO POSTGRESQL ---
+        // ============================================================
+        window.sincronizarDadosDoBanco = async () => {
+            if (!eventoID) return;
+            console.log("⏳ Sincronizando histórico com o servidor...");
+
+            try {
+                // Bate na nova rota Python que criamos!
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/event/${eventoID}`);
+                if (!resposta.ok) throw new Error("Falha ao buscar histórico.");
+                
+                const vendasNoBanco = await resposta.json();
+
+                // Zera o counts local para preencher apenas com a "verdade" do banco
+                counts = {}; 
+                const listaLogs = document.getElementById('lista-logs');
+                if (listaLogs) listaLogs.innerHTML = ''; // Limpa visualmente antes de repovoar
+
+                vendasNoBanco.forEach(venda => {
+                    // Reconstrói o gráfico (counts)
+                    if (!counts[venda.cocktail_id]) counts[venda.cocktail_id] = 0;
+                    counts[venda.cocktail_id]++;
+
+                    // Traduz o ID do drink para o Nome
+                    const drink = drinks.find(d => d.id === venda.cocktail_id);
+                    const nomeDoDrink = drink ? drink.nome : "Drink Desconhecido";
+
+                    // Reconstrói o histórico visual (lista de logs) - Passando os IDs para o estorno funcionar!
+                    if (typeof adicionarLog === 'function') {
+                        adicionarLog(nomeDoDrink, 1, venda.id, venda.cocktail_id);
+                    }
+                });
+
+                // Salva o counts sincronizado na memória e atualiza a tela
+                localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
+                renderizar();
+                console.log("✅ Histórico sincronizado com sucesso! Encontradas", vendasNoBanco.length, "vendas.");
+
+            } catch (e) {
+                console.error("🚨 Erro ao sincronizar com o banco:", e);
+            }
+        };
         
         // --- RADAR DE EVENTOS (SUBSTITUI O ONSNAPSHOT DO FIREBASE) ---
         let intervaloMonitoramento;
@@ -322,7 +406,6 @@
 
 
         // --- MOTOR DE RECEPÇÃO: BUSCAR FESTAS ABERTAS ---
-        // Alterado para 'async function' para o navegador carregar primeiro!
         async function buscarEventosAtivos() {
             document.getElementById('loading').style.display = 'flex';
             
@@ -357,21 +440,26 @@
                 document.getElementById('loading').style.display = 'none';
                 alert("Erro de conexão com o servidor de festas.");
             }
-        } // <-- Fechamento limpo sem ponto e vírgula
+        }
 
         // --- MOTOR DE ENTRADA: CONFIGURAR O APP PARA A FESTA ESCOLHIDA ---
         function entrarNaFesta(idPostgres, nomeEvento) {
             // 1. Esconde a tela de recepção
             document.getElementById('event-selection-overlay').style.display = 'none';
             
-            // 2. Alimenta a Variável Mestra Nova e a Antiga (para destravar o botão!)
+            // 2. Alimenta a Variável Mestra Nova e a Antiga
             ID_FESTA_POSTGRES = idPostgres;
             eventoID = idPostgres; 
+
+            // ==========================================
+            // 🛑 ESCUDO ANTI-F5: Salva no navegador que ele entrou nessa festa!
+            // ==========================================
+            localStorage.setItem('eventoID', eventoID);
             
             // 3. Coloca o nome da festa lá no topo
             document.getElementById('nome-evento').innerText = nomeEvento;
             
-            // 4. Recupera a contagem de cliques do celular (caso o bartender dê F5 sem querer)
+            // 4. Recupera a contagem de cliques do celular
             const c = localStorage.getItem('counts_ev_' + idPostgres); 
             counts = c ? JSON.parse(c) : {};
             
@@ -386,7 +474,12 @@
             ID_FESTA_POSTGRES = null;
             eventoID = null;
             
-            // 2. Limpa a tela de fundo para o bartender não achar que ainda está na festa antiga
+            // ==========================================
+            // 🛑 ESCUDO ANTI-F5: Apaga a memória pra ele não voltar pra cá no F5
+            // ==========================================
+            localStorage.removeItem('eventoID');
+            
+            // 2. Limpa a tela de fundo
             document.getElementById('nome-evento').innerText = "Aguardando...";
             document.getElementById('grid').innerHTML = '';
             document.getElementById('total-count').innerText = "0";

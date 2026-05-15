@@ -544,66 +544,6 @@ class NovoMenu(BaseModel):
     # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
     drinks: List[str] 
 
-# ==========================================
-# O "MOLDE" DE SUGESTÃO DE CARGA
-# ==========================================
-@app.get("/inventory/suggest-load/{event_id}")
-def sugerir_carga(event_id: str):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
-    
-    cur = conn.cursor()
-    try:
-        # A query agora usa COALESCE em tudo que é número para evitar o Erro 500
-        query = """
-            SELECT 
-                i.id, 
-                i.name,
-                SUM(COALESCE(ci.quantity, 0) * COALESCE(em.planned_quantity, 0)) as total,
-                i.measurement_unit
-            FROM event_menus em
-            JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
-            JOIN ingredients i ON ci.ingredient_id = i.id
-            WHERE em.event_id = %s::uuid
-            GROUP BY i.id, i.name, i.measurement_unit
-        """
-        # O ::uuid ali em cima força o banco a reconhecer o ID corretamente
-        
-        cur.execute(query, (event_id,))
-        sugestoes = cur.fetchall()
-        
-        # Transformamos o resultado em uma lista limpa
-        lista_final = []
-        for s in sugestoes:
-            lista_final.append({
-                "id": str(s[0]), 
-                "nome": s[1], 
-                "sugerido": float(s[2]) if s[2] else 0.0, 
-                "unidade": s[3]
-            })
-        
-        return lista_final
-
-    except Exception as e:
-        # Esse print vai aparecer nos logs do seu Render!
-        print(f"DEBUG LOGÍSTICA: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erro no cálculo: {str(e)}")
-    finally:
-        cur.close()
-        conn.close()
-
-
-# ==========================================
-# O "MOLDE" PARA MULTIPLOS INSUMOS
-# ==========================================
-class ItemCarga(BaseModel):
-    ingredient_id: str
-    quantity: float
-
-class CargaEvento(BaseModel):
-    event_id: str
-    itens: List[ItemCarga]
 
 # ==========================================
 # CARREGAR ESTOQUE (VALIDADA)
@@ -680,6 +620,68 @@ def carregar_estoque_evento(payload: CargaEvento):
         if conn:
             cur.close()
             conn.close()
+
+# ==========================================
+# O "MOLDE" DE SUGESTÃO DE CARGA
+# ==========================================
+@app.get("/inventory/suggest-load/{event_id}")
+def sugerir_carga(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    cur = conn.cursor()
+    try:
+        # A query agora usa COALESCE em tudo que é número para evitar o Erro 500
+        query = """
+            SELECT 
+                i.id, 
+                i.name,
+                SUM(COALESCE(ci.quantity, 0) * COALESCE(em.planned_quantity, 0)) as total,
+                i.measurement_unit
+            FROM event_menus em
+            JOIN cocktail_ingredients ci ON em.cocktail_id = ci.cocktail_id
+            JOIN ingredients i ON ci.ingredient_id = i.id
+            WHERE em.event_id = %s::uuid
+            GROUP BY i.id, i.name, i.measurement_unit
+        """
+        # O ::uuid ali em cima força o banco a reconhecer o ID corretamente
+        
+        cur.execute(query, (event_id,))
+        sugestoes = cur.fetchall()
+        
+        # Transformamos o resultado em uma lista limpa
+        lista_final = []
+        for s in sugestoes:
+            lista_final.append({
+                "id": str(s[0]), 
+                "nome": s[1], 
+                "sugerido": float(s[2]) if s[2] else 0.0, 
+                "unidade": s[3]
+            })
+        
+        return lista_final
+
+    except Exception as e:
+        # Esse print vai aparecer nos logs do seu Render!
+        print(f"DEBUG LOGÍSTICA: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro no cálculo: {str(e)}")
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ==========================================
+# O "MOLDE" PARA MULTIPLOS INSUMOS
+# ==========================================
+class ItemCarga(BaseModel):
+    ingredient_id: str
+    quantity: float
+
+class CargaEvento(BaseModel):
+    event_id: str
+    itens: List[ItemCarga]
+
 
 
 # ==========================================
@@ -1104,6 +1106,47 @@ def estornar_venda(payload: EstornoVenda):
     finally:
         cur.close()
         conn.close()
+
+# ==========================================
+# ROTA: RESGATE DE HISTÓRICO (ANTI-F5)
+# ==========================================
+@app.get("/sales/event/{event_id}")
+def listar_vendas_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+        
+    try:
+        cur = conn.cursor()
+        
+        # Busca as vendas do evento ordenadas das mais antigas para as mais novas
+        # Assim o frontend reconstrói a tela exatamente na ordem que as coisas aconteceram
+        query = """
+            SELECT id, cocktail_id, price, user_name
+            FROM sales 
+            WHERE event_id = %s
+            ORDER BY id ASC
+        """
+        cur.execute(query, (event_id,))
+        vendas = cur.fetchall()
+        
+        resultado = []
+        for v in vendas:
+            resultado.append({
+                "id": str(v[0]),
+                "cocktail_id": str(v[1]),
+                "price": float(v[2]) if v[2] else 0.0,
+                "user_name": str(v[3]) if v[3] else "Desconhecido"
+            })
+            
+        cur.close()
+        conn.close()
+        
+        return resultado
+        
+    except Exception as e:
+        if conn: conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
 # NOSSA SÉTIMA ROTA: PAINEL DE ESTOQUE (INVENTORY)
