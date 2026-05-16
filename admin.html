@@ -5337,8 +5337,8 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        event_id: window.eventoSendoCarregado,
-                        itens: itensParaCarga
+                        event_id: eventoID, // 🛑 O AJUSTE: Trocamos a variável fantasma pela sua variável real!
+                        itens: itensParaCarga 
                     })
                 });
 
