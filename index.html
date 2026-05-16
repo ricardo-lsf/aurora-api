@@ -633,11 +633,12 @@
             
             console.log("🕵️ Resposta da API (Menu):", dadosApi);
             
-            // 2. Extração direta e sem firulas
-            // Se dadosApi já for um array (lista), ele pega. Se estiver dentro de ".dados" (padrão antigo), ele pega também.
+            // 2. Extração direta e sem firulas (AGORA LENDO A GAVETA 'drinks'!)
             let listaDrinks = [];
             if (Array.isArray(dadosApi)) {
                 listaDrinks = dadosApi;
+            } else if (dadosApi && Array.isArray(dadosApi.drinks)) { // 🛑 O SEGREDO ESTAVA AQUI!
+                listaDrinks = dadosApi.drinks;
             } else if (dadosApi && Array.isArray(dadosApi.dados)) {
                 listaDrinks = dadosApi.dados;
             }
@@ -952,25 +953,34 @@ function atualizarStatusConexao() {
                     // -----------------------------------------------------
                     // MISSÃO 2: VIGIA O ESTOQUE DOS DRINKS
                     // -----------------------------------------------------
-                    // IMPORTANTE: Confirme se essa rota abaixo é a que busca os drinks do evento no seu Python!
-                    const resEstoque = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}/drinks`);
+                    // 🛑 URL CORRIGIDA PARA /menu (Adeus Erro 404!)
+                    const resEstoque = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}/menu`);
                     
                     if (resEstoque.ok) {
-                        const drinksBanco = await resEstoque.json();
+                        const dataApi = await resEstoque.json();
+                        
+                        // Lida com o formato correto igual fizemos no carregarDrinks
+                        let drinksBanco = [];
+                        if (Array.isArray(dataApi)) drinksBanco = dataApi;
+                        else if (dataApi && Array.isArray(dataApi.drinks)) drinksBanco = dataApi.drinks;
+
                         let teveMudanca = false;
 
-                        drinksBanco.forEach(drinkBanco => {
+                        drinksBanco.forEach(itemBanco => {
                             // Procura o drink na memória do celular
-                            const drinkTela = drinks.find(d => d.id === drinkBanco.id);
+                            const drinkTela = drinks.find(d => d.id === itemBanco.id);
+                            
+                            // 🛑 Ajuste: o nome da coluna no banco é planned_quantity
+                            const estoqueBanco = itemBanco.planned_quantity !== undefined ? itemBanco.planned_quantity : 999;
                             
                             // Se o estoque do banco estiver diferente do celular, a gente atualiza
-                            if (drinkTela && drinkTela.estoque !== drinkBanco.estoque) {
-                                drinkTela.estoque = drinkBanco.estoque;
+                            if (drinkTela && drinkTela.estoque !== estoqueBanco) {
+                                drinkTela.estoque = estoqueBanco;
                                 teveMudanca = true;
                             }
                         });
 
-                        // Se teve diferença (alguém vendeu ou estornou algo), redesenha a tela toda!
+                        // Se teve diferença, redesenha a tela toda!
                         if (teveMudanca) {
                             console.log("🔄 Estoque atualizado via Radar!");
                             renderizar(); 
