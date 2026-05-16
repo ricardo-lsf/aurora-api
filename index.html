@@ -446,6 +446,7 @@
             // 🛑 ESCUDO ANTI-F5: Salva no navegador que ele entrou nessa festa!
             // ==========================================
             localStorage.setItem('eventoID', eventoID);
+            localStorage.setItem('nomeEventoSalvo', nomeEvento); // <-- ADICIONADO AQUI!
             
             // 3. Coloca o nome da festa lá no topo
             document.getElementById('nome-evento').innerText = nomeEvento;
@@ -469,6 +470,7 @@
             // 🛑 ESCUDO ANTI-F5: Apaga a memória pra ele não voltar pra cá no F5
             // ==========================================
             localStorage.removeItem('eventoID');
+            localStorage.removeItem('nomeEventoSalvo'); // <-- ADICIONADO AQUI!
             
             // 2. Limpa a tela de fundo
             document.getElementById('nome-evento').innerText = "Aguardando...";

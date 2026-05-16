@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import psycopg2
@@ -9,6 +9,7 @@ from datetime import date, time
 from fastapi.responses import FileResponse
 import os
 from fastapi.staticfiles import StaticFiles
+
 
 
 app = FastAPI(title="Aurora Bartenders API")
@@ -540,7 +541,7 @@ class NovoMenu(BaseModel):
 # CARREGAR ESTOQUE DO CAMINHÃO (BLINDADO)
 # ==========================================
 @app.post("/inventory/load-event")
-def carregar_estoque_evento(payload: CargaEventoBody): # 🛑 Usa o molde explícito aqui
+def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): # 🛑 Usa o molde explícito aqui
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
