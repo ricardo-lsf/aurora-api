@@ -3822,7 +3822,11 @@
         tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>Carregando...</td></tr>";
         
         try {
-            const res = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idEvento}/menu`);
+            // ============================================================
+            // 🛑 A URL CORRIGIDA PARA O ADMIN (Com o /admin/ no caminho)
+            // ============================================================
+            const res = await fetch(`https://aurora-api-zj8e.onrender.com/admin/events/${idEvento}/menu`);
+            
             if (!res.ok) throw new Error("Erro ao buscar menu");
             const data = await res.json();
             
@@ -3832,7 +3836,7 @@
                 return;
             }
 
-        data.dados.forEach(drink => {
+            data.dados.forEach(drink => {
                 const foto = drink.image_url || 'https://via.placeholder.com/40?text=🍹';
                 const preco = parseFloat(drink.preco_venda || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
                 

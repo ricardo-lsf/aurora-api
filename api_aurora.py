@@ -13,13 +13,15 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Aurora Bartenders API")
 
-# Configuração de CORS - Garanta que está assim:
+# ==========================================
+# CONFIGURAÇÃO DE SEGURANÇA (CORS)
+# ==========================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # O "*" permite que qualquer site (inclusive seu localhost) acesse a API
+    allow_origins=["*"],  # Permite que qualquer front-end (até o seu localhost) acesse a API
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Permite todos os comandos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite qualquer formato de cabeçalho
 )
 
 # Libera a pasta de imagens para acesso público
@@ -274,17 +276,6 @@ def atualizar_evento(event_id: str, dados: EventoUpdate):
         print("Erro no PUT /events:", str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
-
-# ==========================================
-# CONFIGURAÇÃO DE SEGURANÇA (CORS)
-# ==========================================
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Permite que qualquer front-end (até o seu localhost) acesse a API
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite todos os comandos (GET, POST, etc.)
-    allow_headers=["*"],  # Permite qualquer formato de cabeçalho
-)
 
 # O "Molde" (Schema) para criar um evento
 class NovoEvento(BaseModel):
@@ -730,8 +721,8 @@ def salvar_cardapio(event_id: str, menu: NovoMenu):
 # ROTA: BUSCAR O CARDÁPIO DO EVENTO (PARA O ADMIN)
 # Resolve o erro "undefined (reading 'forEach')"
 # ==========================================
-@app.get("/events/{event_id}/menu")
-def buscar_cardapio_evento_admin(event_id: str):
+@app.get("/admin/events/{event_id}/menu")
+def obter_menu_admin(event_id: str):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão")
@@ -974,8 +965,6 @@ def listar_tipos_insumos():
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-from pydantic import BaseModel
-from typing import Optional
 
 # 1. O Molde do que o seu PDV (index.html) vai enviar para a API
 class NovaVenda(BaseModel):
@@ -1456,7 +1445,7 @@ def ver_receita(cocktail_id: str):
 # ==========================================
 # Adicionamos o user_name na url/query
 @app.post("/events/{event_id}/sell/{cocktail_id}")
-def registrar_venda(event_id: str, cocktail_id: str, user_name: str = "Desconhecido"):
+def registrar_venda_direta(event_id: str, cocktail_id: str, user_name: str = "Desconhecido"):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -1539,11 +1528,7 @@ def registrar_estorno(event_id: str, cocktail_id: str):
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
     
-# ==========================================
-# NOSSA DÉCIMA QUARTA ROTA: BUSCAR EVENTOS ATIVOS (PREPARADO PARA MÚLTIPLOS EVENTOS)
-# ==========================================
-
-    
+   
 # ==========================================
 # NOSSA DÉCIMA QUINTA ROTA: LOGIN DA EQUIPE (STAFF)
 # ==========================================
