@@ -537,10 +537,10 @@ class NovoMenu(BaseModel):
 
 
 # ==========================================
-# CARREGAR ESTOQUE (VALIDADA)
+# CARREGAR ESTOQUE DO CAMINHÃO (BLINDADO)
 # ==========================================
 @app.post("/inventory/load-event")
-def carregar_estoque_evento(payload: CargaEvento):
+def carregar_estoque_evento(payload: CargaEventoBody): # 🛑 Usa o molde explícito aqui
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -553,7 +553,7 @@ def carregar_estoque_evento(payload: CargaEvento):
         # ==========================================
         erros_estoque = []
         
-        for item in payload.itens:
+        for item in payload.items:
             cur.execute("SELECT name, current_stock FROM ingredients WHERE id = %s", (item.ingredient_id,))
             resultado = cur.fetchone()
             
@@ -566,7 +566,6 @@ def carregar_estoque_evento(payload: CargaEvento):
             qtd_solicitada = float(item.quantity)
             
             if qtd_solicitada > estoque_atual:
-                # Agora guardamos como um dicionário, não como um texto corrido
                 erros_estoque.append({
                     "insumo": nome_insumo,
                     "pedido": qtd_solicitada,
@@ -574,18 +573,18 @@ def carregar_estoque_evento(payload: CargaEvento):
                 })
         
         if erros_estoque:
-            # O FastAPI entende essa lista e transforma num JSON bonitinho pro JavaScript ler
             raise HTTPException(status_code=400, detail=erros_estoque)
 
         # ==========================================
         # 2. SE PASSOU NO TESTE, FAZ A TRANSFERÊNCIA
         # ==========================================
-        for item in payload.itens:
-            # Tira do Galpão
+        for item in payload.items:
+            # Tira do Galpão Principal
             cur.execute("UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s", 
                         (item.quantity, item.ingredient_id))
             
-            # Coloca no Caminhão
+            # O MOTOBOY DO DESESPERO (A Regra do UPSERT)
+            # Se a linha já existir (caminhão já foi), ele apenas SOMA a nova quantidade.
             query_upsert = """
                 INSERT INTO event_stocks (event_id, ingredient_id, quantity_sent)
                 VALUES (%s, %s, %s)
@@ -595,15 +594,13 @@ def carregar_estoque_evento(payload: CargaEvento):
             cur.execute(query_upsert, (payload.event_id, item.ingredient_id, item.quantity))
         
         conn.commit() 
-        return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
+        return {"status": "sucesso", "detalhes": f"{len(payload.items)} insumos carregados."}
         
     except HTTPException as he:
-        # 1. Se for o nosso erro de estoque, repassa o JSON perfeito pro JavaScript ler!
         if conn: conn.rollback()
         raise he 
         
     except Exception as e:
-        # 2. Se for erro de servidor/banco de dados, converte pra texto e avisa
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
         
@@ -669,10 +666,9 @@ class ItemCarga(BaseModel):
     ingredient_id: str
     quantity: float
 
-class CargaEvento(BaseModel):
+class CargaEventoBody(BaseModel):
     event_id: str
-    itens: List[ItemCarga]
-
+    items: List[ItemCarga] # 🛑 O molde agora usa "items" (com m) para bater com o JS!
 
 
 # ==========================================
