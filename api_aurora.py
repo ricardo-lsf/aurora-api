@@ -553,7 +553,7 @@ def carregar_estoque_evento(payload: CargaEventoBody): # 🛑 Usa o molde explí
         # ==========================================
         erros_estoque = []
         
-        for item in payload.items:
+        for item in payload.itens:
             cur.execute("SELECT name, current_stock FROM ingredients WHERE id = %s", (item.ingredient_id,))
             resultado = cur.fetchone()
             
