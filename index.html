@@ -277,36 +277,49 @@
         // --- ESCUDO ANTI-F5 E INICIALIZAÇÃO PERSISTENTE ---
         // ============================================================
         window.addEventListener('DOMContentLoaded', async () => {
-            // 1. Olha para a memória do navegador para ver se já tem alguém logado
-            const usuarioSalvo = localStorage.getItem('usuarioLogado'); // Usando a chave exata do seu código
-            const eventoSalvo = localStorage.getItem('eventoID'); // Puxa o ID do evento, se o cara já estava dentro de um
+            const usuarioSalvo = localStorage.getItem('usuarioLogado');
+            const eventoSalvo = localStorage.getItem('eventoID');
 
             if (usuarioSalvo) {
                 console.log("🔄 Sessão recuperada para:", usuarioSalvo);
                 usuarioAtual = usuarioSalvo;
                 
-                // Atualiza a tela e esconde o login
                 const userDisplay = document.getElementById('user-display');
                 if (userDisplay) userDisplay.innerText = "👤 " + usuarioAtual;
                 
                 const loginOverlay = document.getElementById('login-overlay');
                 if (loginOverlay) loginOverlay.style.display = 'none';
 
-                // 2. O cara já estava dentro de um evento antes de dar F5?
                 if (eventoSalvo) {
                     eventoID = eventoSalvo;
+                    ID_FESTA_POSTGRES = eventoSalvo; // Garante que a variável mestra também seja preenchida
                     console.log("🔄 Retornando ao evento:", eventoID);
                     
-                    // IMPORTANTE: Aqui você deve chamar a função que carrega os drinks do evento.
-                    // Exemplo: await carregarDrinksDoEvento(eventoID); 
+                    // ============================================================
+                    // 🛑 O DESTRAVAMENTO VISUAL: Tira o loading e as sobreposições da frente!
+                    // ============================================================
+                    const eventSelection = document.getElementById('event-selection-overlay');
+                    if (eventSelection) eventSelection.style.display = 'none';
                     
-                    // Depois que os drinks carregarem, puxamos o histórico do banco!
+                    const loading = document.getElementById('loading');
+                    if (loading) loading.style.display = 'none'; // Se você tiver uma div de loading
+
+                    // 1. Manda carregar o cardápio no grid
+                    if (typeof carregarDrinks === 'function') {
+                        carregarDrinks(eventoID);
+                    }
+                    
+                    // 2. Religa o radar de estoque
+                    if (typeof monitorarEvento === 'function') {
+                        monitorarEvento(eventoID);
+                    }
+                    
+                    // 3. Puxa o histórico de vendas depois de 1 segundo (dá tempo do cardápio desenhar)
                     setTimeout(() => {
                         sincronizarDadosDoBanco();
-                    }, 500); // Um leve atraso só para garantir que os cards dos drinks já desenharam
+                    }, 1000); 
                     
                 } else {
-                    // Se não estava em nenhum evento, manda ele pra tela de escolher evento (Recepção VIP)
                     if (typeof buscarEventosAtivos === 'function') {
                         buscarEventosAtivos();
                     }
@@ -358,28 +371,6 @@
             }
         };
         
-        // --- RADAR DE EVENTOS (SUBSTITUI O ONSNAPSHOT DO FIREBASE) ---
-        let intervaloMonitoramento;
-
-        // DENTRO DO SEU index.html (PDV)
-        window.monitorarEvento = () => {
-            setInterval(async () => {
-                // TROCADO DE eventoAtualID PARA eventoID
-                if (!eventoID) return; 
-                try {
-                    const res = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.status === 'fechado') {
-                            alert("Atenção: O evento foi encerrado pelo Gerente!");
-                            location.reload(); 
-                        }
-                    }
-                } catch (e) {
-                    console.error("Erro ao monitorar evento:", e);
-                }
-            }, 5000); 
-        };
 
         // --- RADAR DO KDS: BUSCA PEDIDOS FEITOS PELO CELULAR ---
         window.atualizarFilaKDS = async () => {
@@ -632,39 +623,47 @@
         };
 
     // --- NOVO MOTOR: BUSCANDO O CARDÁPIO DO EVENTO NO POSTGRESQL ---
-    async function carregarDrinks(id_evento) { // <-- Nome limpo e correto!
+    async function carregarDrinks(id_evento) { 
         try {
             console.log(`Buscando cardápio no banco relacional para o evento:`, id_evento);
             
-            // 1. A chamada correta para a API (usando a variável que passamos pra função)
+            // 1. A chamada para a API
             const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id_evento}/menu`);
             const dadosApi = await resposta.json();
             
-            // 2. O X-9: Vai imprimir no seu F12 EXATAMENTE o que o Python devolveu
-            console.log("🕵️ Resposta da API:", dadosApi);
+            console.log("🕵️ Resposta da API (Menu):", dadosApi);
             
-            // 3. Pega a lista, esteja ela na gaveta "dados" ou solta no Array
-            const listaDrinks = dadosApi.dados ? dadosApi.dados : (Array.isArray(dadosApi) ? dadosApi : []);
+            // 2. Extração direta e sem firulas
+            // Se dadosApi já for um array (lista), ele pega. Se estiver dentro de ".dados" (padrão antigo), ele pega também.
+            let listaDrinks = [];
+            if (Array.isArray(dadosApi)) {
+                listaDrinks = dadosApi;
+            } else if (dadosApi && Array.isArray(dadosApi.dados)) {
+                listaDrinks = dadosApi.dados;
+            }
 
+            // 3. Monta os cards na tela
             if (listaDrinks.length > 0) {
                 drinks = [];
                 listaDrinks.forEach(item => {
                     drinks.push({
                         id: item.id,
-                        // 4. A BLINDAGEM: Lê o nome e o preço, seja do jeito novo ou do jeito velho!
-                        nome: item.drink_nome || item.name,
-                        precoVenda: item.preco_venda || item.sale_price,
-                        estoque: item.planned_quantity || 999,
+                        nome: item.drink_nome || item.name || "Drink sem nome", // Proteção de nome
+                        precoVenda: item.preco_venda || item.sale_price || 0,
+                        estoque: item.planned_quantity !== undefined ? item.planned_quantity : 999, // Se for 0, respeita o 0.
                         imagem: item.image_url || "./imagens/moscow.jpg" 
                     });
                 });
+                
                 renderizar();
                 console.log("✅ Drinks renderizados com sucesso no PDV!");
             } else {
                 console.warn("Nenhum drink encontrado para esta festa.");
+                // Opcional: Mostre uma mensagem na tela se o cardápio estiver vazio
+                document.getElementById('grid').innerHTML = '<p style="color:white; text-align:center; width: 100%;">Nenhum drink adicionado ao cardápio deste evento.</p>';
             }
         } catch (erro) {
-            console.error("Erro ao buscar cardápio:", erro);
+            console.error("🚨 Erro Crítico ao buscar cardápio:", erro);
         }
     }
 
@@ -920,6 +919,70 @@ function atualizarStatusConexao() {
                 }
             });
         }
+
+        // ============================================================
+        // --- O GRANDE RADAR (STATUS DO EVENTO + ESTOQUE EM TEMPO REAL) ---
+        // ============================================================
+        let intervaloMonitoramento;
+
+        window.monitorarEvento = (idPostgres) => {
+            // 1. Limpa o radar antigo para evitar "fantasmas" rodando duas vezes
+            if (intervaloMonitoramento) clearInterval(intervaloMonitoramento);
+
+            console.log("📡 Radar Ativado: Vigiando Status do Evento e Estoque simultaneamente!");
+
+            intervaloMonitoramento = setInterval(async () => {
+                if (!eventoID) return; 
+                
+                try {
+                    // -----------------------------------------------------
+                    // MISSÃO 1: VIGIA SE O EVENTO FOI ENCERRADO
+                    // -----------------------------------------------------
+                    const resStatus = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}`);
+                    if (resStatus.ok) {
+                        const dataStatus = await resStatus.json();
+                        if (dataStatus.status === 'fechado') {
+                            alert("Atenção: O evento foi encerrado pelo Gerente!");
+                            clearInterval(intervaloMonitoramento); // Desliga o radar
+                            location.reload(); // Expulsa o bartender
+                            return; // Para o código aqui mesmo
+                        }
+                    }
+
+                    // -----------------------------------------------------
+                    // MISSÃO 2: VIGIA O ESTOQUE DOS DRINKS
+                    // -----------------------------------------------------
+                    // IMPORTANTE: Confirme se essa rota abaixo é a que busca os drinks do evento no seu Python!
+                    const resEstoque = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}/drinks`);
+                    
+                    if (resEstoque.ok) {
+                        const drinksBanco = await resEstoque.json();
+                        let teveMudanca = false;
+
+                        drinksBanco.forEach(drinkBanco => {
+                            // Procura o drink na memória do celular
+                            const drinkTela = drinks.find(d => d.id === drinkBanco.id);
+                            
+                            // Se o estoque do banco estiver diferente do celular, a gente atualiza
+                            if (drinkTela && drinkTela.estoque !== drinkBanco.estoque) {
+                                drinkTela.estoque = drinkBanco.estoque;
+                                teveMudanca = true;
+                            }
+                        });
+
+                        // Se teve diferença (alguém vendeu ou estornou algo), redesenha a tela toda!
+                        if (teveMudanca) {
+                            console.log("🔄 Estoque atualizado via Radar!");
+                            renderizar(); 
+                        }
+                    }
+
+                } catch (e) {
+                    // Falha silenciosa. Se a rede do evento oscilar, ele tenta de novo em 8s sem travar a tela.
+                    console.error("📡 Oscilação no radar:", e);
+                }
+            }, 8000); // 8000 = 8 segundos. É rápido o suficiente e não sobrecarrega a sua API no Render!
+        };
 
     </script>
 </body>
