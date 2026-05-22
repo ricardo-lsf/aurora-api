@@ -1332,9 +1332,9 @@ def listar_todos_drinks(account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
         
 # ==========================================
-# NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO EXATO DO EVENTO
+# NOSSA DÉCIMA ROTA: LISTAR O CARDÁPIO E O ESTOQUE REAL
 # ==========================================
-@app.get("/events/{event_id}/menu") # Mantenha a rota que já existe no seu código
+@app.get("/events/{event_id}/menu") 
 def listar_menu_evento(event_id: str): 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor) 
@@ -1353,7 +1353,7 @@ def listar_menu_evento(event_id: str):
         id_verdadeiro = evento['id']
         nome_da_festa = evento['name']
 
-        # 2. Busca os drinks e faz o JOIN DUPLO nos insumos!
+        # 2. O MOTOR BI DE ESTOQUE (Calcula a capacidade real de cada drink)
         cur.execute("""
             SELECT 
                 c.id, 
@@ -1361,13 +1361,30 @@ def listar_menu_evento(event_id: str):
                 c.sale_price AS preco_venda, 
                 c.image_url,
                 (
-                    -- Magia do Postgres: Atravessa a ponte e junta os nomes separados por vírgula!
                     SELECT STRING_AGG(i.name, ', ') 
                     FROM cocktail_ingredients ci 
                     JOIN ingredients i ON ci.ingredient_id = i.id
                     WHERE ci.cocktail_id = c.id
                 ) AS descricao,
-                em.planned_quantity
+                
+                -- =========================================================
+                -- A MÁGICA DA COQUETELARIA: O Cálculo do Insumo Gargalo!
+                -- Pega o (Enviado - Usado) e divide pela receita do drink.
+                -- =========================================================
+                COALESCE(
+                    (
+                        SELECT MIN(
+                            FLOOR(
+                                (COALESCE(es.quantity_sent, 0) - COALESCE(es.quantity_used, 0)) / NULLIF(ci.quantity, 0)
+                            )
+                        )
+                        FROM cocktail_ingredients ci
+                        LEFT JOIN event_stocks es ON ci.ingredient_id = es.ingredient_id AND es.event_id = em.event_id
+                        WHERE ci.cocktail_id = c.id
+                    ),
+                    em.planned_quantity -- Fallback de segurança se o drink não tiver ficha técnica
+                ) AS planned_quantity
+
             FROM event_menus em
             JOIN cocktails c ON em.cocktail_id = c.id
             WHERE em.event_id = %s
