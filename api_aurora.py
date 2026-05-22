@@ -590,7 +590,7 @@ def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): # 🛑 Usa o 
         # ==========================================
         # 2. SE PASSOU NO TESTE, FAZ A TRANSFERÊNCIA
         # ==========================================
-        for item in payload.items:
+        for item in payload.itens:
             # Tira do Galpão Principal
             cur.execute("UPDATE ingredients SET current_stock = current_stock - %s WHERE id = %s", 
                         (item.quantity, item.ingredient_id))
