@@ -536,6 +536,17 @@ class NovoMenu(BaseModel):
     # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
     drinks: List[str] 
 
+# ==========================================
+# O "MOLDE" PARA MULTIPLOS INSUMOS
+# ==========================================
+class ItemCarga(BaseModel):
+    ingredient_id: str
+    quantity: float
+
+class CargaEventoBody(BaseModel):
+    event_id: str
+    itens: List[ItemCarga] # 🛑 O molde agora usa "items" (com m) para bater com o JS!
+
 
 # ==========================================
 # CARREGAR ESTOQUE DO CAMINHÃO (BLINDADO)
@@ -658,18 +669,6 @@ def sugerir_carga(event_id: str):
     finally:
         cur.close()
         conn.close()
-
-
-# ==========================================
-# O "MOLDE" PARA MULTIPLOS INSUMOS
-# ==========================================
-class ItemCarga(BaseModel):
-    ingredient_id: str
-    quantity: float
-
-class CargaEventoBody(BaseModel):
-    event_id: str
-    items: List[ItemCarga] # 🛑 O molde agora usa "items" (com m) para bater com o JS!
 
 
 # ==========================================
