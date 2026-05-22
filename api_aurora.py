@@ -606,7 +606,7 @@ def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): # 🛑 Usa o 
             cur.execute(query_upsert, (payload.event_id, item.ingredient_id, item.quantity))
         
         conn.commit() 
-        return {"status": "sucesso", "detalhes": f"{len(payload.items)} insumos carregados."}
+        return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
         
     except HTTPException as he:
         if conn: conn.rollback()
