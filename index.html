@@ -70,6 +70,43 @@
         .rec-list li { padding: 8px 0; border-bottom: 1px solid #333; color: #ccc; font-size: 0.95em; display: flex; justify-content: space-between; }
         .rec-list li span { color: #fff; font-weight: bold; }
 
+        /* ==========================================
+           🚨 ALERTA DE ESTOQUE BAIXO (CSS)
+        ========================================== */
+        .drink-card.stock-low {
+            border: 2px solid #f39c12 !important; /* Laranja chamativo */
+            box-shadow: 0 0 12px rgba(243, 156, 18, 0.4);
+        }
+        
+        /* Muda a cor da tag de quantidade para laranja e faz piscar */
+        .drink-card.stock-low .stock-badge {
+            background-color: #f39c12 !important;
+            color: #fff !important;
+            animation: pulse-low-stock 2s infinite; 
+        }
+
+        @keyframes pulse-low-stock {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Etiqueta flutuante (como a de esgotado, mas laranja) */
+        .low-stock-overlay {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background-color: #f39c12;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 900;
+            padding: 3px 6px;
+            border-radius: 4px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+
         /* DASHBOARD */
         .dashboard { padding: 20px 12px; display: grid; grid-template-columns: 1fr; gap: 20px; }
         @media (min-width: 700px) { .dashboard { grid-template-columns: 2fr 1fr; } } 
@@ -681,18 +718,28 @@
 				const clickAction = `onclick="verReceita('${d.id}')"`;
 
 				g.innerHTML+=`
-				<div class="${cls}">
-					<div class="sold-out-overlay">ESGOTADO</div>
-					<div class="img-wrapper" ${clickAction}>
-						<div class="info-icon">i</div>
-						<img src="${d.imagem||''}" class="drink-img" onerror="this.style.opacity=0.3">
-					</div>
-					<div class="card-body">
-						<div class="drink-name">${d.nome}</div>
-						<div class="info-row"><span class="price-tag">R$ ${parseFloat(p).toFixed(2)}</span><span class="stock-badge">${d.estoque} un</span></div>
-						<div class="controls"><button class="btn-circle btn-remove" onclick="mudar('${d.id}',-1)" ${eventoStatus==='fechado'?'disabled':''}>-</button><span class="drink-count">${counts[d.id]}</span><button class="btn-circle btn-add" onclick="mudar('${d.id}',1)" ${eventoStatus==='fechado'||sold?'disabled':''}>+</button></div>
-					</div>
-				</div>`;
+                <div class="${cls}">
+                    <div class="sold-out-overlay">ESGOTADO</div>
+                    
+                    ${low ? '<div class="low-stock-overlay">ESTOQUE BAIXO</div>' : ''}
+                    
+                    <div class="img-wrapper" ${clickAction}>
+                        <div class="info-icon">i</div>
+                        <img src="${d.imagem||''}" class="drink-img" onerror="this.style.opacity=0.3">
+                    </div>
+                    <div class="card-body">
+                        <div class="drink-name">${d.nome}</div>
+                        <div class="info-row">
+                            <span class="price-tag">R$ ${parseFloat(p).toFixed(2)}</span>
+                            <span class="stock-badge">${d.estoque} un</span>
+                        </div>
+                        <div class="controls">
+                            <button class="btn-circle btn-remove" onclick="mudar('${d.id}',-1)" ${eventoStatus==='fechado'?'disabled':''}>-</button>
+                            <span class="drink-count">${counts[d.id]}</span>
+                            <button class="btn-circle btn-add" onclick="mudar('${d.id}',1)" ${eventoStatus==='fechado'||sold?'disabled':''}>+</button>
+                        </div>
+                    </div>
+                </div>`;
 			});
 			atualizarTotais();
 }
