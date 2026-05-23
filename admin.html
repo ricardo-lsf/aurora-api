@@ -3200,12 +3200,18 @@
                                 <div style="margin-top: 8px;">
                                     <span style="background: ${corStatus}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase;">${ev.status}</span>
                                     
-                                    ${isNoAr ? `<span onclick="event.stopPropagation(); abrirAlertaEstoqueFesta('${ev.id}')" style="background-color: #e11d48; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; box-shadow: 0 0 5px rgba(225,29,72,0.5);">📊 RADAR DE ESTOQUE</span>` : ''}
+                                    ${isNoAr ? `<span id="radar-badge-${ev.id}" onclick="event.stopPropagation(); abrirAlertaEstoqueFesta('${ev.id}')" style="background-color: #6b7280; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; transition: 0.3s;">🔎 Checando...</span>` : ''}
+
 
                                 </div>
                                 ${botaoCargaHTML}
                             </div>
                         `;
+                    }
+
+                    // 🚀 SOLTA O ESPIÃO PARA ESSA FESTA!
+                    if (isNoAr) {
+                        window.checarEstoqueSilencioso(ev.id);
                     }
 
                     if (sA) {
@@ -5541,6 +5547,45 @@
                 containerLista.innerHTML = '<p style="color: #ef4444;">Erro ao conectar com o bar. Verifique o console.</p>';
             }
         };
+
+        // ============================================================
+        // ESPIÃO DE ESTOQUE: Checa os insumos sem o gestor precisar clicar
+        // ============================================================
+        window.checarEstoqueSilencioso = async function(idDaFesta) {
+            try {
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idDaFesta}/inventory-status`);
+                const dados = await resposta.json();
+                
+                // Procura a flag específica dessa festa pelo ID
+                const badge = document.getElementById(`radar-badge-${idDaFesta}`);
+                if (!badge) return;
+
+                if (dados.status === "sucesso") {
+                    let temCritico = false;
+                    
+                    dados.insumos.forEach(item => {
+                        const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
+                        if (percentual <= 20) temCritico = true; // Achou um gargalo!
+                    });
+
+                    // Atualiza o visual da flag dependendo do resultado
+                    if (temCritico) {
+                        badge.innerHTML = "🚨 ESTOQUE CRÍTICO";
+                        badge.style.backgroundColor = "#e11d48"; // Vermelho Alerta
+                        badge.style.boxShadow = "0 0 8px rgba(225,29,72,0.8)";
+                        badge.style.animation = "piscar-alerta 1.5s infinite"; // Começa a piscar!
+                    } else {
+                        badge.innerHTML = "✅ ESTOQUE OK";
+                        badge.style.backgroundColor = "#10b981"; // Verde Seguro
+                        badge.style.boxShadow = "none";
+                        badge.style.animation = "none";
+                    }
+                }
+            } catch (e) {
+                console.error("Erro no espião de estoque:", e);
+            }
+        };
+
 
     </script>
 
