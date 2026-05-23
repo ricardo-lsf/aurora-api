@@ -3199,6 +3199,9 @@
                                 <div style="font-size: 13px; color: #7f8c8d; margin-top: 4px;">📅 ${dataFormatada} | 📍 ${ev.location || 'Sem local'}</div>
                                 <div style="margin-top: 8px;">
                                     <span style="background: ${corStatus}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase;">${ev.status}</span>
+                                    
+                                    ${isNoAr ? `<span onclick="event.stopPropagation(); abrirAlertaEstoqueFesta('${ev.id}')" style="background-color: #e11d48; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; box-shadow: 0 0 5px rgba(225,29,72,0.5);">📊 RADAR DE ESTOQUE</span>` : ''}
+
                                 </div>
                                 ${botaoCargaHTML}
                             </div>
