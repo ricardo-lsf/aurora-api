@@ -1845,6 +1845,38 @@ def gerar_lista_compras(event_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ==========================================
+# RADAR DO GESTOR: STATUS DOS INSUMOS DO EVENTO
+# ==========================================
+@app.get("/events/{event_id}/inventory-status")
+def status_estoque_evento(event_id: str):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    try:
+        cur.execute("""
+            SELECT 
+                i.name AS insumo,
+                i.measurement_unit AS unidade,
+                COALESCE(es.quantity_sent, 0) AS enviado,
+                COALESCE(es.quantity_used, 0) AS usado,
+                (COALESCE(es.quantity_sent, 0) - COALESCE(es.quantity_used, 0)) AS saldo
+            FROM event_stocks es
+            JOIN ingredients i ON es.ingredient_id = i.id
+            WHERE es.event_id = %s
+            ORDER BY saldo ASC; -- Traz os menores saldos primeiro!
+        """, (event_id,))
+        
+        status_insumos = cur.fetchall()
+        return {"status": "sucesso", "insumos": status_insumos}
+
+    except Exception as e:
+        print(f"Erro no radar do gestor: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+# ==========================================
 # ROTA: CRIAR PEDIDO (KDS)
 # ==========================================
 @app.post("/orders/create")

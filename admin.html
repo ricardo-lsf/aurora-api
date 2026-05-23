@@ -1006,6 +1006,30 @@
             cursor: pointer;
             font-weight: bold;
         }
+
+        /* Flag de Alerta de Estoque Crítico no Card */
+        .flag-alerta-estoque {
+            background-color: #e11d48;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            animation: piscar-alerta 1.5s infinite;
+        }
+
+        @keyframes piscar-alerta {
+            0% { opacity: 1; box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7); }
+            70% { opacity: 0.8; box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); }
+            100% { opacity: 1; box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        }
+
+
     </style>
 </head>
 
@@ -1847,6 +1871,21 @@
         </div>
     </div>
 
+
+    <div id="modal-estoque-critico" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center;">
+        <div style="background-color: #1e1e2f; color: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; border: 2px solid #e11d48; text-align: left;">
+            <h3 style="margin-top: 0; color: #e11d48; display: flex; align-items: center; gap: 8px;">
+                🚨 Insumos Críticos no Bar
+            </h3>
+            <p style="font-size: 14px; color: #ccc;">Os itens abaixo atingiram o nível de alerta (menos de 20% do enviado):</p>
+            
+            <div id="lista-insumos-criticos" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+            
+            <button onclick="document.getElementById('modal-estoque-critico').style.display = 'none'" style="background-color: #4b5563; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;">
+                FECHAR AVISO
+            </button>
+        </div>
+    </div>
 
 <script type="module">
 
@@ -5398,7 +5437,7 @@
             }
         };
 
-            // ============================================================
+        // ============================================================
         // SISTEMA DE ARRASTAR MODAIS (NOVA VERSÃO BLINDADA)
         // ============================================================
         window.tornarArrastavel = function(idModalCaixaBranca, idCabecalho) {
@@ -5448,6 +5487,55 @@
                 document.onmouseup = null;
                 document.onmousemove = null;
                 cabecalho.style.cursor = 'grab';
+            }
+        };
+
+        window.abrirAlertaEstoqueFesta = async function(idDaFesta) {
+            const containerLista = document.getElementById('lista-insumos-criticos');
+            if (containerLista) containerLista.innerHTML = 'Puxando dados do bar... ⏳';
+            
+            // Mostra o modal na tela
+            document.getElementById('modal-estoque-critico').style.display = 'flex';
+
+            try {
+                // Bate na nossa nova rota do Python
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idDaFesta}/inventory-status`);
+                const dados = await resposta.json();
+
+                if (dados.status === "sucesso") {
+                    let htmlItens = '';
+                    let contagemCriticos = 0;
+
+                    dados.insumos.forEach(item => {
+                        const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
+                        
+                        // Filtra apenas o que está na zona de risco (sub-20%)
+                        if (percentual <= 20) {
+                            contagemCriticos++;
+                            htmlItens += `
+                                <div style="background-color: #2d2d44; border-left: 4px solid #e11d48; padding: 12px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <b style="color: #f1f1f1; font-size: 15px;">${item.insumo}</b><br>
+                                        <span style="font-size: 12px; color: #aaa;">Saldo atual: ${item.saldo} ${item.unidade}</span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="color: #e11d48; font-weight: bold; font-size: 14px;">${percentual.toFixed(0)}% restante</span><br>
+                                        <span style="font-size: 11px; color: #777;">Enviado: ${item.enviado}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    if (contagemCriticos > 0) {
+                        containerLista.innerHTML = htmlItens;
+                    } else {
+                        containerLista.innerHTML = '<p style="color: #10b981; text-align: center; padding: 20px;">Falsa fumaça! Todos os insumos deste evento subiram e estão seguros no momento.</p>';
+                    }
+                }
+            } catch (erro) {
+                console.error("Erro ao carregar insumos críticos:", erro);
+                containerLista.innerHTML = '<p style="color: #ef4444;">Erro ao conectar com o bar. Verifique o console.</p>';
             }
         };
 
