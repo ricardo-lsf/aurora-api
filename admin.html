@@ -5347,6 +5347,21 @@
                 botaoElement.innerText = "Processando... ⏳";
             }
 
+        let idFestaParaCarga = window.eventoSendoCarregado || localStorage.getItem('eventoCargaAdmin');
+        
+        // ==========================================
+        // 🛑 TRAVA DE SEGURANÇA UX
+        // Impede o envio se não souber o destino!
+        // ==========================================
+            if (!idFestaParaCarga || idFestaParaCarga === "null") {
+                alert("⚠️ ALERTA LOGÍSTICO:\nPor favor, feche esta tela e clique primeiro no card do evento para selecioná-lo. O sistema precisa saber o destino exato da carga!");
+                
+                // Se você tiver desabilitado o botão de confirmar ou mudado o texto para "Carregando...", reverta aqui!
+                // Exemplo: document.getElementById('btn-confirmar-carga').disabled = false;
+                
+                return; // 🛑 Corta a função aqui. O pacote quebrado nem chega a ir pro Python!
+            }
+
             const inputs = document.querySelectorAll('.input-carga-insumo');
             const itensParaCarga = [];
 
