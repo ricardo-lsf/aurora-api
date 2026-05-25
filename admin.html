@@ -5561,6 +5561,22 @@
                 if (!badge) return;
 
                 if (dados.status === "sucesso") {
+                    
+                    // ==========================================
+                    // 1. CHECAGEM INICIAL: TEM ALGUMA CARGA?
+                    // Se o array de insumos estiver vazio, o caminhão não passou aqui.
+                    // ==========================================
+                    if (!dados.insumos || dados.insumos.length === 0) {
+                        badge.innerHTML = "📦 SEM ESTOQUE";
+                        badge.style.backgroundColor = "#64748b"; // Cinza chumbo/azulado, neutro
+                        badge.style.boxShadow = "none";
+                        badge.style.animation = "none";
+                        return; // 🛑 Para a execução aqui, não precisa calcular o resto!
+                    }
+
+                    // ==========================================
+                    // 2. SE PASSOU DAQUI, TEM ESTOQUE. VAMOS CAÇAR O GARGALO!
+                    // ==========================================
                     let temCritico = false;
                     
                     dados.insumos.forEach(item => {
@@ -5568,12 +5584,14 @@
                         if (percentual <= 20) temCritico = true; // Achou um gargalo!
                     });
 
-                    // Atualiza o visual da flag dependendo do resultado
+                    // ==========================================
+                    // 3. ATUALIZA A FLAG PARA OK OU CRÍTICO
+                    // ==========================================
                     if (temCritico) {
                         badge.innerHTML = "🚨 ESTOQUE CRÍTICO";
                         badge.style.backgroundColor = "#e11d48"; // Vermelho Alerta
                         badge.style.boxShadow = "0 0 8px rgba(225,29,72,0.8)";
-                        badge.style.animation = "piscar-alerta 1.5s infinite"; // Começa a piscar!
+                        badge.style.animation = "piscar-alerta 1.5s infinite"; 
                     } else {
                         badge.innerHTML = "✅ ESTOQUE OK";
                         badge.style.backgroundColor = "#10b981"; // Verde Seguro
