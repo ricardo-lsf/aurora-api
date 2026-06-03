@@ -5341,25 +5341,21 @@
         };
 
         window.confirmarCargaEvento = async function(botaoElement) {
+            
+            // ==========================================
+            // 🛑 1. TRAVA DE SEGURANÇA: Tem festa selecionada?
+            // ==========================================
+            let idFestaParaCarga = (typeof eventoID !== 'undefined' ? eventoID : null) || window.eventoSendoCarregado || localStorage.getItem('eventoCargaAdmin');
+            
+            if (!idFestaParaCarga || idFestaParaCarga === "null") {
+                alert("⚠️ ALERTA LOGÍSTICO:\nPor favor, feche esta tela e clique no card do evento desejado primeiro. O sistema precisa saber o destino da carga!");
+                return; // Corta aqui e não dá o Erro 422!
+            }
+
             // TRAVA DE SEGURANÇA VISUAL
             if (botaoElement) {
                 botaoElement.disabled = true;
                 botaoElement.innerText = "Processando... ⏳";
-            }
-
-        let idFestaParaCarga = window.eventoSendoCarregado || localStorage.getItem('eventoCargaAdmin');
-        
-        // ==========================================
-        // 🛑 TRAVA DE SEGURANÇA UX
-        // Impede o envio se não souber o destino!
-        // ==========================================
-            if (!idFestaParaCarga || idFestaParaCarga === "null") {
-                alert("⚠️ ALERTA LOGÍSTICO:\nPor favor, feche esta tela e clique primeiro no card do evento para selecioná-lo. O sistema precisa saber o destino exato da carga!");
-                
-                // Se você tiver desabilitado o botão de confirmar ou mudado o texto para "Carregando...", reverta aqui!
-                // Exemplo: document.getElementById('btn-confirmar-carga').disabled = false;
-                
-                return; // 🛑 Corta a função aqui. O pacote quebrado nem chega a ir pro Python!
             }
 
             const inputs = document.querySelectorAll('.input-carga-insumo');
@@ -5383,6 +5379,7 @@
                 if (botaoElement) { 
                     botaoElement.disabled = false; 
                     botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO"; 
+                    botaoElement.style.backgroundColor = ""; // Reseta a cor se tiver
                 }
                 return;
             }
@@ -5400,7 +5397,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        event_id: eventoID, // 🛑 O AJUSTE: Trocamos a variável fantasma pela sua variável real!
+                        event_id: idFestaParaCarga, // Usa a variável blindada que criamos no início
                         itens: itensParaCarga 
                     })
                 });
@@ -5417,11 +5414,10 @@
                                 <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
                                     ⚠️ Atenção na Carga
                                 </h4>
-                                <ul style="margin-bottom: 0; padding-left: 20px; font-size: 14px;">
+                                <ul style="margin-bottom: 10px; padding-left: 20px; font-size: 14px;">
                         `;
                         
                         result.detail.forEach(erro => {
-                            // 🛑 BLINDAGEM: Verifica se é o erro de estoque ou erro técnico do Python
                             if (erro.insumo) {
                                 htmlErro += `<li style="margin-bottom: 5px;">
                                     <b>${erro.insumo}</b>: Tentou carregar <b>${erro.pedido}</b> | Saldo atual: <b>${erro.disponivel}</b>
@@ -5433,19 +5429,27 @@
                             }
                         });
                         
-                        htmlErro += `</ul></div>`;
+                        // Adiciona uma dica para o usuário
+                        htmlErro += `</ul>
+                                <p style="font-size: 13px; font-weight: bold; margin-bottom: 0; color: #7f1d1d;">
+                                    💡 Ajuste os valores nos campos acima e clique em Confirmar novamente.
+                                </p>
+                            </div>`;
                         
                         if (divErros) {
                             divErros.innerHTML = htmlErro;
                         } 
                         
-                        // O BOTÃO MUTANTE: Vira um botão de fechar vermelho
+                        // ==========================================
+                        // 🔄 2. O BOTÃO MUTANTE: AGORA ELE REENVIA!
+                        // ==========================================
                         if (botaoElement) {
                             botaoElement.disabled = false;
-                            botaoElement.innerText = "Fechar (Carga não realizada)";
-                            botaoElement.style.backgroundColor = "#c0392b"; 
+                            botaoElement.innerText = "🔄 REENVIAR CARGA ATUALIZADA";
+                            botaoElement.style.backgroundColor = "#f39c12"; // Fica laranja/amarelo chamativo
                             botaoElement.setAttribute('data-erro', 'true'); 
-                            botaoElement.onclick = function() { window.fecharModalLogistica(); };
+                            // Faz ele chamar a própria função de novo em vez de fechar a tela!
+                            botaoElement.onclick = function() { window.confirmarCargaEvento(botaoElement); };
                         }
                     } else {
                         alert("Erro: " + (result.detail || "Erro ao processar carga."));
@@ -5454,9 +5458,11 @@
             } catch (error) {
                 alert("Erro de conexão com o servidor.");
             } finally {
+                // Só reseta o botão para o original se NÃO for o erro de estoque
                 if (botaoElement && !botaoElement.getAttribute('data-erro')) {
                     botaoElement.disabled = false;
                     botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO";
+                    botaoElement.style.backgroundColor = "";
                 }
             }
         };
