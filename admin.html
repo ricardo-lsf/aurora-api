@@ -1871,18 +1871,24 @@
         </div>
     </div>
 
-
     <div id="modal-estoque-critico" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center;">
-        <div style="background-color: #1e1e2f; color: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; border: 2px solid #e11d48; text-align: left;">
-            <h3 style="margin-top: 0; color: #e11d48; display: flex; align-items: center; gap: 8px;">
-                🚨 Insumos Críticos no Bar
-            </h3>
-            <p style="font-size: 14px; color: #ccc;">Os itens abaixo atingiram o nível de alerta (menos de 20% do enviado):</p>
+        <div id="box-modal-estoque" style="background-color: #1e1e2f; color: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; border: 2px solid #e11d48; text-align: left; transition: all 0.3s ease;">
             
-            <div id="lista-insumos-criticos" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 id="titulo-modal-estoque" style="margin: 0; color: #e11d48; display: flex; align-items: center; gap: 8px;">
+                    🚨 Insumos Críticos
+                </h3>
+                <button id="btn-toggle-estoque" style="background-color: #374151; color: white; border: 1px solid #4b5563; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; transition: 0.2s;">
+                    VER ESTOQUE COMPLETO
+                </button>
+            </div>
+            
+            <p id="desc-modal-estoque" style="font-size: 13px; color: #ccc; margin-top: 0;">Itens com saldo abaixo de 20%:</p>
+            
+            <div id="lista-insumos-criticos" style="max-height: 350px; overflow-y: auto; margin-bottom: 20px; padding-right: 5px;"></div>
             
             <button onclick="document.getElementById('modal-estoque-critico').style.display = 'none'" style="background-color: #4b5563; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold;">
-                FECHAR AVISO
+                FECHAR PAINEL
             </button>
         </div>
     </div>
@@ -5520,53 +5526,107 @@
             }
         };
 
+        window.dadosEstoqueModalAtual = []; // Guarda os dados do banco para não ficar recarregando a API
+        window.modoEstoqueCompleto = false; // Controle da chavinha (Crítico ou Completo)
+
         window.abrirAlertaEstoqueFesta = async function(idDaFesta) {
             const containerLista = document.getElementById('lista-insumos-criticos');
-            if (containerLista) containerLista.innerHTML = 'Puxando dados do bar... ⏳';
-            
-            // Mostra o modal na tela
-            document.getElementById('modal-estoque-critico').style.display = 'flex';
+            const modal = document.getElementById('modal-estoque-critico');
+            const boxModal = document.getElementById('box-modal-estoque');
+            const btnToggle = document.getElementById('btn-toggle-estoque');
+            const titulo = document.getElementById('titulo-modal-estoque');
+            const desc = document.getElementById('desc-modal-estoque');
+
+            if (containerLista) containerLista.innerHTML = '<p style="text-align:center; padding: 20px;">Puxando dados do bar... ⏳</p>';
+            modal.style.display = 'flex';
+
+            // Sempre que abrir o modal, reseta para mostrar os críticos primeiro
+            window.modoEstoqueCompleto = false;
+            atualizarVisualToggle();
 
             try {
-                // Bate na nossa nova rota do Python
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idDaFesta}/inventory-status`);
                 const dados = await resposta.json();
 
                 if (dados.status === "sucesso") {
-                    let htmlItens = '';
-                    let contagemCriticos = 0;
-
-                    dados.insumos.forEach(item => {
-                        const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
-                        
-                        // Filtra apenas o que está na zona de risco (sub-20%)
-                        if (percentual <= 20) {
-                            contagemCriticos++;
-                            htmlItens += `
-                                <div style="background-color: #2d2d44; border-left: 4px solid #e11d48; padding: 12px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <b style="color: #f1f1f1; font-size: 15px;">${item.insumo}</b><br>
-                                        <span style="font-size: 12px; color: #aaa;">Saldo atual: ${item.saldo} ${item.unidade}</span>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <span style="color: #e11d48; font-weight: bold; font-size: 14px;">${percentual.toFixed(0)}% restante</span><br>
-                                        <span style="font-size: 11px; color: #777;">Enviado: ${item.enviado}</span>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    });
-
-                    if (contagemCriticos > 0) {
-                        containerLista.innerHTML = htmlItens;
-                    } else {
-                        containerLista.innerHTML = '<p style="color: #10b981; text-align: center; padding: 20px;">Falsa fumaça! Todos os insumos deste evento subiram e estão seguros no momento.</p>';
-                    }
+                    window.dadosEstoqueModalAtual = dados.insumos;
+                    renderizarItensEstoque();
                 }
             } catch (erro) {
-                console.error("Erro ao carregar insumos críticos:", erro);
-                containerLista.innerHTML = '<p style="color: #ef4444;">Erro ao conectar com o bar. Verifique o console.</p>';
+                console.error("Erro ao carregar insumos:", erro);
+                containerLista.innerHTML = '<p style="color: #ef4444; text-align:center;">Erro ao conectar com o banco de dados.</p>';
             }
+
+            // ==========================================
+            // FUNÇÃO INTERNA: Desenha os bloquinhos na tela
+            // ==========================================
+            function renderizarItensEstoque() {
+                let htmlItens = '';
+                let contagemVisivel = 0;
+
+                window.dadosEstoqueModalAtual.forEach(item => {
+                    const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
+                    const critico = percentual <= 30;
+
+                    // Se a chavinha for "Crítico" e o item tiver ok, pula ele
+                    if (!window.modoEstoqueCompleto && !critico) return;
+
+                    contagemVisivel++;
+                    
+                    // Pinta as bordas de acordo com o status
+                    const corBorda = critico ? '#e11d48' : '#3b82f6';
+                    const corPorcentagem = critico ? '#e11d48' : '#60a5fa';
+
+                    htmlItens += `
+                        <div style="background-color: #2d2d44; border-left: 4px solid ${corBorda}; padding: 12px; margin-bottom: 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <b style="color: #f1f1f1; font-size: 15px;">${item.insumo}</b><br>
+                                <span style="font-size: 13px; color: #aaa;">Saldo atual: <b style="color: #fff;">${item.saldo}</b> ${item.unidade}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="color: ${corPorcentagem}; font-weight: bold; font-size: 14px;">${percentual.toFixed(0)}% restante</span><br>
+                                <span style="font-size: 11px; color: #777;">Enviado: ${item.enviado} | Usado: ${item.usado}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (contagemVisivel > 0) {
+                    containerLista.innerHTML = htmlItens;
+                } else {
+                    containerLista.innerHTML = '<p style="color: #10b981; text-align: center; padding: 20px;">Tudo sob controle! Nenhum insumo na zona de risco.</p>';
+                }
+            }
+
+            // ==========================================
+            // FUNÇÃO INTERNA: Muda a cor e o título do Modal
+            // ==========================================
+            function atualizarVisualToggle() {
+                if (window.modoEstoqueCompleto) {
+                    btnToggle.innerText = "VER APENAS CRÍTICOS";
+                    btnToggle.style.backgroundColor = "#e11d48"; // Botão fica vermelho
+                    btnToggle.style.borderColor = "#be123c";
+                    titulo.innerHTML = "📦 Visão Geral de Estoque";
+                    titulo.style.color = "#60a5fa"; // Título fica azul
+                    desc.innerText = "Lista completa de todos os itens em operação:";
+                    boxModal.style.borderColor = "#3b82f6"; // Borda do modal fica azul
+                } else {
+                    btnToggle.innerText = "VER ESTOQUE COMPLETO";
+                    btnToggle.style.backgroundColor = "#374151"; // Botão fica cinza
+                    btnToggle.style.borderColor = "#4b5563";
+                    titulo.innerHTML = "🚨 Insumos Críticos";
+                    titulo.style.color = "#e11d48"; // Título fica vermelho
+                    desc.innerText = "Itens com saldo abaixo de 30%:";
+                    boxModal.style.borderColor = "#e11d48"; // Borda do modal fica vermelha
+                }
+            }
+
+            // Ação de clique na chavinha
+            btnToggle.onclick = function() {
+                window.modoEstoqueCompleto = !window.modoEstoqueCompleto; // Inverte o estado
+                atualizarVisualToggle();
+                renderizarItensEstoque(); // Redesenha a tela instantaneamente
+            };
         };
 
         // ============================================================
