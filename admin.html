@@ -2661,6 +2661,32 @@
         // 2. BIBLIOTECA & ORÇAMENTO
         // ============================================================
         
+        window.carregarDrinksParaOrcamento = async function() {
+            try {
+                // Bate na API em Python (ajuste o final da URL se a sua rota se chamar diferente, ex: /drinks)
+                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/cocktails');
+                const dados = await resposta.json();
+                
+                // Popula a variável global que o seu código já usa
+                window.bibliotecaGlobal = dados.map(drink => ({
+                    id: drink.id,
+                    nome: drink.name,
+                    tipo: drink.drink_type || (drink.is_mocktail ? 'Mocktail' : 'Cocktail'), 
+                    tecnica: drink.technique || '-'
+                }));
+
+                // Chama a sua função original que desenha os checkboxes na tela
+                window.renderLibOrcamento();
+            } catch (erro) {
+                console.error("Erro ao puxar os drinks da API:", erro);
+                document.getElementById('orcamento-lista-drinks').innerHTML = '<p style="color:red">Erro ao carregar cardápio do servidor.</p>';
+            }
+        };
+
+        // Dispara a busca quando a página carregar
+        document.addEventListener('DOMContentLoaded', () => {
+            window.carregarDrinksParaOrcamento();
+        });
 
         // --- LISTA COM TERMINOLOGIA COCKTAIL/MOCKTAIL (V62) ---
         window.renderLibOrcamento = () => {
