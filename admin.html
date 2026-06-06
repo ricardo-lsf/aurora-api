@@ -1199,6 +1199,11 @@
                             <label>Nº Orçamento</label>
                             <span id="orcNumeroDisplay" style="color:#3498db; font-weight:bold;">Novo</span>
                         </div>
+                        
+                        <div><label>Nome do Cliente / Empresa</label><input type="text" id="orcCliente"></div>
+                        <div><label>Data do Evento</label><input type="date" id="orcData"></div>
+                        <div><label>Local / Cidade</label><input type="text" id="orcLocal"></div>
+                        <hr style="width:100%; border:0; border-top:1px dashed #ccc;">
 
                         <div style="display: flex; gap: 15px; margin-top: 15px; background: #2d2d44; padding: 15px; border-radius: 8px; border: 1px solid #4b5563;">
                             <div style="flex: 1;">
@@ -1234,12 +1239,8 @@
                             </div>
                         </div>
 
-                        <div><label>Nome do Cliente / Empresa</label><input type="text" id="orcCliente"></div>
-                        <div><label>Data do Evento</label><input type="date" id="orcData"></div>
-                        <div><label>Local / Cidade</label><input type="text" id="orcLocal"></div>
-                        <hr style="width:100%; border:0; border-top:1px dashed #ccc;">
 
-                        <h4 style="margin:5px 0;">💰 Precificação</h4>
+                        <!-- <h4 style="margin:5px 0;">💰 Precificação</h4>
                         <div class="grid-2">
                             <div><label style="white-space: nowrap;">Nº Convidados</label><input type="number"
                                     id="orcQtdPessoas" placeholder="0" oninput="calcOrcamento()"></div>
@@ -1254,7 +1255,7 @@
                             <label style="color:#2e7d32;">VALOR TOTAL ESTIMADO:</label>
                             <div id="orcTotalDisplay" style="font-size:1.8em; font-weight:bold; color:#1b5e20;">R$ 0,00
                             </div>
-                        </div>
+                        </div> -->
 
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button onclick="salvarOrcamento()" class="btn-success" style="flex:1;">💾 SALVAR</button>
