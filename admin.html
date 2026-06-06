@@ -2664,8 +2664,7 @@
         window.carregarDrinksParaOrcamento = async function() {
             try {
                 // Tenta buscar o ID da conta no navegador
-                //const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id'); 
-                const accountId = a57c20f3-526a-41f4-8b95-d4cd7cd2e362; 
+                const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id'); 
 
                 // SE NÃO ACHAR O ID: Em vez de quebrar com um 'throw', avisa na tela de forma elegante
                 if (!accountId) {
