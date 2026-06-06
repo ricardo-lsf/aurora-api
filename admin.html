@@ -2719,31 +2719,7 @@
                 </div>`;
             });
         };
-
-        // --- LISTA COM TERMINOLOGIA COCKTAIL/MOCKTAIL (V62) ---
-        window.renderLibOrcamento = () => {
-            const d = document.getElementById('orcamento-lista-drinks');
-            if (!d) return;
-            d.innerHTML = '';
-            bibliotecaGlobal.sort((a, b) => a.nome.localeCompare(b.nome));
-
-            bibliotecaGlobal.forEach(x => {
-                const isMocktail = x.tipo === 'Mocktail' || x.tipo === 'Sem Álcool';
-                const tag = isMocktail
-                    ? '<span class="tag-alcool tag-sem">Mocktail</span>'
-                    : '<span class="tag-alcool tag-com">Cocktail</span>';
-
-                d.innerHTML += `
-                <div class="chk-item">
-                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="countOrcDrinks()" class="chk-drink-orc">
-                    <label for="orc_chk_${x.id}" style="width:100%; cursor:pointer; display:flex; justify-content:space-between;">
-                        <span><b>${x.nome}</b> <small style="color:#666">(${x.tecnica || '-'})</small></span>
-                        ${tag}
-                    </label>
-                </div>`;
-            });
-        };
-
+        
         window.countOrcDrinks = () => {
             const count = document.querySelectorAll('.chk-drink-orc:checked').length;
             document.getElementById('orcCountDrinks').innerText = count;
