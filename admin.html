@@ -2748,31 +2748,7 @@
         // ==========================================
 
         let orcamentosCache = [];
-        onSnapshot(query(collection(db, "orcamentos"), orderBy("numero", "desc"), limit(20)), (snap) => {
-            const l = document.getElementById('lista-orcamentos-salvos');
-            orcamentosCache = [];
-            if (!l) return;
-            l.innerHTML = '';
-            if (snap.empty) l.innerHTML = '<p style="text-align:center; color:#999">Nenhum orçamento salvo.</p>';
-            snap.forEach(doc => {
-                const d = doc.data();
-                orcamentosCache.push({ id: doc.id, ...d });
-                const dataF = d.dataEvento ? new Date(d.dataEvento + 'T00:00:00').toLocaleDateString() : '-';
-                l.innerHTML += `
-                <div class="orcamento-item" onclick="popularOrcamento('${doc.id}')" style="cursor:pointer">
-                    <div>
-                        <span class="orc-id">${d.numero || '?'}</span>
-                        <b>${d.cliente}</b>
-                    </div>
-                    <div style="text-align:right">
-                        <small style="display:block">${dataF}</small>
-                        <small style="color:#27ae60; font-weight:bold;">${d.total}</small>
-                    </div>
-                </div>
-            `;
-            });
-        });
-
+        
         window.limparOrcamento = () => {
             document.getElementById('orcIdHidden').value = '';
             document.getElementById('orcNumeroDisplay').innerText = 'Novo';
@@ -2808,64 +2784,43 @@
         };
 
         // SALVAR COM NUMERAÇÃO AUTOMÁTICA
+        // SALVAR (PREPARADO PARA MIGRAÇÃO POSTGRESQL)
         window.salvarOrcamento = async () => {
             const cliente = document.getElementById('orcCliente').value;
             if (!cliente) return alert("Preencha o nome do cliente!");
 
+            // 1. Coleta os drinks selecionados
             const selecionados = [];
             document.querySelectorAll('.chk-drink-orc:checked').forEach(chk => {
-                const drink = bibliotecaGlobal.find(d => d.id === chk.value);
-                // Salva dados atuais para histórico
-                if (drink) selecionados.push({ id: drink.id, nome: drink.nome, tipo: drink.tipo, tecnica: drink.tecnica, classificacao: drink.classificacao });
+                const drink = window.bibliotecaGlobal.find(d => d.id == chk.value);
+                if (drink) selecionados.push({ id: drink.id, nome: drink.nome, tipo: drink.tipo, tecnica: drink.tecnica });
             });
 
-            // TENTA GERAR NÚMERO SE FOR NOVO
+            // 2. Número do Orçamento (Provisório - O Python fará a numeração real para evitar duplicidade)
             let novoNumero = document.getElementById('orcNumeroDisplay').innerText;
             const idHidden = document.getElementById('orcIdHidden').value;
-
+            
             if (!idHidden || novoNumero === 'Novo') {
-                const ano = new Date().getFullYear();
-                const qLast = query(collection(db, "orcamentos"), orderBy("numero", "desc"), limit(1));
-                const snapLast = await getDocs(qLast);
-
-                let seq = 1;
-                if (!snapLast.empty) {
-                    const lastNum = snapLast.docs[0].data().numero;
-                    if (lastNum && lastNum.startsWith(ano)) {
-                        const parts = lastNum.split('/');
-                        if (parts.length === 2) seq = parseInt(parts[1]) + 1;
-                    }
-                }
-                novoNumero = `${ano}/${String(seq).padStart(4, '0')}`;
+                novoNumero = `NOVO (Aguardando Servidor)`;
             }
 
+            // 3. Monta o pacote de dados EXATAMENTE como você estruturou antes
             const dados = {
                 numero: novoNumero,
-                cliente,
+                cliente: cliente,
                 dataEvento: document.getElementById('orcData').value,
                 local: document.getElementById('orcLocal').value,
                 qtdPessoas: parseInt(document.getElementById('orcQtdPessoas').value) || 0,
                 valorPessoa: parseFloat(document.getElementById('orcValorPessoa').value) || 0,
                 extras: parseFloat(document.getElementById('orcExtras').value) || 0,
                 total: document.getElementById('orcTotalDisplay').innerText,
-                drinks: selecionados,
-                atualizadoEm: new Date()
+                drinks: selecionados
             };
 
-            try {
-                if (idHidden) {
-                    await updateDoc(doc(db, "orcamentos", idHidden), dados);
-                    alert(`Orçamento ${novoNumero} atualizado!`);
-                } else {
-                    dados.criadoEm = new Date();
-                    const ref = await addDoc(collection(db, "orcamentos"), dados);
-                    document.getElementById('orcIdHidden').value = ref.id;
-                    document.getElementById('orcNumeroDisplay').innerText = novoNumero;
-                    alert(`Orçamento ${novoNumero} criado!`);
-                }
-            } catch (e) {
-                alert("Erro: " + e.message);
-            }
+            // 4. Aqui entra a trava. Em vez de Firebase, vamos ver se o pacote montou certo.
+            console.log("PACOTE PRONTO PARA O BANCO DE DADOS:", dados);
+            
+            alert(`Estrutura montada com sucesso, Rica!\nAbra o F12 (Console) para ver o pacote de dados.\n\nNa próxima etapa, vamos conectar isso à API Python para salvar no PostgreSQL.`);
         };
 
         // ============================================================
