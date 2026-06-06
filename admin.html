@@ -2710,20 +2710,18 @@
 
                 // Mapeamento limpo
                 // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
-                window.bibliotecaGlobal = listaDrinks.map(drink => ({
-                    ...drink, // O pulo do gato: preserva todos os dados originais da API
-                    id: drink.id,
-                    nome: drink.drink_nome || 'Sem Nome',
-                    tipo: drink.drink_type || 'Cocktail', 
-                    tecnica: drink.technique || '-',
-                    // Garantindo os campos que a Ficha Técnica usa:
-                    categoria: drink.category || '-',
-                    foto: drink.image_url || '',
-                    valorVenda: drink.sale_price || 0,
-                    preparo: drink.preparation_steps || ''
-                }));
-
-
+                // window.bibliotecaGlobal = listaDrinks.map(drink => ({
+                //     ...drink, // O pulo do gato: preserva todos os dados originais da API
+                //     id: drink.id,
+                //     nome: drink.drink_nome || 'Sem Nome',
+                //     tipo: drink.drink_type || 'Cocktail', 
+                //     tecnica: drink.technique || '-',
+                //     // Garantindo os campos que a Ficha Técnica usa:
+                //     categoria: drink.category || '-',
+                //     foto: drink.image_url || '',
+                //     valorVenda: drink.sale_price || 0,
+                //     preparo: drink.preparation_steps || ''
+                // }));
 
                 window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
                     id: drink.id,
@@ -2741,93 +2739,98 @@
             }
         };
 
-        // --- LISTA COM TERMINOLOGIA (COM ALARME DE HTML) ---
+        // ==========================================
+        // LISTA DE DRINKS COM BLOQUEIO DE PACOTE
+        // ==========================================
         window.renderLibOrcamento = () => {
             const d = document.getElementById('orcamento-lista-drinks');
+            if (!d) return;
             
-            // 🛑 O ALARME: Se o HTML não existir, ele vai gritar na tela!
-            if (!d) {
-                alert("🚨 ALERTA DE LAYOUT: O JavaScript trouxe 30 drinks do banco de dados, mas não encontrou a div com ID 'orcamento-lista-drinks' no seu HTML para desenhá-los! Verifique se você não apagou ela sem querer.");
-                console.error("Div 'orcamento-lista-drinks' não encontrada no DOM.");
-                return;
-            }
+            const pacoteAtual = document.getElementById('orcPacote').value;
+            const niveisDoPacote = { 'bronze': 1, 'prata': 2, 'ouro': 3, 'diamante': 4, 'personalizado': 5 };
+            const poderDoPacote = niveisDoPacote[pacoteAtual] || 1;
 
             d.innerHTML = '';
             window.bibliotecaGlobal.sort((a, b) => a.nome.localeCompare(b.nome));
 
             window.bibliotecaGlobal.forEach(x => {
+                // SIMULADOR TEMPORÁRIO (Até criarmos a coluna no PostgreSQL)
+                // Colocamos peso nos drinks. Aperol e Negroni = Prata (2). Cosmopolitan = Ouro (3).
+                let nivelDoDrink = 1; 
+                if(['Aperol', 'Negroni', 'Moscow Mule'].includes(x.nome)) nivelDoDrink = 2;
+                if(['Cosmopolitan', 'Bramble'].includes(x.nome)) nivelDoDrink = 3;
+                if(['Whiskey Sour', 'Pandemia'].includes(x.nome)) nivelDoDrink = 4;
+
                 const isMocktail = x.tipo === 'Mocktail' || x.tipo === 'Sem Álcool';
                 const tag = isMocktail
                     ? '<span class="tag-alcool tag-sem">Mocktail</span>'
                     : '<span class="tag-alcool tag-com">Cocktail</span>';
 
+                // Se o pacote escolhido for mais fraco que o nível do drink, bloqueia ele!
+                const bloqueado = poderDoPacote < nivelDoDrink;
+                const opacity = bloqueado ? '0.4' : '1';
+                const disabled = bloqueado ? 'disabled' : '';
+                const iconeBloqueio = bloqueado ? '🔒 <small style="color:#e11d48; font-size:10px;">Upgrade</small>' : '';
+
                 d.innerHTML += `
-                <div class="chk-item">
-                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="countOrcDrinks()" class="chk-drink-orc">
-                    <label for="orc_chk_${x.id}" style="width:100%; cursor:pointer; display:flex; justify-content:space-between;">
-                        <span><b>${x.nome}</b> <small style="color:#666">(${x.tecnica || '-'})</small></span>
+                <div class="chk-item" style="opacity: ${opacity}; transition: 0.3s;">
+                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="countOrcDrinks()" class="chk-drink-orc" ${disabled}>
+                    <label for="orc_chk_${x.id}" style="width:100%; cursor:${bloqueado ? 'not-allowed' : 'pointer'}; display:flex; justify-content:space-between;">
+                        <span><b>${x.nome}</b> ${iconeBloqueio}</span>
                         ${tag}
                     </label>
                 </div>`;
             });
-        };
-        
-        window.countOrcDrinks = () => {
-            const count = document.querySelectorAll('.chk-drink-orc:checked').length;
-            document.getElementById('orcCountDrinks').innerText = count;
+            
+            // Reconta os checkboxes ativos para garantir
+            setTimeout(window.countOrcDrinks, 100);
         };
 
-window.calcularPreviaOrcamento = () => {
+        // ==========================================
+        // CÉREBRO DO ORÇAMENTO (LÓGICA REAL DE MERCADO)
+        // ==========================================
+        window.calcularPreviaOrcamento = () => {
             const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
             const horas = parseInt(document.getElementById('orcHoras').value) || 0;
             const pacote = document.getElementById('orcPacote').value;
-            const extras = parseFloat(document.getElementById('orcExtras')?.value) || 0; // Se ainda tiver o campo extra
+            const extras = parseFloat(document.getElementById('orcExtras')?.value) || 0;
 
-            // 1. Custos Base Fixos (Exemplo: Pode ajustar depois)
-            const custoBartenderHora = 50; // R$ 50 a hora de mão de obra
-            const qtdeBartenders = Math.ceil(qtdPessoas / 40); // 1 bartender a cada 40 convidados
-            const custoMaoDeObra = qtdeBartenders * horas * custoBartenderHora;
+            // 1. Custo Real da Mão de Obra (Ajuste para sua realidade local)
+            const custoBartender = 150; // R$ 150 a diária/evento por bartender
+            const qtdeBartenders = Math.ceil(qtdPessoas / 40); // 1 a cada 40 pessoas
+            const custoMaoDeObra = qtdeBartenders * custoBartender;
 
-            // 2. Custo da Bebida por Pessoa (Simulador temporário por pacote)
-            // No futuro próximo, isso virá da soma exata da Ficha Técnica!
-            let custoBebidaPessoaHora = 0;
-            if (pacote === 'bronze') custoBebidaPessoaHora = 12.00;
-            if (pacote === 'prata') custoBebidaPessoaHora = 18.00;
-            if (pacote === 'ouro') custoBebidaPessoaHora = 28.00;
-            if (pacote === 'diamante') custoBebidaPessoaHora = 45.00;
+            // 2. Custo Base da Bebida (Custo SEU para montar o bar, não o preço de venda)
+            let custoBebidaPorPessoa = 0;
+            if (pacote === 'bronze') custoBebidaPorPessoa = 25.00;
+            if (pacote === 'prata') custoBebidaPorPessoa = 40.00;
+            if (pacote === 'ouro') custoBebidaPorPessoa = 65.00;
+            if (pacote === 'diamante') custoBebidaPorPessoa = 95.00;
+            if (pacote === 'personalizado') custoBebidaPorPessoa = 0; // Calcula exato pela ficha depois
 
-            const custoTotalBebida = custoBebidaPessoaHora * horas * qtdPessoas;
-            const custoTotalReal = custoTotalBebida + custoMaoDeObra;
+            const custoTotalBebida = custoBebidaPorPessoa * qtdPessoas;
+            const custoTotalOperacao = custoTotalBebida + custoMaoDeObra;
 
-            // 3. Formação do Preço (Margem de Lucro)
-            // O sistema coloca uma margem (markup) segura em cima do custo
-            const markup = 2.5; // Multiplica o custo por 2.5 para ter margem de manobra
-            let valorVendaTotal = (custoTotalReal * markup) + extras;
+            // 3. Margem de Lucro Comercial (Markup)
+            // Se o custo for R$ 2000, e o markup 2.0, você vende por R$ 4000 (50% de lucro bruto)
+            const markup = 2.0; 
+            let valorVendaTotal = (custoTotalOperacao * markup) + extras;
 
-            // 4. Se for o "Modo Pacote Fechado", a gente arredonda para a faixa para ficar atrativo
-            // Ex: R$ 3412,00 vira R$ 3490,00
+            // 4. Arredondamento estético (ex: R$ 3412 vira R$ 3450 ou R$ 3490)
             valorVendaTotal = Math.ceil(valorVendaTotal / 10) * 10;
 
-            // 5. Calcula o valor por pessoa apenas para sua visualização/argumentação
             const valorPorPessoaFinal = qtdPessoas > 0 ? valorVendaTotal / qtdPessoas : 0;
 
-            // Exibe na tela (assumindo que a função formatCurrency existe no seu código)
             const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
             
-            document.getElementById('orcCustoDisplay').innerText = formata(custoTotalReal);
+            document.getElementById('orcCustoDisplay').innerText = formata(custoTotalOperacao);
             document.getElementById('orcTotalDisplay').innerText = formata(valorVendaTotal);
             
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if(txtPessoa) txtPessoa.innerText = `(${formata(valorPorPessoaFinal)} por pessoa)`;
-        };
 
-        // Adiciona esse gatilho também nas caixinhas de drinks (para o futuro quando lermos a ficha)
-        window.countOrcDrinks = () => {
-            const count = document.querySelectorAll('.chk-drink-orc:checked').length;
-            const txt = document.getElementById('orcCountDrinks');
-            if(txt) txt.innerText = count;
-            
-            window.calcularPreviaOrcamento(); // Recalcula tudo se ticar um drink novo
+            // Atualiza a lista de drinks para bloquear o que não pertence ao pacote!
+            window.renderLibOrcamento();
         };
 
         // ==========================================
