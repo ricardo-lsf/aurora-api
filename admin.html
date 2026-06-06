@@ -1199,6 +1199,41 @@
                             <label>Nº Orçamento</label>
                             <span id="orcNumeroDisplay" style="color:#3498db; font-weight:bold;">Novo</span>
                         </div>
+
+                        <div style="display: flex; gap: 15px; margin-top: 15px; background: #2d2d44; padding: 15px; border-radius: 8px; border: 1px solid #4b5563;">
+                            <div style="flex: 1;">
+                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Convidados (Ex: 50)</label>
+                                <input type="number" id="orcQtdPessoas" class="form-control" style="width: 100%; background: #1e1e2d; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;" value="50" onchange="window.calcularPreviaOrcamento()">
+                            </div>
+                            
+                            <div style="flex: 1;">
+                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Tempo (Horas)</label>
+                                <input type="number" id="orcHoras" class="form-control" style="width: 100%; background: #1e1e2d; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;" value="4" onchange="window.calcularPreviaOrcamento()">
+                            </div>
+
+                            <div style="flex: 2;">
+                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Pacote / Nível da Carta</label>
+                                <select id="orcPacote" class="form-control" style="width: 100%; background: #1e1e2d; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;" onchange="window.calcularPreviaOrcamento()">
+                                    <option value="bronze">🥉 Bronze (Marcas de Entrada)</option>
+                                    <option value="prata" selected>🥈 Prata (Marcas Standard)</option>
+                                    <option value="ouro">🥇 Ouro (Marcas Premium)</option>
+                                    <option value="diamante">💎 Diamante (Super Premium)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; margin-top: 20px; background: #1e1e2d; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
+                            <div>
+                                <span style="color: #aaa; font-size: 12px; display: block;">Custo Estimado (Bebidas + Mão de Obra)</span>
+                                <span id="orcCustoDisplay" style="color: #e11d48; font-size: 18px; font-weight: bold;">R$ 0,00</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="color: #aaa; font-size: 12px; display: block;">Valor Sugerido para Venda</span>
+                                <span id="orcTotalDisplay" style="color: #10b981; font-size: 24px; font-weight: bold;">R$ 0,00</span>
+                                <small id="orcPrecoPessoaDisplay" style="display: block; color: #60a5fa; font-size: 11px;">(R$ 0,00 por pessoa)</small>
+                            </div>
+                        </div>
+
                         <div><label>Nome do Cliente / Empresa</label><input type="text" id="orcCliente"></div>
                         <div><label>Data do Evento</label><input type="date" id="orcData"></div>
                         <div><label>Local / Cidade</label><input type="text" id="orcLocal"></div>
@@ -2687,6 +2722,15 @@
                     preparo: drink.preparation_steps || ''
                 }));
 
+
+
+                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+                    id: drink.id,
+                    nome: drink.drink_nome || 'Sem Nome',
+                    tipo: drink.drink_type || 'Cocktail', 
+                    tecnica: drink.technique || '-'
+                }));
+
                 window.renderLibOrcamento();
                 
             } catch (erro) {
@@ -2732,12 +2776,57 @@
             document.getElementById('orcCountDrinks').innerText = count;
         };
 
-        window.calcOrcamento = () => {
-            const qtd = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
-            const valorPorPessoa = parseFloat(document.getElementById('orcValorPessoa').value) || 0;
-            const extras = parseFloat(document.getElementById('orcExtras').value) || 0;
-            const total = (qtd * valorPorPessoa) + extras;
-            document.getElementById('orcTotalDisplay').innerText = formatCurrency(total);
+window.calcularPreviaOrcamento = () => {
+            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
+            const horas = parseInt(document.getElementById('orcHoras').value) || 0;
+            const pacote = document.getElementById('orcPacote').value;
+            const extras = parseFloat(document.getElementById('orcExtras')?.value) || 0; // Se ainda tiver o campo extra
+
+            // 1. Custos Base Fixos (Exemplo: Pode ajustar depois)
+            const custoBartenderHora = 50; // R$ 50 a hora de mão de obra
+            const qtdeBartenders = Math.ceil(qtdPessoas / 40); // 1 bartender a cada 40 convidados
+            const custoMaoDeObra = qtdeBartenders * horas * custoBartenderHora;
+
+            // 2. Custo da Bebida por Pessoa (Simulador temporário por pacote)
+            // No futuro próximo, isso virá da soma exata da Ficha Técnica!
+            let custoBebidaPessoaHora = 0;
+            if (pacote === 'bronze') custoBebidaPessoaHora = 12.00;
+            if (pacote === 'prata') custoBebidaPessoaHora = 18.00;
+            if (pacote === 'ouro') custoBebidaPessoaHora = 28.00;
+            if (pacote === 'diamante') custoBebidaPessoaHora = 45.00;
+
+            const custoTotalBebida = custoBebidaPessoaHora * horas * qtdPessoas;
+            const custoTotalReal = custoTotalBebida + custoMaoDeObra;
+
+            // 3. Formação do Preço (Margem de Lucro)
+            // O sistema coloca uma margem (markup) segura em cima do custo
+            const markup = 2.5; // Multiplica o custo por 2.5 para ter margem de manobra
+            let valorVendaTotal = (custoTotalReal * markup) + extras;
+
+            // 4. Se for o "Modo Pacote Fechado", a gente arredonda para a faixa para ficar atrativo
+            // Ex: R$ 3412,00 vira R$ 3490,00
+            valorVendaTotal = Math.ceil(valorVendaTotal / 10) * 10;
+
+            // 5. Calcula o valor por pessoa apenas para sua visualização/argumentação
+            const valorPorPessoaFinal = qtdPessoas > 0 ? valorVendaTotal / qtdPessoas : 0;
+
+            // Exibe na tela (assumindo que a função formatCurrency existe no seu código)
+            const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
+            
+            document.getElementById('orcCustoDisplay').innerText = formata(custoTotalReal);
+            document.getElementById('orcTotalDisplay').innerText = formata(valorVendaTotal);
+            
+            const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
+            if(txtPessoa) txtPessoa.innerText = `(${formata(valorPorPessoaFinal)} por pessoa)`;
+        };
+
+        // Adiciona esse gatilho também nas caixinhas de drinks (para o futuro quando lermos a ficha)
+        window.countOrcDrinks = () => {
+            const count = document.querySelectorAll('.chk-drink-orc:checked').length;
+            const txt = document.getElementById('orcCountDrinks');
+            if(txt) txt.innerText = count;
+            
+            window.calcularPreviaOrcamento(); // Recalcula tudo se ticar um drink novo
         };
 
         // ==========================================
