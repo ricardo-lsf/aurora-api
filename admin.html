@@ -2664,7 +2664,7 @@
         window.carregarDrinksParaOrcamento = async function() {
             try {
                 // Seu ID Fixo (funcionando perfeitamente)
-                const accountId = "COLOQUE_AQUI_O_UUID_DA_SUA_CONTA_DO_SUPABASE"; 
+                const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362'; 
                 
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
                 if (!resposta.ok) throw new Error(`Erro no servidor: Status ${resposta.status}`);
