@@ -2673,11 +2673,18 @@
                 if (jsonResposta.status !== "sucesso") throw new Error("O servidor não retornou sucesso.");
 
                 // Mapeamento limpo
-                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+                // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
+                window.bibliotecaGlobal = listaDrinks.map(drink => ({
+                    ...drink, // O pulo do gato: preserva todos os dados originais da API
                     id: drink.id,
                     nome: drink.drink_nome || 'Sem Nome',
                     tipo: drink.drink_type || 'Cocktail', 
-                    tecnica: drink.technique || '-'
+                    tecnica: drink.technique || '-',
+                    // Garantindo os campos que a Ficha Técnica usa:
+                    categoria: drink.category || '-',
+                    foto: drink.image_url || '',
+                    valorVenda: drink.sale_price || 0,
+                    preparo: drink.preparation_steps || ''
                 }));
 
                 window.renderLibOrcamento();
