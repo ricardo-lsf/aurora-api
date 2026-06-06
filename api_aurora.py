@@ -2142,3 +2142,41 @@ def listar_equipe():
     finally:
         cur.close()
         conn.close()
+
+# ==========================================
+# ROTA: LISTAR ORÇAMENTOS SALVOS
+# ==========================================
+@app.get("/orcamentos")
+def listar_orcamentos():
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Puxa os últimos 50 orçamentos ordenados do mais recente para o mais antigo
+        query = """
+            SELECT 
+                id, numero, cliente, data_evento, local, 
+                qtd_pessoas, pacote_escolhido, valor_pessoa, 
+                extras, total, drinks_selecionados, status
+            FROM budgets 
+            ORDER BY numero DESC 
+            LIMIT 50;
+        """
+        
+        cur.execute(query)
+        orcamentos_banco = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        return {
+            "status": "sucesso", 
+            "dados": orcamentos_banco
+        }
+        
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=400, detail=str(e))

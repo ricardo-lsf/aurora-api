@@ -2744,10 +2744,78 @@
         };
 
         // ==========================================
-        //  3. GESTÃO DE ORÇAMENTOS (V62)
+        //  3. GESTÃO DE ORÇAMENTOS (V62) - MIGRADO POSTGRESQL
         // ==========================================
 
-        let orcamentosCache = [];
+        window.orcamentosCache = [];
+
+        window.carregarOrcamentosSalvos = async function() {
+            const l = document.getElementById('lista-orcamentos-salvos');
+            if (!l) return;
+            
+            l.innerHTML = '<p style="text-align:center; color:#999">Carregando orçamentos... ⏳</p>';
+
+            try {
+                // Bate na sua nova rota em Python para buscar os orçamentos
+                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos');
+                
+                if (!resposta.ok) throw new Error("Erro na resposta do servidor");
+                
+                const json = await resposta.json();
+                
+                if (json.status !== "sucesso") throw new Error("Erro ao buscar dados");
+
+                // Traduz os dados do banco para o formato que sua tela usa
+                window.orcamentosCache = json.dados.map(d => ({
+                    id: d.id,
+                    numero: d.numero,
+                    cliente: d.cliente,
+                    dataEvento: d.data_evento, 
+                    local: d.local,
+                    qtdPessoas: d.qtd_pessoas,
+                    valorPessoa: d.valor_pessoa,
+                    extras: d.extras,
+                    total: d.total,
+                    drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || [])
+                }));
+
+                l.innerHTML = '';
+                
+                if (window.orcamentosCache.length === 0) {
+                    l.innerHTML = '<p style="text-align:center; color:#999">Nenhum orçamento salvo no PostgreSQL.</p>';
+                    return;
+                }
+
+                // Desenha a lista lateral de orçamentos
+                window.orcamentosCache.forEach(d => {
+                    const dataF = d.dataEvento ? new Date(d.dataEvento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
+                    
+                    l.innerHTML += `
+                    <div class="orcamento-item" onclick="popularOrcamento('${d.id}')" style="cursor:pointer; background-color: #2d2d44; padding: 10px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #3b82f6; display: flex; justify-content: space-between; transition: 0.2s;">
+                        <div>
+                            <span class="orc-id" style="color: #60a5fa; font-weight: bold; font-size: 12px;">${d.numero || '?'}</span><br>
+                            <b style="color: #f1f1f1;">${d.cliente}</b>
+                        </div>
+                        <div style="text-align:right">
+                            <small style="display:block; color: #aaa;">${dataF}</small>
+                            <small style="color:#10b981; font-weight:bold;">${d.total}</small>
+                        </div>
+                    </div>
+                    `;
+                });
+
+            } catch (erro) {
+                console.error("Erro ao puxar orçamentos:", erro);
+                l.innerHTML = '<p style="text-align:center; color:#e11d48">Erro ao conectar com o banco de dados.</p>';
+            }
+        };
+
+        // --- ATENÇÃO: NÃO ESQUEÇA DE CHAMAR AS DUAS FUNÇÕES AO CARREGAR A PÁGINA ---
+        document.addEventListener('DOMContentLoaded', () => {
+            window.carregarDrinksParaOrcamento();
+            window.carregarOrcamentosSalvos(); 
+        });
+
         
         window.limparOrcamento = () => {
             document.getElementById('orcIdHidden').value = '';
