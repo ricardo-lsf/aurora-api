@@ -2663,30 +2663,48 @@
         
         window.carregarDrinksParaOrcamento = async function() {
             try {
-                // Bate na API em Python (ajuste o final da URL se a sua rota se chamar diferente, ex: /drinks)
-                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/cocktails');
-                const dados = await resposta.json();
+                // Pega o ID da sua conta que já deve estar salvo no navegador (ajuste o nome da chave se necessário)
+                const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id'); 
                 
-                // Popula a variável global que o seu código já usa
-                window.bibliotecaGlobal = dados.map(drink => ({
+                if (!accountId) {
+                    throw new Error("ID da conta não encontrado para buscar os drinks.");
+                }
+
+                // 1. Batendo na porta certa: /drinks/{account_id}
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
+                
+                if (!resposta.ok) {
+                    throw new Error(`Servidor recusou a conexão (Erro ${resposta.status})`);
+                }
+
+                const jsonResposta = await resposta.json();
+                
+                // 2. Desempacotando do formato correto (pegando o array dentro de "dados")
+                if (jsonResposta.status !== "sucesso") {
+                    throw new Error("O servidor não retornou sucesso.");
+                }
+
+                const listaDrinks = jsonResposta.dados;
+
+                // 3. Traduzindo os campos que o Python mandou (drink_nome, drink_type, etc.)
+                window.bibliotecaGlobal = listaDrinks.map(drink => ({
                     id: drink.id,
-                    nome: drink.name,
-                    tipo: drink.drink_type || (drink.is_mocktail ? 'Mocktail' : 'Cocktail'), 
+                    nome: drink.drink_nome || 'Sem Nome',
+                    tipo: drink.drink_type || 'Cocktail', 
                     tecnica: drink.technique || '-'
                 }));
 
-                // Chama a sua função original que desenha os checkboxes na tela
+                // Desenha as caixinhas na tela!
                 window.renderLibOrcamento();
+                
             } catch (erro) {
                 console.error("Erro ao puxar os drinks da API:", erro);
-                document.getElementById('orcamento-lista-drinks').innerHTML = '<p style="color:red">Erro ao carregar cardápio do servidor.</p>';
+                const divDrinks = document.getElementById('orcamento-lista-drinks');
+                if (divDrinks) {
+                    divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold; padding:10px;">⚠️ Falha na conexão com o cardápio: ${erro.message}</p>`;
+                }
             }
         };
-
-        // Dispara a busca quando a página carregar
-        document.addEventListener('DOMContentLoaded', () => {
-            window.carregarDrinksParaOrcamento();
-        });
 
         // --- LISTA COM TERMINOLOGIA COCKTAIL/MOCKTAIL (V62) ---
         window.renderLibOrcamento = () => {
