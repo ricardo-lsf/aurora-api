@@ -2663,48 +2663,61 @@
         
         window.carregarDrinksParaOrcamento = async function() {
             try {
-                // Tenta buscar o ID da conta no navegador
-                const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id'); 
-
-                // SE NÃO ACHAR O ID: Em vez de quebrar com um 'throw', avisa na tela de forma elegante
-                if (!accountId) {
-                    const divDrinks = document.getElementById('orcamento-lista-drinks');
-                    if (divDrinks) {
-                        divDrinks.innerHTML = `<p style="color:#f39c12; font-weight:bold; padding:10px;">🔑 Identificação necessária: Faça login ou selecione uma conta para carregar o cardápio.</p>`;
-                    }
-                    console.warn("Aviso: ID da conta (account_id/user_id) não foi encontrado no localStorage ainda.");
-                    return; // Para a função sem travar o resto do script
+                // 1. Pega o ID (ajuste aqui se colocou direto nas aspas ou se está puxando do localStorage)
+                const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id') || "COLOQUE_SEU_UUID_AQUI_SE_FOR_FIXO"; 
+                
+                if (!accountId || accountId.includes("COLOQUE_SEU_UUID")) {
+                    console.warn("Aviso: ID da conta não configurado corretamente.");
+                    return;
                 }
 
-                // Batendo na porta certa
+                console.log("📡 Chamando API para o ID da conta:", accountId);
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
                 
                 if (!resposta.ok) {
-                    throw new Error(`Servidor recusou a conexão (Erro ${resposta.status})`);
+                    throw new Error(`Erro no servidor: Status ${resposta.status}`);
                 }
 
-                const jsonResposta = await resposta.json();
+                const jsonResposta = await response = await resposta.json();
                 
+                // ==========================================
+                // 🕵️‍♂️ O ESPORTISTA: Vamos ver o que o Python respondeu!
+                // ==========================================
+                console.log("📦 RESPOSTA BRUTA DO PYTHON:", jsonResposta);
+
                 if (jsonResposta.status !== "sucesso") {
-                    throw new Error("O servidor não retornou sucesso.");
+                    throw new Error("O servidor não retornou a flag de sucesso.");
                 }
 
                 const listaDrinks = jsonResposta.dados;
+                console.log("🍹 LISTA DE DRINKS DENTRO DE DADOS:", listaDrinks);
 
-                window.bibliotecaGlobal = listaDrinks.map(drink => ({
-                    id: drink.id,
-                    nome: drink.drink_nome || 'Sem Nome',
-                    tipo: drink.drink_type || 'Cocktail', 
-                    tecnica: drink.technique || '-'
-                }));
+                if (!listaDrinks || listaDrinks.length === 0) {
+                    document.getElementById('orcamento-lista-drinks').innerHTML = '<p style="color:#f39c12; text-align:center; padding:10px;">⚠️ O servidor respondeu com sucesso, mas o seu catálogo de drinks está VAZIO para esta conta no banco de dados.</p>';
+                    return;
+                }
 
+                // Traduzindo os campos
+                window.bibliotecaGlobal = listaDrinks.map(drink => {
+                    // Log para checar se as colunas vieram com os nomes certos
+                    console.log("Checando colunas do drink:", drink.id, drink.drink_nome, drink.drink_type);
+                    return {
+                        id: drink.id,
+                        nome: drink.drink_nome || 'Sem Nome',
+                        tipo: drink.drink_type || 'Cocktail', 
+                        tecnica: drink.technique || '-'
+                    };
+                });
+
+                // Desenha na tela
                 window.renderLibOrcamento();
+                console.log("🎨 renderLibOrcamento() executada com sucesso!");
                 
             } catch (erro) {
-                console.error("Erro ao puxar os drinks da API:", erro);
+                console.error("❌ Erro fatal na carga dos drinks:", erro);
                 const divDrinks = document.getElementById('orcamento-lista-drinks');
                 if (divDrinks) {
-                    divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold; padding:10px;">⚠️ Falha na conexão com o cardápio: ${erro.message}</p>`;
+                    divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold; padding:10px;">⚠️ Falha na conexão: ${erro.message}</p>`;
                 }
             }
         };
