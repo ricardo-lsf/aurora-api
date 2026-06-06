@@ -2658,19 +2658,25 @@
         };
 
         // ============================================================
-        // 2. BIBLIOTECA & ORÇAMENTO
+        // 2. BIBLIOTECA & ORÇAMENTO - ATUALIZADO
         // ============================================================
         
         window.carregarDrinksParaOrcamento = async function() {
             try {
-                // Pega o ID da sua conta que já deve estar salvo no navegador (ajuste o nome da chave se necessário)
+                // Tenta buscar o ID da conta no navegador
                 const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id'); 
                 
+                // SE NÃO ACHAR O ID: Em vez de quebrar com um 'throw', avisa na tela de forma elegante
                 if (!accountId) {
-                    throw new Error("ID da conta não encontrado para buscar os drinks.");
+                    const divDrinks = document.getElementById('orcamento-lista-drinks');
+                    if (divDrinks) {
+                        divDrinks.innerHTML = `<p style="color:#f39c12; font-weight:bold; padding:10px;">🔑 Identificação necessária: Faça login ou selecione uma conta para carregar o cardápio.</p>`;
+                    }
+                    console.warn("Aviso: ID da conta (account_id/user_id) não foi encontrado no localStorage ainda.");
+                    return; // Para a função sem travar o resto do script
                 }
 
-                // 1. Batendo na porta certa: /drinks/{account_id}
+                // Batendo na porta certa
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
                 
                 if (!resposta.ok) {
@@ -2679,14 +2685,12 @@
 
                 const jsonResposta = await resposta.json();
                 
-                // 2. Desempacotando do formato correto (pegando o array dentro de "dados")
                 if (jsonResposta.status !== "sucesso") {
                     throw new Error("O servidor não retornou sucesso.");
                 }
 
                 const listaDrinks = jsonResposta.dados;
 
-                // 3. Traduzindo os campos que o Python mandou (drink_nome, drink_type, etc.)
                 window.bibliotecaGlobal = listaDrinks.map(drink => ({
                     id: drink.id,
                     nome: drink.drink_nome || 'Sem Nome',
@@ -2694,7 +2698,6 @@
                     tecnica: drink.technique || '-'
                 }));
 
-                // Desenha as caixinhas na tela!
                 window.renderLibOrcamento();
                 
             } catch (erro) {
@@ -2744,7 +2747,7 @@
         };
 
         // ==========================================
-        //  3. GESTÃO DE ORÇAMENTOS (V62) - MIGRADO POSTGRESQL
+        //  3. GESTÃO DE ORÇAMENTOS (V62) - ATUALIZADO FORMATO DINHEIRO
         // ==========================================
 
         window.orcamentosCache = [];
@@ -2756,16 +2759,12 @@
             l.innerHTML = '<p style="text-align:center; color:#999">Carregando orçamentos... ⏳</p>';
 
             try {
-                // Bate na sua nova rota em Python para buscar os orçamentos
                 const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos');
-                
                 if (!resposta.ok) throw new Error("Erro na resposta do servidor");
                 
                 const json = await resposta.json();
-                
                 if (json.status !== "sucesso") throw new Error("Erro ao buscar dados");
 
-                // Traduz os dados do banco para o formato que sua tela usa
                 window.orcamentosCache = json.dados.map(d => ({
                     id: d.id,
                     numero: d.numero,
@@ -2786,10 +2785,14 @@
                     return;
                 }
 
-                // Desenha a lista lateral de orçamentos
                 window.orcamentosCache.forEach(d => {
                     const dataF = d.dataEvento ? new Date(d.dataEvento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
                     
+                    // 💵 AJUSTE AQUI: Converte o valor para número e passa pela sua função formatCurrency
+                    const valorFormatado = typeof formatCurrency === 'function' 
+                        ? formatCurrency(parseFloat(d.total || 0)) 
+                        : 'R$ ' + parseFloat(d.total || 0).toFixed(2);
+
                     l.innerHTML += `
                     <div class="orcamento-item" onclick="popularOrcamento('${d.id}')" style="cursor:pointer; background-color: #2d2d44; padding: 10px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #3b82f6; display: flex; justify-content: space-between; transition: 0.2s;">
                         <div>
@@ -2798,7 +2801,7 @@
                         </div>
                         <div style="text-align:right">
                             <small style="display:block; color: #aaa;">${dataF}</small>
-                            <small style="color:#10b981; font-weight:bold;">${d.total}</small>
+                            <small style="color:#10b981; font-weight:bold;">${valorFormatado}</small>
                         </div>
                     </div>
                     `;
@@ -2810,7 +2813,7 @@
             }
         };
 
-        // --- ATENÇÃO: NÃO ESQUEÇA DE CHAMAR AS DUAS FUNÇÕES AO CARREGAR A PÁGINA ---
+        // Garante a execução ao carregar o DOM
         document.addEventListener('DOMContentLoaded', () => {
             window.carregarDrinksParaOrcamento();
             window.carregarOrcamentosSalvos(); 
