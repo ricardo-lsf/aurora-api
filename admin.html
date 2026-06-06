@@ -2785,6 +2785,11 @@
             // Reconta os checkboxes ativos para garantir
             setTimeout(window.countOrcDrinks, 100);
         };
+        
+        window.countOrcDrinks = () => {
+            const count = document.querySelectorAll('.chk-drink-orc:checked').length;
+            document.getElementById('orcCountDrinks').innerText = count;
+        };
 
         // ==========================================
         // CÉREBRO DO ORÇAMENTO (LÓGICA REAL DE MERCADO)
