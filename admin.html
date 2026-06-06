@@ -2663,63 +2663,61 @@
         
         window.carregarDrinksParaOrcamento = async function() {
             try {
-                // 1. Pega o ID (ajuste aqui se colocou direto nas aspas ou se está puxando do localStorage)
-                const accountId = localStorage.getItem('account_id') || localStorage.getItem('user_id') || "COLOQUE_SEU_UUID_AQUI_SE_FOR_FIXO"; 
+                // Seu ID Fixo (funcionando perfeitamente)
+                const accountId = "COLOQUE_AQUI_O_UUID_DA_SUA_CONTA_DO_SUPABASE"; 
                 
-                if (!accountId || accountId.includes("COLOQUE_SEU_UUID")) {
-                    console.warn("Aviso: ID da conta não configurado corretamente.");
-                    return;
-                }
-
-                console.log("📡 Chamando API para o ID da conta:", accountId);
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
-                
-                if (!resposta.ok) {
-                    throw new Error(`Erro no servidor: Status ${resposta.status}`);
-                }
+                if (!resposta.ok) throw new Error(`Erro no servidor: Status ${resposta.status}`);
 
                 const jsonResposta = await resposta.json();
-                
-                // ==========================================
-                // 🕵️‍♂️ O ESPORTISTA: Vamos ver o que o Python respondeu!
-                // ==========================================
-                console.log("📦 RESPOSTA BRUTA DO PYTHON:", jsonResposta);
+                if (jsonResposta.status !== "sucesso") throw new Error("O servidor não retornou sucesso.");
 
-                if (jsonResposta.status !== "sucesso") {
-                    throw new Error("O servidor não retornou a flag de sucesso.");
-                }
+                // Mapeamento limpo
+                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+                    id: drink.id,
+                    nome: drink.drink_nome || 'Sem Nome',
+                    tipo: drink.drink_type || 'Cocktail', 
+                    tecnica: drink.technique || '-'
+                }));
 
-                const listaDrinks = jsonResposta.dados;
-                console.log("🍹 LISTA DE DRINKS DENTRO DE DADOS:", listaDrinks);
-
-                if (!listaDrinks || listaDrinks.length === 0) {
-                    document.getElementById('orcamento-lista-drinks').innerHTML = '<p style="color:#f39c12; text-align:center; padding:10px;">⚠️ O servidor respondeu com sucesso, mas o seu catálogo de drinks está VAZIO para esta conta no banco de dados.</p>';
-                    return;
-                }
-
-                // Traduzindo os campos
-                window.bibliotecaGlobal = listaDrinks.map(drink => {
-                    // Log para checar se as colunas vieram com os nomes certos
-                    console.log("Checando colunas do drink:", drink.id, drink.drink_nome, drink.drink_type);
-                    return {
-                        id: drink.id,
-                        nome: drink.drink_nome || 'Sem Nome',
-                        tipo: drink.drink_type || 'Cocktail', 
-                        tecnica: drink.technique || '-'
-                    };
-                });
-
-                // Desenha na tela
                 window.renderLibOrcamento();
-                console.log("🎨 renderLibOrcamento() executada com sucesso!");
                 
             } catch (erro) {
-                console.error("❌ Erro fatal na carga dos drinks:", erro);
+                console.error("Erro na carga dos drinks:", erro);
                 const divDrinks = document.getElementById('orcamento-lista-drinks');
-                if (divDrinks) {
-                    divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold; padding:10px;">⚠️ Falha na conexão: ${erro.message}</p>`;
-                }
+                if (divDrinks) divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold;">⚠️ Falha na conexão: ${erro.message}</p>`;
             }
+        };
+
+        // --- LISTA COM TERMINOLOGIA (COM ALARME DE HTML) ---
+        window.renderLibOrcamento = () => {
+            const d = document.getElementById('orcamento-lista-drinks');
+            
+            // 🛑 O ALARME: Se o HTML não existir, ele vai gritar na tela!
+            if (!d) {
+                alert("🚨 ALERTA DE LAYOUT: O JavaScript trouxe 30 drinks do banco de dados, mas não encontrou a div com ID 'orcamento-lista-drinks' no seu HTML para desenhá-los! Verifique se você não apagou ela sem querer.");
+                console.error("Div 'orcamento-lista-drinks' não encontrada no DOM.");
+                return;
+            }
+
+            d.innerHTML = '';
+            window.bibliotecaGlobal.sort((a, b) => a.nome.localeCompare(b.nome));
+
+            window.bibliotecaGlobal.forEach(x => {
+                const isMocktail = x.tipo === 'Mocktail' || x.tipo === 'Sem Álcool';
+                const tag = isMocktail
+                    ? '<span class="tag-alcool tag-sem">Mocktail</span>'
+                    : '<span class="tag-alcool tag-com">Cocktail</span>';
+
+                d.innerHTML += `
+                <div class="chk-item">
+                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="countOrcDrinks()" class="chk-drink-orc">
+                    <label for="orc_chk_${x.id}" style="width:100%; cursor:pointer; display:flex; justify-content:space-between;">
+                        <span><b>${x.nome}</b> <small style="color:#666">(${x.tecnica || '-'})</small></span>
+                        ${tag}
+                    </label>
+                </div>`;
+            });
         };
 
         // --- LISTA COM TERMINOLOGIA COCKTAIL/MOCKTAIL (V62) ---
