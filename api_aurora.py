@@ -305,6 +305,95 @@ class NovaCompra(BaseModel):
     supplier_name: Optional[str] = "Não informado"
 
 
+class PedidoSimulacaoCusto(BaseModel):
+    account_id: str
+    drink_ids: List[str]
+    pacote: str  # Ex: 'bronze', 'prata', 'ouro', 'diamante'
+
+# ==========================================
+# ROTA DE INTELIGÊNCIA: SIMULADOR DE CUSTO POR PACOTE
+# ==========================================
+@app.post("/orcamentos/simular-custo")
+def simular_custo_pacote(pedido: PedidoSimulacaoCusto):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+
+    try:
+        cur = conn.cursor()
+        
+        # A mágica do COALESCE com a sua estrutura de tabelas
+        query = """
+            SELECT 
+                c.id AS drink_id,
+                c.name AS drink_nome,
+                ci.quantity AS qtd_ml_na_receita,
+                gen_ing.name AS ingrediente_base,
+                COALESCE(real_ing.name, gen_ing.name) AS ingrediente_usado,
+                COALESCE(real_ing.current_cost_price, gen_ing.current_cost_price) AS preco_garrafa,
+                COALESCE(real_ing.package_quantity, gen_ing.package_quantity) AS tamanho_garrafa
+            FROM cocktails c
+            JOIN cocktail_ingredients ci ON c.id = ci.cocktail_id
+            JOIN ingredients gen_ing ON ci.ingredient_id = gen_ing.id
+            LEFT JOIN package_rules pr 
+                ON pr.categoria_generica = gen_ing.name 
+                AND pr.pacote = %s 
+                AND pr.account_id = %s
+            LEFT JOIN ingredients real_ing ON pr.real_ingredient_id = real_ing.id
+            WHERE c.id = ANY(%s) AND c.account_id = %s;
+        """
+        
+        # O pedido.pacote vem como string ('bronze', 'prata', etc)
+        cur.execute(query, (pedido.pacote, pedido.account_id, pedido.drink_ids, pedido.account_id))
+        linhas = cur.fetchall()
+        
+        custo_total_selecao = 0
+        drinks_calculados = {}
+
+        for linha in linhas:
+            d_id = linha[0]
+            d_nome = linha[1]
+            qtd_usada = float(linha[2]) if linha[2] else 0
+            ing_nome = linha[4]
+            preco = float(linha[5]) if linha[5] else 0
+            tamanho = float(linha[6]) if linha[6] and float(linha[6]) > 0 else 1 
+
+            # Matemática do custo real do insumo
+            custo_ingrediente = (preco / tamanho) * qtd_usada
+
+            if d_id not in drinks_calculados:
+                drinks_calculados[d_id] = {
+                    "nome": d_nome,
+                    "custo_total_drink": 0,
+                    "detalhes": []
+                }
+            
+            drinks_calculados[d_id]["custo_total_drink"] += custo_ingrediente
+            drinks_calculados[d_id]["detalhes"].append({
+                "ingrediente": ing_nome,
+                "qtd_usada_ml": qtd_usada,
+                "custo_calculado": round(custo_ingrediente, 4) # Arredondando para não dar dízima
+            })
+
+            custo_total_selecao += custo_ingrediente
+
+        cur.close()
+        conn.close()
+
+        return {
+            "status": "sucesso",
+            "pacote_simulado": pedido.pacote,
+            "custo_base_todas_bebidas": round(custo_total_selecao, 2),
+            "detalhe_por_drink": drinks_calculados
+        }
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/ingredients/")
 def criar_insumo(insumo: NovoInsumo):
     conn = get_db_connection()
