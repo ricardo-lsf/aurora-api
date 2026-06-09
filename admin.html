@@ -2710,7 +2710,7 @@
 
                 // Mapeamento limpo
                 // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
-                window.bibliotecaGlobal = listaDrinks.map(drink => ({
+                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
                     ...drink, // O pulo do gato: preserva todos os dados originais da API
                     id: drink.id,
                     nome: drink.drink_nome || 'Sem Nome',
