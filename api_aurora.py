@@ -355,6 +355,7 @@ class NovoCocktail(BaseModel):
     drink_type: Optional[str] = "Cocktail"   # <--- ADICIONADO!
     sale_price: float
     image_url: Optional[str] = ""
+    min_package_level: int = 1
     recipe: List[IngredienteReceita]
 
 class EdicaoInsumo(BaseModel):
@@ -1201,14 +1202,16 @@ def criar_drink_completo(drink: NovoCocktail):
         cur = conn.cursor()
         novo_drink_id = str(uuid.uuid4())
         
-        # Inserimos o Cabeçalho (AGORA COM TECHNIQUE E DRINK_TYPE)
+        # Inserimos o Cabeçalho (AGORA COM O MIN_PACKAGE_LEVEL)
         query_drink = """
-            INSERT INTO cocktails (id, account_id, name, preparation_steps, category, technique, drink_type, sale_price, image_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+            INSERT INTO cocktails (id, account_id, name, preparation_steps, category, technique, drink_type, sale_price, image_url, min_package_level)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         cur.execute(query_drink, (
             novo_drink_id, drink.account_id, drink.name, 
-            drink.preparation_steps, drink.category, drink.technique, drink.drink_type, drink.sale_price, drink.image_url
+            drink.preparation_steps, drink.category, drink.technique, 
+            drink.drink_type, drink.sale_price, drink.image_url, 
+            drink.min_package_level # <-- Variável nova aqui no final
         ))
         
         # Loop da Ficha Técnica
@@ -1247,15 +1250,18 @@ def atualizar_drink_completo(cocktail_id: str, drink: NovoCocktail):
     try:
         cur = conn.cursor()
         
-        # 1. Atualiza o Cabeçalho do drink
+   # 1. Atualiza o Cabeçalho do drink (COM MIN_PACKAGE_LEVEL)
         query_drink = """
             UPDATE cocktails 
-            SET name = %s, preparation_steps = %s, category = %s, technique = %s, drink_type = %s, sale_price = %s, image_url = %s
+            SET name = %s, preparation_steps = %s, category = %s, technique = %s, 
+                drink_type = %s, sale_price = %s, image_url = %s, min_package_level = %s
             WHERE id = %s AND account_id = %s;
         """
         cur.execute(query_drink, (
-            drink.name, drink.preparation_steps, drink.category, drink.technique, drink.drink_type, 
-            drink.sale_price, drink.image_url, cocktail_id, drink.account_id
+            drink.name, drink.preparation_steps, drink.category, drink.technique, 
+            drink.drink_type, drink.sale_price, drink.image_url, 
+            drink.min_package_level, # <-- Variável nova adicionada aqui
+            cocktail_id, drink.account_id
         ))
         
         # 2. Apaga a receita antiga inteira (é mais seguro que tentar adivinhar o que mudou)
