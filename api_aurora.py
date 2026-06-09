@@ -1309,7 +1309,8 @@ def listar_todos_drinks(account_id: str):
                 technique,
                 drink_type,
                 category,
-                preparation_steps
+                preparation_steps, 
+                min_package_level
             FROM cocktails 
             WHERE account_id = %s
             ORDER BY name;

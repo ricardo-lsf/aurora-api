@@ -2697,48 +2697,6 @@
         // 2. BIBLIOTECA & ORÇAMENTO - ATUALIZADO
         // ============================================================
         
-/*         window.carregarDrinksParaOrcamento = async function() {
-            try {
-                // Seu ID Fixo (funcionando perfeitamente)
-                const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362'; 
-                
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
-                if (!resposta.ok) throw new Error(`Erro no servidor: Status ${resposta.status}`);
-
-                const jsonResposta = await resposta.json();
-                if (jsonResposta.status !== "sucesso") throw new Error("O servidor não retornou sucesso.");
-
-                // Mapeamento limpo
-                // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
-                 window.bibliotecaGlobal = listaDrinks.map(drink => ({
-                    ...drink, // O pulo do gato: preserva todos os dados originais da API
-                    id: drink.id,
-                    nome: drink.drink_nome || 'Sem Nome',
-                    tipo: drink.drink_type || 'Cocktail', 
-                    tecnica: drink.technique || '-',
-                    // Garantindo os campos que a Ficha Técnica usa:
-                    categoria: drink.category || '-',
-                    foto: drink.image_url || '',
-                    valorVenda: drink.sale_price || 0,
-                    preparo: drink.preparation_steps || ''
-                }));
-
-                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
-                    id: drink.id,
-                    nome: drink.drink_nome || 'Sem Nome',
-                    tipo: drink.drink_type || 'Cocktail', 
-                    tecnica: drink.technique || '-'
-                }));
-
-                window.renderLibOrcamento();
-                
-            } catch (erro) {
-                console.error("Erro na carga dos drinks:", erro);
-                const divDrinks = document.getElementById('orcamento-lista-drinks');
-                if (divDrinks) divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold;">⚠️ Falha na conexão: ${erro.message}</p>`;
-            }
-        }; */
-
         window.carregarDrinksParaOrcamento = async function() {
             try {
                 // Recupera o ID da conta ativo
@@ -2766,6 +2724,7 @@
                     categoria: drink.category || '-',
                     foto: drink.image_url || '',
                     preparo: drink.preparation_steps || '',
+                    nivelMinimo: parseInt(drink.min_package_level) || 1,
                     
                     // Correção crucial do valor de venda (Lendo do apelido do SQL Python)
                     valorVenda: parseFloat(drink.preco_venda || 0)
@@ -2796,12 +2755,8 @@
             window.bibliotecaGlobal.sort((a, b) => a.nome.localeCompare(b.nome));
 
             window.bibliotecaGlobal.forEach(x => {
-                // SIMULADOR TEMPORÁRIO (Até criarmos a coluna no PostgreSQL)
-                // Colocamos peso nos drinks. Aperol e Negroni = Prata (2). Cosmopolitan = Ouro (3).
-                let nivelDoDrink = 1; 
-                if(['Aperol', 'Negroni', 'Moscow Mule'].includes(x.nome)) nivelDoDrink = 2;
-                if(['Cosmopolitan', 'Bramble'].includes(x.nome)) nivelDoDrink = 3;
-                if(['Whiskey Sour', 'Pandemia'].includes(x.nome)) nivelDoDrink = 4;
+                // AGORA O SISTEMA LÊ O PESO REAL DO BANCO DE DADOS!
+                const nivelDoDrink = x.nivelMinimo; 
 
                 const isMocktail = x.tipo === 'Mocktail' || x.tipo === 'Sem Álcool';
                 const tag = isMocktail
