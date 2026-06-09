@@ -2697,7 +2697,7 @@
         // 2. BIBLIOTECA & ORÇAMENTO - ATUALIZADO
         // ============================================================
         
-        window.carregarDrinksParaOrcamento = async function() {
+/*         window.carregarDrinksParaOrcamento = async function() {
             try {
                 // Seu ID Fixo (funcionando perfeitamente)
                 const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362'; 
@@ -2734,6 +2734,48 @@
                 
             } catch (erro) {
                 console.error("Erro na carga dos drinks:", erro);
+                const divDrinks = document.getElementById('orcamento-lista-drinks');
+                if (divDrinks) divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold;">⚠️ Falha na conexão: ${erro.message}</p>`;
+            }
+        }; */
+
+        window.carregarDrinksParaOrcamento = async function() {
+            try {
+                // Recupera o ID da conta ativo
+                const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362';
+                
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
+                if (!resposta.ok) throw new Error(`Erro no servidor: Status ${resposta.status}`);
+
+                const jsonResposta = await resposta.json();
+                if (jsonResposta.status !== "sucesso") throw new Error("O servidor não retornou sucesso.");
+
+                // ============================================================
+                // MAPEAMENTO UNIFICADO (ORÇAMENTO + FICHA TÉCNICA)
+                // ============================================================
+                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+                    ...drink, // Mantém tudo o que veio bruto do banco por segurança
+                    
+                    // Chaves universais que a tela inteira usa:
+                    id: drink.id,
+                    nome: drink.drink_nome || 'Sem Nome',
+                    tipo: drink.drink_type || 'Cocktail', 
+                    tecnica: drink.technique || '-',
+                    
+                    // Chaves específicas que a sua Ficha Técnica antiga exige:
+                    categoria: drink.category || '-',
+                    foto: drink.image_url || '',
+                    preparo: drink.preparation_steps || '',
+                    
+                    // Correção crucial do valor de venda (Lendo do apelido do SQL Python)
+                    valorVenda: parseFloat(drink.preco_venda || 0)
+                }));
+
+                // Desenha os checkboxes na tela de orçamento
+                window.renderLibOrcamento();
+                
+            } catch (erro) {
+                console.error("Erro na carga unificada dos drinks:", erro);
                 const divDrinks = document.getElementById('orcamento-lista-drinks');
                 if (divDrinks) divDrinks.innerHTML = `<p style="color:#e11d48; font-weight:bold;">⚠️ Falha na conexão: ${erro.message}</p>`;
             }
