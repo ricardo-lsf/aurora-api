@@ -2708,7 +2708,7 @@
                 const jsonResposta = await resposta.json();
                 if (jsonResposta.status !== "sucesso") throw new Error("O servidor não retornou sucesso.");
 
-                // Mapeamento limpo
+                // Mapeamento limpo //
                 // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
                 window.bibliotecaGlobal = listaDrinks.map(drink => ({
                     ...drink, // O pulo do gato: preserva todos os dados originais da API
