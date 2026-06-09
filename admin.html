@@ -2710,7 +2710,7 @@
 
                 // Mapeamento limpo
                 // 3. Traduzindo os campos, mas GUARDANDO TUDO que veio do banco
-                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+/*                 window.bibliotecaGlobal = listaDrinks.map(drink => ({
                     ...drink, // O pulo do gato: preserva todos os dados originais da API
                     id: drink.id,
                     nome: drink.drink_nome || 'Sem Nome',
@@ -2721,14 +2721,14 @@
                     foto: drink.image_url || '',
                     valorVenda: drink.sale_price || 0,
                     preparo: drink.preparation_steps || ''
-                }));
+                })); */
 
-                //window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
-                //    id: drink.id,
-                //    nome: drink.drink_nome || 'Sem Nome',
-                //    tipo: drink.drink_type || 'Cocktail', 
-                //    tecnica: drink.technique || '-'
-                //}));
+                window.bibliotecaGlobal = jsonResposta.dados.map(drink => ({
+                    id: drink.id,
+                    nome: drink.drink_nome || 'Sem Nome',
+                    tipo: drink.drink_type || 'Cocktail', 
+                    tecnica: drink.technique || '-'
+                }));
 
                 window.renderLibOrcamento();
                 
