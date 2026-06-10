@@ -2800,40 +2800,73 @@
         };
 
         // ==========================================
-        // CÉREBRO DO ORÇAMENTO (LÓGICA REAL DE MERCADO)
+        // CÉREBRO DO ORÇAMENTO (COM API DE CUSTOS REAIS)
         // ==========================================
-        window.calcularPreviaOrcamento = () => {
+        window.calcularPreviaOrcamento = async () => {
             const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
             const horas = parseInt(document.getElementById('orcHoras').value) || 0;
             const pacote = document.getElementById('orcPacote').value;
             const extras = parseFloat(document.getElementById('orcExtras')?.value) || 0;
 
-            // 1. Custo Real da Mão de Obra (Ajuste para sua realidade local)
-            const custoBartender = 150; // R$ 150 a diária/evento por bartender
-            const qtdeBartenders = Math.ceil(qtdPessoas / 40); // 1 a cada 40 pessoas
+            // 1. Custo Real da Mão de Obra (Ajuste para sua realidade)
+            const custoBartender = 150; 
+            const qtdeBartenders = Math.ceil(qtdPessoas / 40); 
             const custoMaoDeObra = qtdeBartenders * custoBartender;
 
-            // 2. Custo Base da Bebida (Custo SEU para montar o bar, não o preço de venda)
-            let custoBebidaPorPessoa = 0;
-            if (pacote === 'bronze') custoBebidaPorPessoa = 25.00;
-            if (pacote === 'prata') custoBebidaPorPessoa = 40.00;
-            if (pacote === 'ouro') custoBebidaPorPessoa = 65.00;
-            if (pacote === 'diamante') custoBebidaPorPessoa = 95.00;
-            if (pacote === 'personalizado') custoBebidaPorPessoa = 0; // Calcula exato pela ficha depois
+            // 2. Levantar os drinks que você "ticou" na tela
+            const chks = document.querySelectorAll('.chk-drink-orc:checked');
+            const drinkIds = Array.from(chks).map(chk => chk.value);
 
-            const custoTotalBebida = custoBebidaPorPessoa * qtdPessoas;
+            let custoTotalBebida = 0;
+
+            if (drinkIds.length > 0) {
+                try {
+                    // Avisa o usuário que está fazendo a conta
+                    document.getElementById('orcCustoDisplay').innerText = "Calculando...";
+
+                    // IMPORTANTE: Use a variável da sua conta aqui!
+                    const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362'; 
+
+                    const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos/simular-custo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            account_id: accountId,
+                            drink_ids: drinkIds,
+                            pacote: pacote
+                        })
+                    });
+                    
+                    const json = await resposta.json();
+                    
+                    if (json.status === "sucesso" && json.custo_base_todas_bebidas > 0) {
+                        // 3. MATEMÁTICA DO EVENTO:
+                        // Descobre o custo médio de UM drink do cardápio escolhido
+                        const custoMedioPorDrink = json.custo_base_todas_bebidas / drinkIds.length;
+                        
+                        // Define quantos drinks cada pessoa bebe por hora (Média de mercado: 1.5 a 2)
+                        const drinksPorPessoaPorHora = 1.5; 
+                        const totalDrinksConsumidos = qtdPessoas * horas * drinksPorPessoaPorHora;
+                        
+                        // Custo final de insumos do evento
+                        custoTotalBebida = totalDrinksConsumidos * custoMedioPorDrink;
+                    }
+                } catch (err) {
+                    console.error("Erro ao simular custo no Python:", err);
+                }
+            }
+
             const custoTotalOperacao = custoTotalBebida + custoMaoDeObra;
 
-            // 3. Margem de Lucro Comercial (Markup)
-            // Se o custo for R$ 2000, e o markup 2.0, você vende por R$ 4000 (50% de lucro bruto)
-            const markup = 2.0; 
+            // 4. Formação de Preço (Margem de Lucro / Markup)
+            const markup = 2.0; // Multiplica o custo por 2
             let valorVendaTotal = (custoTotalOperacao * markup) + extras;
 
-            // 4. Arredondamento estético (ex: R$ 3412 vira R$ 3450 ou R$ 3490)
+            // Arredondamento estético para fechar proposta (ex: R$ 3412 vira R$ 3420)
             valorVendaTotal = Math.ceil(valorVendaTotal / 10) * 10;
-
             const valorPorPessoaFinal = qtdPessoas > 0 ? valorVendaTotal / qtdPessoas : 0;
 
+            // 5. Exibe os resultados na tela
             const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
             
             document.getElementById('orcCustoDisplay').innerText = formata(custoTotalOperacao);
@@ -2842,7 +2875,7 @@
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if(txtPessoa) txtPessoa.innerText = `(${formata(valorPorPessoaFinal)} por pessoa)`;
 
-            // Atualiza a lista de drinks para bloquear o que não pertence ao pacote!
+            // Garante que a lista aplique os cadeados bloqueando o que não pertence ao pacote
             window.renderLibOrcamento();
         };
 
