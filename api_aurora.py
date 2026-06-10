@@ -1514,25 +1514,18 @@ def ver_receita(cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Busca os textos de preparo
+        # 1. Busca os textos de preparo do próprio drink (1 linha)
+        # VERIFIQUE: Se os nomes das colunas forem diferentes no seu banco, altere aqui!
         cur.execute("SELECT technique, preparation_steps FROM cocktails WHERE id = %s;", (cocktail_id,))
         drink_info = cur.fetchone()
         
-        # 2. Busca a lista de ingredientes COM A MATEMÁTICA DE CUSTOS
+        # 2. Busca a lista de ingredientes (várias linhas) com a coluna corrigida
         query_ingredientes = """
             SELECT 
-                i.id AS insumoId,    -- Alterado para casar com o JS (insumoId)
-                i.name AS ingrediente,
-                i.brand AS marca,
-                ci.quantity AS qtd,  -- Alterado para casar com o JS (qtd)
-                i.measurement_unit AS unMedida,
-                i.current_cost_price AS preco_garrafa,
-                i.package_quantity AS tamanho_garrafa,
-                
-                -- O CÁLCULO EXATO DO CUSTO DESSA LINHA:
-                -- Usamos NULLIF para evitar erro de divisão por zero caso o tamanho esteja em branco
-                ((i.current_cost_price / COALESCE(NULLIF(i.package_quantity, 0), 1)) * ci.quantity) AS custo
-                
+                i.id AS ingrediente_id,    -- CORREÇÃO: O ID ESTAVA FALTANDO!
+                i.name AS ingrediente, 
+                ci.quantity AS quantidade, 
+                i.measurement_unit AS unidade
             FROM cocktail_ingredients ci
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE ci.cocktail_id = %s
@@ -1544,6 +1537,7 @@ def ver_receita(cocktail_id: str):
         cur.close()
         conn.close()
         
+        # Empacota o combo completo e manda para o Front-end!
         return {
             "status": "sucesso", 
             "drink": drink_info,
