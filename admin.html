@@ -3063,13 +3063,12 @@
             });
         }
 
-        // 4.2 CARREGAR PARA EDIÇÃO (CORRIGIDO NA AUDITORIA) ---
+        // 4.2 CARREGAR PARA EDIÇÃO (CORRIGIDO E ALINHADO COM POSTGRES) ---
         window.carregarDrinkParaEdicao = async (id) => {
             const drink = window.bibliotecaGlobal.find(x => x.id === id);
             if (!drink) return;
         
-        // 🟢 RAIO-X 1: O que veio no cabeçalho do drink?
-        console.log("DADOS DO DRINK SELECIONADO:", drink);
+            console.log("DADOS DO DRINK SELECIONADO:", drink);
 
             window.idDrinkEditando = id;
 
@@ -3078,10 +3077,10 @@
             document.getElementById('globalImg').value = drink.image_url || '';
             document.getElementById('globalPrice').value = drink.preco_venda || '';
             
-            // O drink.nivelMinimo é aquela variável que já mapeamos na função anterior!
+            // O drink.nivelMinimo mapeado na auditoria do orçamento
             document.getElementById('drinkPackageLevel').value = drink.nivelMinimo || 1;
             
-            // Mapeamento corrigido dos Selects e Textareas (Técnica, Categoria, Preparo)
+            // Mapeamento dos Selects e Textareas
             if(document.getElementById('globalTecnica')) 
                 document.getElementById('globalTecnica').value = drink.technique || 'Montado';
             
@@ -3104,30 +3103,28 @@
                 const data = await res.json();
 
                 if (data.status === "sucesso") {
-
-                // 🟢 RAIO-X 2: O que veio na receita vs O que tem no estoque?
-                                console.log("RECEITA VINDO DA API:", data.ingredientes);
-                                console.log("MEU ESTOQUE ATUAL:", window.catalogoGeral);
+                    console.log("RECEITA VINDO DA API:", data.ingredientes);
 
                     window.receitaAtual = data.ingredientes.map(ing => {
-                        // Cruza com o Estoque (catalogoGeral) para descobrir o R$
-                        // MÁGICA: Procura no estoque pelo NOME (já que a API não mandou o ID)
+                        // Cruza com o Estoque apenas para garantir a existência do item ou fallback de ID
                         const infoEstoque = (window.catalogoGeral || []).find(i => 
-                        i.id === ing.ingrediente_id || 
-                        (i.produto && i.produto.toLowerCase() === ing.ingrediente.toLowerCase()));
+                            i.id === ing.ingrediente_id || 
+                            (i.produto && i.produto.toLowerCase() === ing.ingrediente.toLowerCase())
+                        );
 
-                        //const infoEstoque = (window.catalogoGeral || []).find(i => i.id === ing.ingrediente_id);
-                        const precoUnitario = infoEstoque ? (parseFloat(infoEstoque.custoPorVol) || 0) : 0;
-                        
-                        // Salva o ID real para podermos salvar a edição do drink depois
                         const idRealDoBanco = infoEstoque ? infoEstoque.id : (ing.ingrediente_id || "");
 
                         return {
-                            insumoId: ing.ingrediente_id || ing.id, 
-                            nome: ing.ingrediente,
-                            qtd: ing.quantidade,
+                            insumoId: idRealDoBanco, 
+                            
+                            // Ajuste 2: Exibe o nome do insumo + a marca vinda do banco de forma elegante
+                            nome: ing.marca ? `${ing.ingrediente} (${ing.marca})` : ing.ingrediente,
+                            
+                            qtd: parseFloat(ing.quantidade),
                             unMedida: ing.unidade,
-                            custo: precoUnitario * ing.quantidade
+                            
+                            // Ajuste 1: Puxa a matemática exata e real que o Python calculou!
+                            custo: parseFloat(ing.custo || 0)
                         };
                     });
                     

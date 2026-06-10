@@ -1519,13 +1519,18 @@ def ver_receita(cocktail_id: str):
         cur.execute("SELECT technique, preparation_steps FROM cocktails WHERE id = %s;", (cocktail_id,))
         drink_info = cur.fetchone()
         
-        # 2. Busca a lista de ingredientes (várias linhas) com a coluna corrigida
+        # 2. Busca a lista de ingredientes mantendo o contrato original da sua API
         query_ingredientes = """
             SELECT 
-                i.id AS ingrediente_id,    -- CORREÇÃO: O ID ESTAVA FALTANDO!
+                i.id AS ingrediente_id, 
                 i.name AS ingrediente, 
+                i.brand AS marca,
                 ci.quantity AS quantidade, 
-                i.measurement_unit AS unidade
+                i.measurement_unit AS unidade,
+                
+                -- A mágica do cálculo exato em tempo real no banco
+                ((i.current_cost_price::NUMERIC / COALESCE(NULLIF(i.package_quantity::NUMERIC, 0), 1)) * ci.quantity::NUMERIC) AS custo
+                
             FROM cocktail_ingredients ci
             JOIN ingredients i ON ci.ingredient_id = i.id
             WHERE ci.cocktail_id = %s
