@@ -340,7 +340,7 @@ def simular_custo_pacote(pedido: PedidoSimulacaoCusto):
                 AND pr.pacote = %s 
                 AND pr.account_id = %s
             LEFT JOIN ingredients real_ing ON pr.real_ingredient_id = real_ing.id
-            WHERE c.id = ANY(%s) AND c.account_id = %s;
+            WHERE c.id::text = ANY(%s) AND c.account_id = %s;
         """
         
         # O pedido.pacote vem como string ('bronze', 'prata', etc)

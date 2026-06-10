@@ -2824,9 +2824,6 @@
                     // Avisa o usuário que está fazendo a conta
                     document.getElementById('orcCustoDisplay').innerText = "Calculando...";
 
-                    // IMPORTANTE: Use a variável da sua conta aqui!
-                    const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362'; 
-
                     const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos/simular-custo', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
