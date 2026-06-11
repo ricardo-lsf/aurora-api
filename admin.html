@@ -1438,8 +1438,10 @@
                                     📊 Importar Excel
                                 </button>
 
-                                <button onclick="toggleNovoItem()" class="btn-info" style="font-size:0.8em;">+
-                                    Novo</button>
+                                <button onclick="toggleNovoItem()" class="btn-info" style="font-size:0.8em;">+ Novo</button>
+
+                                <button onclick="window.abrirModalRegra()" class="btn-sua-classe">🔗 Criar Regra de Pacote</button>
+
                             </div>
                         </div>
 
@@ -1940,6 +1942,34 @@
         </div>
     </div>
 
+    <div id="modalRegrasPacote" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:#fff; padding:20px; border-radius:8px; width:400px; max-width:90%;">
+            <h3 style="margin-top:0;">🔗 Vincular Marca ao Pacote</h3>
+            
+            <label>Nome do Ingrediente na Ficha (ex: Vodka):</label>
+            <input type="text" id="regraCategoriaGenerica" class="form-control" style="width:100%; margin-bottom:15px; padding:8px;" placeholder="Ex: Vodka, Gin, Rum...">
+            
+            <label>Qual Pacote?</label>
+            <select id="regraPacoteSelect" class="form-control" style="width:100%; margin-bottom:15px; padding:8px;">
+                <option value="bronze">🥉 Bronze</option>
+                <option value="prata">🥈 Prata</option>
+                <option value="ouro">🥇 Ouro</option>
+                <option value="diamante">💎 Diamante</option>
+            </select>
+            
+            <label>Qual a Marca Real do Estoque?</label>
+            <select id="regraIngredienteReal" class="form-control" style="width:100%; margin-bottom:20px; padding:8px;">
+                <option value="">Carregando estoque...</option>
+            </select>
+            
+            <div style="display:flex; justify-content:space-between;">
+                <button onclick="document.getElementById('modalRegrasPacote').style.display='none'" style="padding:10px; border:none; background:#ccc; border-radius:4px; cursor:pointer;">Cancelar</button>
+                <button onclick="salvarRegraPacoteJs()" style="padding:10px; border:none; background:#28a745; color:#fff; border-radius:4px; cursor:pointer;">Salvar Regra</button>
+            </div>
+        </div>
+    </div>
+
+    
 <script type="module">
 
 
@@ -2471,7 +2501,7 @@
         };
 
 
-// ============================================================
+        // ============================================================
         // --- SALVAR NOVO PRODUTO (REDIRECIONADO PARA POSTGRESQL) ---
         // ============================================================
         window.salvarCatalogo = async () => {
@@ -3206,6 +3236,83 @@
                 }
             } catch (e) {
                 console.error("Erro ao simular pacote:", e);
+            }
+        };
+
+        // ==========================================
+        // FUNÇÕES: GERENCIADOR DE REGRAS DE PACOTE
+        // ==========================================
+        
+        // Função para abrir o modal e preencher o select com os itens do estoque
+        window.abrirModalRegra = () => {
+            const selectReal = document.getElementById('regraIngredienteReal');
+            selectReal.innerHTML = '<option value="">-- Selecione a Garrafa Real --</option>';
+            
+            // Puxa o seu catalogoGeral que já está carregado na memória do painel
+            if (window.catalogoGeral && window.catalogoGeral.length > 0) {
+                // Ordena os itens por nome para ficar mais fácil de achar
+                const itensOrdenados = [...window.catalogoGeral].sort((a, b) => {
+                    const nomeA = a.produto || a.nome || '';
+                    const nomeB = b.produto || b.nome || '';
+                    return nomeA.localeCompare(nomeB);
+                });
+
+                itensOrdenados.forEach(item => {
+                    const nomeExibicao = item.marca ? `${item.produto || item.nome} (${item.marca})` : (item.produto || item.nome);
+                    selectReal.innerHTML += `<option value="${item.id}">${nomeExibicao}</option>`;
+                });
+            } else {
+                selectReal.innerHTML = '<option value="">Erro: Estoque vazio ou não carregado</option>';
+            }
+
+            // Exibe o modal na tela
+            document.getElementById('modalRegrasPacote').style.display = 'flex';
+        };
+
+        // Função para enviar os dados para a nossa rota do Python
+        window.salvarRegraPacoteJs = async () => {
+            const categoria = document.getElementById('regraCategoriaGenerica').value.trim();
+            const pacote = document.getElementById('regraPacoteSelect').value;
+            const ingredienteRealId = document.getElementById('regraIngredienteReal').value;
+
+            if (!categoria || !ingredienteRealId) {
+                alert("Por favor, preencha a categoria genérica e escolha o ingrediente real!");
+                return;
+            }
+
+            try {
+                const btn = document.querySelector('button[onclick="salvarRegraPacoteJs()"]');
+                const textoAntigo = btn.innerText;
+                btn.innerText = "Salvando...";
+                btn.disabled = true;
+
+                const res = await fetch(`${API_BASE}/package-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        account_id: ACCOUNT_ID,
+                        categoria_generica: categoria,
+                        pacote: pacote,
+                        real_ingredient_id: ingredienteRealId
+                    })
+                });
+
+                const data = await res.json();
+                
+                if (data.status === "sucesso") {
+                    alert(`Sucesso! Agora sempre que a receita pedir "${categoria}" no pacote ${pacote}, o sistema usará a garrafa selecionada.`);
+                    document.getElementById('modalRegrasPacote').style.display = 'none';
+                    document.getElementById('regraCategoriaGenerica').value = '';
+                } else {
+                    alert("Erro ao salvar: " + JSON.stringify(data));
+                }
+
+                btn.innerText = textoAntigo;
+                btn.disabled = false;
+
+            } catch (err) {
+                console.error("Erro na requisição:", err);
+                alert("Erro ao conectar com o servidor.");
             }
         };
 

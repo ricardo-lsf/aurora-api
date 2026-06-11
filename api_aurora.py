@@ -45,8 +45,55 @@ class EventoUpdate(BaseModel):
     descCustosAdicionais: Optional[str] = ""
     sinalPerc: Optional[float] = 0.0
 
-
 # ... (suas configurações de app e rotas antigas) ...
+
+class NovaRegraPacote(BaseModel):
+    account_id: str
+    categoria_generica: str
+    pacote: str
+    real_ingredient_id: str
+
+# ==========================================
+# ROTA DE REGRAS: SALVAR / ATUALIZAR REGRA DE PACOTE
+# ==========================================
+@app.post("/package-rules")
+def salvar_regra_pacote(regra: NovaRegraPacote):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        nova_regra_id = str(uuid.uuid4())
+        
+        # 1. Limpa a regra antiga se ela já existir para evitar duplicidade
+        cur.execute("""
+            DELETE FROM package_rules 
+            WHERE account_id = %s AND categoria_generica = %s AND pacote = %s;
+        """, (regra.account_id, regra.categoria_generica, regra.pacote))
+        
+        # 2. Insere a nova regra
+        query_insert = """
+            INSERT INTO package_rules (id, account_id, categoria_generica, pacote, real_ingredient_id)
+            VALUES (%s, %s, %s, %s, %s);
+        """
+        cur.execute(query_insert, (
+            nova_regra_id, regra.account_id, regra.categoria_generica, 
+            regra.pacote, regra.real_ingredient_id
+        ))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "mensagem": "Regra salva com sucesso!"}
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 # ==========================================
 # ROTA: VERIFICAR STATUS DO EVENTO (GET)
