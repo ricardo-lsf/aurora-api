@@ -1358,7 +1358,7 @@
 
                     <div style="margin-bottom: 15px;">
                         <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Pacote Mínimo (Orçamento)</label>
-                        <select id="drinkPackageLevel" class="form-control" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" onchange="if(window.idDrinkEditando) window.carregarDrinkParaEdicao(window.idDrinkEditando)">
+                        <select id="drinkPackageLevel" class="form-control" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" onchange="window.simularPacoteNaFicha()">
                             <option value="1">🥉 Bronze (Marcas de Entrada / Todos os Pacotes)</option>
                             <option value="2">🥈 Prata (Marcas Standard)</option>
                             <option value="3">🥇 Ouro (Marcas Premium)</option>
@@ -3063,7 +3063,9 @@
             });
         }
 
-        // 4.2 CARREGAR PARA EDIÇÃO (CORRIGIDO E ALINHADO COM POSTGRES) ---
+        // ==========================================
+        // 4.2 CARREGAR PARA EDIÇÃO (LIMPO E SEM O BUG DO DROPDOWN)
+        // ==========================================
         window.carregarDrinkParaEdicao = async (id) => {
             const drink = window.bibliotecaGlobal.find(x => x.id === id);
             if (!drink) return;
@@ -3077,7 +3079,7 @@
             document.getElementById('globalImg').value = drink.image_url || '';
             document.getElementById('globalPrice').value = drink.preco_venda || '';
             
-            // O drink.nivelMinimo mapeado na auditoria do orçamento
+            // Define o nível no dropdown exatamente como está salvo no banco
             document.getElementById('drinkPackageLevel').value = drink.nivelMinimo || 1;
             
             // Mapeamento dos Selects e Textareas
@@ -3098,27 +3100,41 @@
                 window.atualizarPreview(drink.image_url || '');
             }
 
-            try {
-                // 1. Pega o número que está no seu dropdown (1, 2, 3 ou 4)
-                const nivelNumero = document.getElementById('drinkPackageLevel').value || "1";
-                
-                // 2. Dicionário de tradução rápido
-                const mapaPacotes = {
-                    "1": "bronze",
-                    "2": "prata",
-                    "3": "ouro",
-                    "4": "diamante"
-                };
-                
-                // 3. Converte o número para texto
-                const pacoteSelecionado = mapaPacotes[nivelNumero];
+            // A MÁGICA ACONTECE AQUI: Em vez de fazer o fetch gigante, chamamos a nova função!
+            await window.simularPacoteNaFicha();
 
-                // 4. Manda para o Python o texto bonitinho que ele espera ler na tabela de regras
+            const btn = document.getElementById('btnSalvarDrink');
+            if (btn) { btn.innerText = "🔄 ATUALIZAR"; btn.className = "btn-update-main"; }
+        };
+
+        // ==========================================
+        // NOVA FUNÇÃO: LÊ O PACOTE ESCOLHIDO E TRAZ A RECEITA ATUALIZADA
+        // ==========================================
+        window.simularPacoteNaFicha = async () => {
+            const id = window.idDrinkEditando;
+            if (!id) return; // Se não tem drink aberto, não faz nada
+
+            // 1. Pega o número que está selecionado no dropdown agora mesmo
+            const nivelNumero = document.getElementById('drinkPackageLevel').value || "1";
+            
+            // 2. Dicionário de tradução rápido
+            const mapaPacotes = {
+                "1": "bronze",
+                "2": "prata",
+                "3": "ouro",
+                "4": "diamante"
+            };
+            
+            // 3. Converte o número para texto
+            const pacoteSelecionado = mapaPacotes[nivelNumero];
+
+            try {
+                // 4. Manda para o Python o texto que ele espera ler na tabela de regras
                 const res = await fetch(`${API_BASE}/cocktails/${id}/recipe?pacote=${pacoteSelecionado}&account_id=${ACCOUNT_ID}`);
                 const data = await res.json();
 
                 if (data.status === "sucesso") {
-                    console.log("RECEITA VINDO DA API:", data.ingredientes);
+                    console.log("RECEITA VINDO DA API COM REGRAS APLICADAS:", data.ingredientes);
 
                     window.receitaAtual = data.ingredientes.map(ing => {
                         // Cruza com o Estoque apenas para garantir a existência do item ou fallback de ID
@@ -3132,13 +3148,13 @@
                         return {
                             insumoId: idRealDoBanco, 
                             
-                            // Ajuste 2: Exibe o nome do insumo + a marca vinda do banco de forma elegante
+                            // Exibe o nome do insumo + a marca vinda do banco de forma elegante
                             nome: ing.marca ? `${ing.ingrediente} (${ing.marca})` : ing.ingrediente,
                             
                             qtd: parseFloat(ing.quantidade),
                             unMedida: ing.unidade,
                             
-                            // Ajuste 1: Puxa a matemática exata e real que o Python calculou!
+                            // Puxa a matemática exata e real que o Python calculou
                             custo: parseFloat(ing.custo || 0)
                         };
                     });
@@ -3146,11 +3162,51 @@
                     window.renderizarIngredientesNaTela();
                 }
             } catch (e) {
-                console.error("Erro ao carregar receita:", e);
+                console.error("Erro ao simular pacote na receita:", e);
             }
+        
+        };
 
-            const btn = document.getElementById('btnSalvarDrink');
-            if (btn) { btn.innerText = "🔄 ATUALIZAR"; btn.className = "btn-update-main"; }
+        // ==========================================
+        // NOVA FUNÇÃO: SÓ ATUALIZA A RECEITA QUANDO MUDA O PACOTE
+        // ==========================================
+        window.simularPacoteNaFicha = async () => {
+            const id = window.idDrinkEditando;
+            if (!id) return;
+
+            // 1. Lê a opção que você acabou de clicar (sem resetar o botão)
+            const nivelNumero = document.getElementById('drinkPackageLevel').value || "1";
+            const mapaPacotes = { "1": "bronze", "2": "prata", "3": "ouro", "4": "diamante" };
+            const pacoteSelecionado = mapaPacotes[nivelNumero];
+
+            try {
+                // 2. Busca a matemática atualizada no Python
+                const res = await fetch(`${API_BASE}/cocktails/${id}/recipe?pacote=${pacoteSelecionado}&account_id=${ACCOUNT_ID}`);
+                const data = await res.json();
+
+                if (data.status === "sucesso") {
+                    window.receitaAtual = data.ingredientes.map(ing => {
+                        const infoEstoque = (window.catalogoGeral || []).find(i => 
+                            i.id === ing.ingrediente_id || 
+                            (i.produto && i.produto.toLowerCase() === ing.ingrediente.toLowerCase())
+                        );
+                        const idRealDoBanco = infoEstoque ? infoEstoque.id : (ing.ingrediente_id || "");
+
+                        return {
+                            insumoId: idRealDoBanco, 
+                            nome: ing.marca ? `${ing.ingrediente} (${ing.marca})` : ing.ingrediente,
+                            qtd: parseFloat(ing.quantidade),
+                            unMedida: ing.unidade,
+                            custo: parseFloat(ing.custo || 0)
+                        };
+                    });
+                    
+                    // 3. Pinta a tela com a marca e o custo novos
+                    window.renderizarIngredientesNaTela();
+                }
+            } catch (e) {
+                console.error("Erro ao simular pacote:", e);
+            }
         };
 
         // 4.3 LIMPAR TELA E NOVO DRINK ---
