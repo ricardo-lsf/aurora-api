@@ -1503,10 +1503,10 @@ def listar_menu_evento(event_id: str):
         conn.close()
     
 # ==========================================
-# NOSSA DÉCIMA PRIMEIRA ROTA: BUSCAR RECEITA DO DRINK (FICHA TÉCNICA)
+# NOSSA DÉCIMA PRIMEIRA ROTA: BUSCAR RECEITA (AGORA INTELIGENTE POR PACOTE)
 # ==========================================
 @app.get("/cocktails/{cocktail_id}/recipe")
-def ver_receita(cocktail_id: str):
+def ver_receita(cocktail_id: str, pacote: str = None, account_id: str = None):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -1514,35 +1514,44 @@ def ver_receita(cocktail_id: str):
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # 1. Busca os textos de preparo do próprio drink (1 linha)
-        # VERIFIQUE: Se os nomes das colunas forem diferentes no seu banco, altere aqui!
+        # 1. Busca os textos de preparo
         cur.execute("SELECT technique, preparation_steps FROM cocktails WHERE id = %s;", (cocktail_id,))
         drink_info = cur.fetchone()
         
-        # 2. Busca a lista de ingredientes mantendo o contrato original da sua API
+        # 2. Busca os ingredientes aplicando a substituição de marcas se o pacote for informado
         query_ingredientes = """
             SELECT 
                 i.id AS ingrediente_id, 
-                i.name AS ingrediente, 
-                i.brand AS marca,
+                COALESCE(real_ing.name, i.name) AS ingrediente, 
+                COALESCE(real_ing.brand, i.brand) AS marca,
                 ci.quantity AS quantidade, 
                 i.measurement_unit AS unidade,
                 
-                -- A mágica do cálculo exato em tempo real no banco
-                ((i.current_cost_price::NUMERIC / COALESCE(NULLIF(i.package_quantity::NUMERIC, 0), 1)) * ci.quantity::NUMERIC) AS custo
+                -- Matemática dinâmica: se houver regra para o pacote, calcula o preço da marca real
+                ((COALESCE(real_ing.current_cost_price, i.current_cost_price)::NUMERIC / 
+                  COALESCE(NULLIF(COALESCE(real_ing.package_quantity, i.package_quantity)::NUMERIC, 0), 1)) * ci.quantity::NUMERIC) AS custo
                 
             FROM cocktail_ingredients ci
             JOIN ingredients i ON ci.ingredient_id = i.id
+            
+            -- Se 'pacote' e 'account_id' forem enviados, o JOIN abaixo vai encontrar a regra de substituição
+            LEFT JOIN package_rules pr 
+                ON pr.categoria_generica = i.name 
+                AND pr.pacote = %s 
+                AND pr.account_id = %s
+            LEFT JOIN ingredients real_ing ON pr.real_ingredient_id = real_ing.id
+            
             WHERE ci.cocktail_id = %s
             ORDER BY i.name;
         """
-        cur.execute(query_ingredientes, (cocktail_id,))
+        
+        # Passamos os parâmetros para o SQL. Se forem None, o LEFT JOIN simplesmente não trará nada (o que é perfeito)
+        cur.execute(query_ingredientes, (pacote, account_id, cocktail_id))
         ingredientes = cur.fetchall()
         
         cur.close()
         conn.close()
         
-        # Empacota o combo completo e manda para o Front-end!
         return {
             "status": "sucesso", 
             "drink": drink_info,

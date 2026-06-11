@@ -1358,7 +1358,7 @@
 
                     <div style="margin-bottom: 15px;">
                         <label style="display:block; margin-bottom:5px; font-weight:bold; color:#555;">Pacote Mínimo (Orçamento)</label>
-                        <select id="drinkPackageLevel" class="form-control" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                        <select id="drinkPackageLevel" class="form-control" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc;" onchange="if(window.idDrinkEditando) window.carregarDrinkParaEdicao(window.idDrinkEditando)">
                             <option value="1">🥉 Bronze (Marcas de Entrada / Todos os Pacotes)</option>
                             <option value="2">🥈 Prata (Marcas Standard)</option>
                             <option value="3">🥇 Ouro (Marcas Premium)</option>
@@ -3099,7 +3099,22 @@
             }
 
             try {
-                const res = await fetch(`${API_BASE}/cocktails/${id}/recipe`);
+                // 1. Pega o número que está no seu dropdown (1, 2, 3 ou 4)
+                const nivelNumero = document.getElementById('drinkPackageLevel').value || "1";
+                
+                // 2. Dicionário de tradução rápido
+                const mapaPacotes = {
+                    "1": "bronze",
+                    "2": "prata",
+                    "3": "ouro",
+                    "4": "diamante"
+                };
+                
+                // 3. Converte o número para texto
+                const pacoteSelecionado = mapaPacotes[nivelNumero];
+
+                // 4. Manda para o Python o texto bonitinho que ele espera ler na tabela de regras
+                const res = await fetch(`${API_BASE}/cocktails/${id}/recipe?pacote=${pacoteSelecionado}&account_id=${ACCOUNT_ID}`);
                 const data = await res.json();
 
                 if (data.status === "sucesso") {
