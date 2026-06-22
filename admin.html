@@ -1218,11 +1218,11 @@
 
                             <div style="flex: 2;">
                                 <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Pacote / Nível da Carta</label>
-                                <select id="orcPacote" class="form-control" style="width: 100%; background: #1e1e2d; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;" onchange="window.calcularPreviaOrcamento()">
-                                    <option value="bronze">🥉 Bronze (Marcas de Entrada)</option>
-                                    <option value="prata" selected>🥈 Prata (Marcas Standard)</option>
-                                    <option value="ouro">🥇 Ouro (Marcas Premium)</option>
-                                    <option value="diamante">💎 Diamante (Super Premium)</option>
+                                <select id="orcPacote" class="form-control" onchange="window.renderLibOrcamento(); window.calcularPreviaOrcamento();">
+                                    <option value="bronze">🥉 Bronze</option>
+                                    <option value="prata">🥈 Prata</option>
+                                    <option value="ouro">🥇 Ouro</option>
+                                    <option value="diamante">💎 Diamante</option>
                                 </select>
                             </div>
                         </div>
@@ -2782,13 +2782,17 @@
         };
 
         // ==========================================
-        // LISTA DE DRINKS COM BLOQUEIO DE PACOTE
+        // LISTA DE DRINKS COM BLOQUEIO DE PACOTE E MEMÓRIA
         // ==========================================
         window.renderLibOrcamento = () => {
             const d = document.getElementById('orcamento-lista-drinks');
             if (!d) return;
             
-            const pacoteAtual = document.getElementById('orcPacote').value;
+            // 1. O ANTÍDOTO DA AMNÉSIA: Salva quem estava marcado antes de apagar a lista
+            const selecionadosAtuais = Array.from(document.querySelectorAll('.chk-drink-orc:checked')).map(c => c.value);
+
+            // Garantia de leitura do pacote (com fallback para bronze)
+            const pacoteAtual = document.getElementById('orcPacote')?.value || 'bronze';
             const niveisDoPacote = { 'bronze': 1, 'prata': 2, 'ouro': 3, 'diamante': 4, 'personalizado': 5 };
             const poderDoPacote = niveisDoPacote[pacoteAtual] || 1;
 
@@ -2796,23 +2800,24 @@
             window.bibliotecaGlobal.sort((a, b) => a.nome.localeCompare(b.nome));
 
             window.bibliotecaGlobal.forEach(x => {
-                // AGORA O SISTEMA LÊ O PESO REAL DO BANCO DE DADOS!
                 const nivelDoDrink = x.nivelMinimo; 
-
                 const isMocktail = x.tipo === 'Mocktail' || x.tipo === 'Sem Álcool';
                 const tag = isMocktail
                     ? '<span class="tag-alcool tag-sem">Mocktail</span>'
                     : '<span class="tag-alcool tag-com">Cocktail</span>';
 
-                // Se o pacote escolhido for mais fraco que o nível do drink, bloqueia ele!
                 const bloqueado = poderDoPacote < nivelDoDrink;
                 const opacity = bloqueado ? '0.4' : '1';
                 const disabled = bloqueado ? 'disabled' : '';
                 const iconeBloqueio = bloqueado ? '🔒 <small style="color:#e11d48; font-size:10px;">Upgrade</small>' : '';
 
+                // 2. RECUPERA A MEMÓRIA: Se o ID estava na lista de salvos, e o pacote atual permite, marca de novo!
+                const isChecked = selecionadosAtuais.includes(x.id.toString()) && !bloqueado ? 'checked' : '';
+
+                // 3. O GATILHO DUPLO: Agora o onchange conta os drinks E calcula o dinheiro na mesma hora!
                 d.innerHTML += `
                 <div class="chk-item" style="opacity: ${opacity}; transition: 0.3s;">
-                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="countOrcDrinks()" class="chk-drink-orc" ${disabled}>
+                    <input type="checkbox" id="orc_chk_${x.id}" value="${x.id}" onchange="window.countOrcDrinks(); window.calcularPreviaOrcamento();" class="chk-drink-orc" ${disabled} ${isChecked}>
                     <label for="orc_chk_${x.id}" style="width:100%; cursor:${bloqueado ? 'not-allowed' : 'pointer'}; display:flex; justify-content:space-between;">
                         <span><b>${x.nome}</b> ${iconeBloqueio}</span>
                         ${tag}
@@ -2820,7 +2825,6 @@
                 </div>`;
             });
             
-            // Reconta os checkboxes ativos para garantir
             setTimeout(window.countOrcDrinks, 100);
         };
         
@@ -3015,10 +3019,10 @@
         };
 
         // SALVAR COM NUMERAÇÃO AUTOMÁTICA
-        // SALVAR (PREPARADO PARA MIGRAÇÃO POSTGRESQL)
+        // SALVAR (PREPARADO PARA MIGRAÇÃO POSTGRESQL E BLINDADO CONTRA ERROS)
         window.salvarOrcamento = async () => {
-            const cliente = document.getElementById('orcCliente').value;
-            if (!cliente) return alert("Preencha o nome do cliente!");
+            const clienteInput = document.getElementById('orcCliente');
+            if (!clienteInput || !clienteInput.value) return alert("Preencha o nome do cliente!");
 
             // 1. Coleta os drinks selecionados
             const selecionados = [];
@@ -3027,32 +3031,38 @@
                 if (drink) selecionados.push({ id: drink.id, nome: drink.nome, tipo: drink.tipo, tecnica: drink.tecnica });
             });
 
-            // 2. Número do Orçamento (Provisório - O Python fará a numeração real para evitar duplicidade)
-            let novoNumero = document.getElementById('orcNumeroDisplay').innerText;
-            const idHidden = document.getElementById('orcIdHidden').value;
+            // 2. Número do Orçamento
+            const orcNumeroDisplay = document.getElementById('orcNumeroDisplay');
+            let novoNumero = orcNumeroDisplay ? orcNumeroDisplay.innerText : 'Novo';
             
+            const idHidden = document.getElementById('orcIdHidden')?.value;
             if (!idHidden || novoNumero === 'Novo') {
                 novoNumero = `NOVO (Aguardando Servidor)`;
             }
 
-            // 3. Monta o pacote de dados EXATAMENTE como você estruturou antes
+            // 3. Monta o pacote de dados BLINDADO (usando ?.value)
             const dados = {
                 numero: novoNumero,
-                cliente: cliente,
-                dataEvento: document.getElementById('orcData').value,
-                local: document.getElementById('orcLocal').value,
-                qtdPessoas: parseInt(document.getElementById('orcQtdPessoas').value) || 0,
-                valorPessoa: parseFloat(document.getElementById('orcValorPessoa').value) || 0,
-                extras: parseFloat(document.getElementById('orcExtras').value) || 0,
-                total: document.getElementById('orcTotalDisplay').innerText,
+                cliente: clienteInput.value,
+                dataEvento: document.getElementById('orcData')?.value || '',
+                local: document.getElementById('orcLocal')?.value || '',
+                qtdPessoas: parseInt(document.getElementById('orcQtdPessoas')?.value) || 0,
+                valorPessoa: parseFloat(document.getElementById('orcValorPessoa')?.value) || 0,
+                extras: parseFloat(document.getElementById('orcExtras')?.value) || 0,
+                total: document.getElementById('orcTotalDisplay')?.innerText || '0.00',
+                
+                // IMPORTANTE: Adicionei o Pacote Selecionado, pois o banco de dados novo precisa disso!
+                pacoteSelecionado: document.getElementById('orcPacoteNivel')?.value || 'bronze',
+                
                 drinks: selecionados
             };
 
-            // 4. Aqui entra a trava. Em vez de Firebase, vamos ver se o pacote montou certo.
+            // 4. Teste de fogo no Console
             console.log("PACOTE PRONTO PARA O BANCO DE DADOS:", dados);
             
-            alert(`Estrutura montada com sucesso, Rica!\nAbra o F12 (Console) para ver o pacote de dados.\n\nNa próxima etapa, vamos conectar isso à API Python para salvar no PostgreSQL.`);
+            alert(`Estrutura montada com sucesso, Rica!\nAbra o F12 (Console) para ver o pacote de dados.\n\nNa próxima etapa, vamos conectar isso à API Python.`);
         };
+        
 
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO
