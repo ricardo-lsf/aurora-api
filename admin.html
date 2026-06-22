@@ -2925,7 +2925,13 @@
             try {
                 // 📍 AJUSTE 1 APLICADO AQUI: Adicionado o parâmetro account_id na URL
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/orcamentos?account_id=a57c20f3-526a-41f4-8b95-d4cd7cd2e362`);
-                if (!resposta.ok) throw new Error("Erro na resposta do servidor");
+                
+                // NOVO BLOCO: Lendo a fofoca exata do erro que o Python mandou
+                if (!resposta.ok) {
+                    const erroReal = await resposta.json();
+                    console.error("ERRO EXPLÍCITO DO PYTHON:", erroReal);
+                    throw new Error("Erro bloqueado pela API");
+                }
                 
                 const json = await resposta.json();
                 if (json.status !== "sucesso") throw new Error("Erro ao buscar dados");
