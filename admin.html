@@ -2923,7 +2923,8 @@
             l.innerHTML = '<p style="text-align:center; color:#999">Carregando orçamentos... ⏳</p>';
 
             try {
-                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos');
+                // 📍 AJUSTE 1 APLICADO AQUI: Adicionado o parâmetro account_id na URL
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/orcamentos?account_id=a57c20f3-526a-41f4-8b95-d4cd7cd2e362`);
                 if (!resposta.ok) throw new Error("Erro na resposta do servidor");
                 
                 const json = await resposta.json();
@@ -3082,7 +3083,7 @@
                     const displayNumero = document.getElementById('orcNumeroDisplay');
                     if (displayNumero) displayNumero.innerText = resultado.numero_gerado;
                     
-                    if (window.carregarListaOrcamentos) window.carregarListaOrcamentos();
+                    if (window.carregarOrcamentosSalvos) window.carregarOrcamentosSalvos();
                 } else {
                     alert("Erro ao salvar orçamento: " + JSON.stringify(resultado.detail));
                 }
