@@ -2366,7 +2366,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
         cur = conn.cursor()
         
         # 1. GERADOR DE NUMERAÇÃO AUTOMÁTICA SEQUENCIAL (Lendo da tabela budget)
-        cur.execute("SELECT COUNT(*) FROM budget WHERE account_id = %s;", (orc.account_id,))
+        cur.execute("SELECT COUNT(*) FROM budgets WHERE account_id = %s;", (orc.account_id,))
         total_existente = cur.fetchone()[0]
         proximo_numero = f"ORC-{str(total_existente + 1).zfill(4)}"
         
@@ -2375,8 +2375,8 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
         drinks_jsonb = json.dumps(orc.drinks)
         
         # 3. SQL LIMPO (id e created_at rodam no automático pelo Postgres)
-        query_budget = """
-            INSERT INTO budget (
+        query_budgets = """
+            INSERT INTO budgets (
                 account_id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
                 drinks_selecionados, status
@@ -2384,7 +2384,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             RETURNING id;
         """
         
-        cur.execute(query_budget, (
+        cur.execute(query_budgets, (
             orc.account_id, proximo_numero, orc.cliente, 
             orc.data_evento if orc.data_evento else None, # Trata data vazia
             orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
@@ -2402,7 +2402,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
         return {
             "status": "sucesso",
             "mensagem": f"Orçamento {proximo_numero} do cliente {orc.cliente} salvo com sucesso!",
-            "budget_id": str(id_gerado),
+            "budgets_id": str(id_gerado),
             "numero_gerado": proximo_numero
         }
         
