@@ -3097,47 +3097,7 @@
             }
         };
         
-        // ==========================================
-        // FUNÇÃO: CARREGAR O HISTÓRICO DE ORÇAMENTOS
-        // ==========================================
-        window.carregarListaOrcamentos = async () => {
-            try {
-                // Vai na nossa rota GET do Python puxar os orçamentos salvos
-                const res = await fetch(`${API_BASE}/orcamentos?account_id=${ACCOUNT_ID}`);
-                const json = await res.json();
-
-                if (json.status === "sucesso") {
-                    console.log("ORÇAMENTOS LOCALIZADOS NO BANCO:", json.dados);
-                    
-                    // Procura a div no seu HTML onde a lista vai ser desenhada
-                    const container = document.getElementById('historico-orcamentos-lista');
-                    if (!container) return; // Se a div não existir na tela, ele para por aqui em silêncio
-                    
-                    container.innerHTML = ''; // Limpa a lista antiga
-                    
-                    // Desenha cada orçamento que veio do banco
-                    json.dados.forEach(orc => {
-                        container.innerHTML += `
-                            <div style="padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between;">
-                                <span><b>${orc.numero}</b> - ${orc.cliente}</span>
-                                <span>${orc.qtd_pessoas} pessoas | Total: R$ ${parseFloat(orc.total).toFixed(2)}</span>
-                                <span style="color: ${orc.status === 'Pendente' ? 'orange' : 'green'};">${orc.status}</span>
-                            </div>
-                        `;
-                    });
-                } else {
-                    console.error("O servidor retornou um erro na listagem:", json);
-                }
-            } catch (erro) {
-                console.error("Erro ao conectar com a API de listagem:", erro);
-            }
-        };
         
-        // Dispara a busca automaticamente assim que a página terminar de carregar
-        setTimeout(() => {
-            if (window.carregarListaOrcamentos) window.carregarListaOrcamentos();
-        }, 1500);
-
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO
         // ============================================================
