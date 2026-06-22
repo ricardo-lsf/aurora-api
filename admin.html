@@ -2987,7 +2987,7 @@
         window.limparOrcamento = () => {
             document.getElementById('orcIdHidden').value = '';
             document.getElementById('orcNumeroDisplay').innerText = 'Novo';
-            ['orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcValorPessoa', 'orcExtras'].forEach(id => document.getElementById(id).value = '');
+            ['orcCliente', 'orcData', 'orcLocal', 'orcHoras', 'orcQtdPessoas', 'orcValorPessoa', 'orcExtras'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('orcTotalDisplay').innerText = 'R$ 0,00';
             document.querySelectorAll('.chk-drink-orc').forEach(c => c.checked = false);
             window.countOrcDrinks();
@@ -3062,7 +3062,7 @@
             
             alert(`Estrutura montada com sucesso, Rica!\nAbra o F12 (Console) para ver o pacote de dados.\n\nNa próxima etapa, vamos conectar isso à API Python.`);
         };
-        
+
 
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO
