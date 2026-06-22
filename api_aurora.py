@@ -2311,13 +2311,13 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # AJUSTES: Nome da tabela corrigido para 'budget' e adicionado filtro por account_id
+        # AJUSTES: Adicionado filtro por account_id
         query = """
             SELECT 
                 id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, 
                 extras, total, drinks_selecionados, status
-            FROM budget 
+            FROM budgets 
             WHERE account_id = %s
             ORDER BY numero DESC 
             LIMIT 50;
@@ -2365,7 +2365,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
     try:
         cur = conn.cursor()
         
-        # 1. GERADOR DE NUMERAÇÃO AUTOMÁTICA SEQUENCIAL (Lendo da tabela budget)
+        # 1. GERADOR DE NUMERAÇÃO AUTOMÁTICA SEQUENCIAL (Lendo da tabela budgets)
         cur.execute("SELECT COUNT(*) FROM budgets WHERE account_id = %s;", (orc.account_id,))
         total_existente = cur.fetchone()[0]
         proximo_numero = f"ORC-{str(total_existente + 1).zfill(4)}"
