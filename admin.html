@@ -3019,7 +3019,7 @@
         };
 
         // SALVAR COM NUMERAÇÃO AUTOMÁTICA
-        // SALVAR (PREPARADO PARA MIGRAÇÃO POSTGRESQL E BLINDADO CONTRA ERROS)
+        // SALVAR ORÇAMENTO DEFINITIVO (ALINHADO COM A TABELA BUDGET)
         window.salvarOrcamento = async () => {
             const clienteInput = document.getElementById('orcCliente');
             if (!clienteInput || !clienteInput.value) return alert("Preencha o nome do cliente!");
@@ -3028,41 +3028,115 @@
             const selecionados = [];
             document.querySelectorAll('.chk-drink-orc:checked').forEach(chk => {
                 const drink = window.bibliotecaGlobal.find(d => d.id == chk.value);
-                if (drink) selecionados.push({ id: drink.id, nome: drink.nome, tipo: drink.tipo, tecnica: drink.tecnica });
+                if (drink) {
+                    selecionados.push({ 
+                        id: drink.id, 
+                        nome: drink.nome, 
+                        tipo: drink.tipo, 
+                        tecnica: drink.tecnica 
+                    });
+                }
             });
 
-            // 2. Número do Orçamento
-            const orcNumeroDisplay = document.getElementById('orcNumeroDisplay');
-            let novoNumero = orcNumeroDisplay ? orcNumeroDisplay.innerText : 'Novo';
-            
-            const idHidden = document.getElementById('orcIdHidden')?.value;
-            if (!idHidden || novoNumero === 'Novo') {
-                novoNumero = `NOVO (Aguardando Servidor)`;
+            if (selecionados.length === 0) {
+                return alert("Selecione pelo menos um drink para o orçamento!");
             }
 
-            // 3. Monta o pacote de dados BLINDADO (usando ?.value)
+            // 2. Formatações numéricas para o banco de dados (Removendo máscaras de R$)
+            const textoTotalRaw = document.getElementById('orcTotalDisplay')?.innerText || '0';
+            const totalNumerico = parseFloat(textoTotalRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
+
+            const textoPessoaRaw = document.getElementById('orcPrecoPessoaDisplay')?.innerText || '0';
+            const valorPessoaNumerico = parseFloat(textoPessoaRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
+
+            // 3. Monta o payload exato esperado pelo Pydantic (Campos id e created_at ocultados de propósito)
             const dados = {
-                numero: novoNumero,
-                cliente: clienteInput.value,
-                dataEvento: document.getElementById('orcData')?.value || '',
+                account_id: ACCOUNT_ID,
+                cliente: clienteInput.value.trim(),
+                data_evento: document.getElementById('orcData')?.value || null,
                 local: document.getElementById('orcLocal')?.value || '',
-                qtdPessoas: parseInt(document.getElementById('orcQtdPessoas')?.value) || 0,
-                valorPessoa: parseFloat(document.getElementById('orcValorPessoa')?.value) || 0,
+                qtd_pessoas: parseInt(document.getElementById('orcQtdPessoas')?.value) || 0,
+                valor_pessoa: valorPessoaNumerico,
                 extras: parseFloat(document.getElementById('orcExtras')?.value) || 0,
-                total: document.getElementById('orcTotalDisplay')?.innerText || '0.00',
-                
-                // IMPORTANTE: Adicionei o Pacote Selecionado, pois o banco de dados novo precisa disso!
-                pacoteSelecionado: document.getElementById('orcPacoteNivel')?.value || 'bronze',
-                
-                drinks: selecionados
+                total: totalNumerico,
+                pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze', // Nome da coluna corrigido aqui!
+                drinks: selecionados // Vai direto como array de objetos para virar jsonb
             };
 
-            // 4. Teste de fogo no Console
-            console.log("PACOTE PRONTO PARA O BANCO DE DADOS:", dados);
-            
-            alert(`Estrutura montada com sucesso, Rica!\nAbra o F12 (Console) para ver o pacote de dados.\n\nNa próxima etapa, vamos conectar isso à API Python.`);
+            try {
+                const btnSalvar = document.getElementById('btnSalvarOrcamento');
+                if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = "Salvando..."; }
+
+                // 4. Envio direto para o banco PostgreSQL
+                const resposta = await fetch(`${API_BASE}/orcamentos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultado = await resposta.json();
+
+                if (resultado.status === "sucesso") {
+                    alert(`🎉 ${resultado.mensagem}`);
+                    
+                    const displayNumero = document.getElementById('orcNumeroDisplay');
+                    if (displayNumero) displayNumero.innerText = resultado.numero_gerado;
+                    
+                    if (window.carregarListaOrcamentos) window.carregarListaOrcamentos();
+                } else {
+                    alert("Erro ao salvar orçamento: " + JSON.stringify(resultado.detail));
+                }
+
+                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = "💾 SALVAR ORÇAMENTO"; }
+
+            } catch (erro) {
+                console.error("Erro na requisição de salvamento:", erro);
+                alert("Falha ao conectar com o servidor da Aurora.");
+                const btnSalvar = document.getElementById('btnSalvarOrcamento');
+                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = "💾 SALVAR ORÇAMENTO"; }
+            }
         };
         
+        // ==========================================
+        // FUNÇÃO: CARREGAR O HISTÓRICO DE ORÇAMENTOS
+        // ==========================================
+        window.carregarListaOrcamentos = async () => {
+            try {
+                // Vai na nossa rota GET do Python puxar os orçamentos salvos
+                const res = await fetch(`${API_BASE}/orcamentos?account_id=${ACCOUNT_ID}`);
+                const json = await res.json();
+
+                if (json.status === "sucesso") {
+                    console.log("ORÇAMENTOS LOCALIZADOS NO BANCO:", json.dados);
+                    
+                    // Procura a div no seu HTML onde a lista vai ser desenhada
+                    const container = document.getElementById('historico-orcamentos-lista');
+                    if (!container) return; // Se a div não existir na tela, ele para por aqui em silêncio
+                    
+                    container.innerHTML = ''; // Limpa a lista antiga
+                    
+                    // Desenha cada orçamento que veio do banco
+                    json.dados.forEach(orc => {
+                        container.innerHTML += `
+                            <div style="padding: 10px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between;">
+                                <span><b>${orc.numero}</b> - ${orc.cliente}</span>
+                                <span>${orc.qtd_pessoas} pessoas | Total: R$ ${parseFloat(orc.total).toFixed(2)}</span>
+                                <span style="color: ${orc.status === 'Pendente' ? 'orange' : 'green'};">${orc.status}</span>
+                            </div>
+                        `;
+                    });
+                } else {
+                    console.error("O servidor retornou um erro na listagem:", json);
+                }
+            } catch (erro) {
+                console.error("Erro ao conectar com a API de listagem:", erro);
+            }
+        };
+        
+        // Dispara a busca automaticamente assim que a página terminar de carregar
+        setTimeout(() => {
+            if (window.carregarListaOrcamentos) window.carregarListaOrcamentos();
+        }, 1500);
 
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO

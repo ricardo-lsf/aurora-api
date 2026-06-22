@@ -9,8 +9,7 @@ from datetime import date, time
 from fastapi.responses import FileResponse
 import os
 from fastapi.staticfiles import StaticFiles
-
-
+import json
 
 app = FastAPI(title="Aurora Bartenders API")
 
@@ -2301,10 +2300,10 @@ def listar_equipe():
         conn.close()
 
 # ==========================================
-# ROTA: LISTAR ORÇAMENTOS SALVOS
+# ROTA: LISTAR ORÇAMENTOS SALVOS DA CONTA (GET)
 # ==========================================
 @app.get("/orcamentos")
-def listar_orcamentos():
+def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâmetro
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -2312,18 +2311,19 @@ def listar_orcamentos():
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Puxa os últimos 50 orçamentos ordenados do mais recente para o mais antigo
+        # AJUSTES: Nome da tabela corrigido para 'budget' e adicionado filtro por account_id
         query = """
             SELECT 
                 id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, 
                 extras, total, drinks_selecionados, status
-            FROM budgets 
+            FROM budget 
+            WHERE account_id = %s
             ORDER BY numero DESC 
             LIMIT 50;
         """
         
-        cur.execute(query)
+        cur.execute(query, (account_id,))
         orcamentos_banco = cur.fetchall()
         
         cur.close()
@@ -2335,5 +2335,79 @@ def listar_orcamentos():
         }
         
     except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# 1. MODELO DE ENTRADA CORRIGIDO CONFORME A TABELA BUDGET
+class NovoOrcamentoInput(BaseModel):
+    account_id: str
+    cliente: str
+    data_evento: Optional[str] = None
+    local: Optional[str] = None
+    qtd_pessoas: int
+    valor_pessoa: float
+    extras: float
+    total: float
+    pacote_escolhido: str  # 100% alinhado com a coluna 8
+    drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
+
+# ==========================================
+# ROTA: SALVAR NOVO ORÇAMENTO NA TABELA BUDGET
+# ==========================================
+@app.post("/orcamentos")
+def salvar_orcamento(orc: NovoOrcamentoInput):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        # 1. GERADOR DE NUMERAÇÃO AUTOMÁTICA SEQUENCIAL (Lendo da tabela budget)
+        cur.execute("SELECT COUNT(*) FROM budget WHERE account_id = %s;", (orc.account_id,))
+        total_existente = cur.fetchone()[0]
+        proximo_numero = f"ORC-{str(total_existente + 1).zfill(4)}"
+        
+        # 2. PREPARAÇÃO DO JSONB
+        # Transforma a lista de dicionários do Python em uma String JSON válida para o banco
+        drinks_jsonb = json.dumps(orc.drinks)
+        
+        # 3. SQL LIMPO (id e created_at rodam no automático pelo Postgres)
+        query_budget = """
+            INSERT INTO budget (
+                account_id, numero, cliente, data_evento, local, 
+                qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
+                drinks_selecionados, status
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """
+        
+        cur.execute(query_budget, (
+            orc.account_id, proximo_numero, orc.cliente, 
+            orc.data_evento if orc.data_evento else None, # Trata data vazia
+            orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
+            orc.valor_pessoa, orc.extras, orc.total, 
+            drinks_jsonb, "Pendente"
+        ))
+        
+        # Captura o ID gerado automaticamente pelo gen_random_uuid()
+        id_gerado = cur.fetchone()[0]
+        
+        conn.commit()
+        cur.close()
         conn.close()
+        
+        return {
+            "status": "sucesso",
+            "mensagem": f"Orçamento {proximo_numero} do cliente {orc.cliente} salvo com sucesso!",
+            "budget_id": str(id_gerado),
+            "numero_gerado": proximo_numero
+        }
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
         raise HTTPException(status_code=400, detail=str(e))
