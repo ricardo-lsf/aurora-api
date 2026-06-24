@@ -2943,10 +2943,11 @@
                     dataEvento: d.data_evento, 
                     local: d.local,
                     qtdPessoas: d.qtd_pessoas,
-                    pacote_escolhido: d.pacote_escolhido, // <--- ADICIONE ESTA LINHA!
+                    pacote_escolhido: d.pacote_escolhido,
                     valorPessoa: d.valor_pessoa,
                     extras: d.extras,
                     total: d.total,
+                    custoEstimado: d.custo_estimado, // <--- ADICIONE ESTA LINHA!
                     drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || [])
                 }));
 
