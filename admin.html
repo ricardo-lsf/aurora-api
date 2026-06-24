@@ -3244,21 +3244,26 @@
         };
         
         // ==========================================
-        // FUNÇÃO: RECALCULAR COM BASE NO VALOR NEGOCIADO
+        // FUNÇÃO: RECALCULAR (SIMPLES E DIRETO)
         // ==========================================
         window.recalcularValorPorPessoa = () => {
-            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas')?.value) || 1; // Evita divisão por zero
-            const valorNegociado = parseFloat(document.getElementById('orcValorNegociado')?.value) || 0;
+            // 1. Pega a quantidade de pessoas (evitando dividir por zero)
+            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas')?.value) || 1; 
             
-            // Faz a conta reversa
-            const valorPessoa = valorNegociado / (qtdPessoas > 0 ? qtdPessoas : 1);
-            const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
+            // 2. Pega o valor cru direto do input (ex: 4000.50)
+            const inputNegociado = document.getElementById('orcValorNegociado');
+            const valorNegociado = parseFloat(inputNegociado?.value) || 0;
             
-            // Atualiza a telinha de "por pessoa"
+            // 3. Faz a matemática limpa
+            const valorPessoa = valorNegociado / qtdPessoas;
+            
+            // 4. Formata e exibe os resultados nos textos em tela (os SPANs que aceitam a máscara brasileira)
+            const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2).replace('.', ',')}`;
+            
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if (txtPessoa) txtPessoa.innerText = `(${formata(valorPessoa)} por pessoa)`;
             
-            // Alimenta silenciosamente o campo oculto que o seu botão de Salvar e PDF leem
+            // Atualiza o campo oculto que o PDF e o Banco de Dados vão usar
             const txtTotal = document.getElementById('orcTotalDisplay');
             if (txtTotal) txtTotal.innerText = formata(valorNegociado);
         };
