@@ -2316,7 +2316,7 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
             SELECT 
                 id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, 
-                extras, total, drinks_selecionados, status
+                extras, total, drinks_selecionados, status, custo_estimado  -- <--- ADICIONE AQUI
             FROM budgets 
             WHERE account_id = %s
             ORDER BY numero DESC 
@@ -2352,6 +2352,7 @@ class NovoOrcamentoInput(BaseModel):
     total: float
     pacote_escolhido: str  # 100% alinhado com a coluna 8
     drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
+    custo_estimado: float
 
 # ==========================================
 # ROTA: SALVAR NOVO ORÇAMENTO NA TABELA BUDGET
@@ -2375,21 +2376,21 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
         drinks_jsonb = json.dumps(orc.drinks)
         
         # 3. SQL LIMPO (id e created_at rodam no automático pelo Postgres)
-        query_budgets = """
+        query_budget = """
             INSERT INTO budgets (
                 account_id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
-                drinks_selecionados, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                drinks_selecionados, status, custo_estimado
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """
         
-        cur.execute(query_budgets, (
+        cur.execute(query_budget, (
             orc.account_id, proximo_numero, orc.cliente, 
-            orc.data_evento if orc.data_evento else None, # Trata data vazia
+            orc.data_evento if orc.data_evento else None,
             orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
             orc.valor_pessoa, orc.extras, orc.total, 
-            drinks_jsonb, "Pendente"
+            drinks_jsonb, "Pendente", orc.custo_estimado  # <--- INCLUA AQUI NO FINAL
         ))
         
         # Captura o ID gerado automaticamente pelo gen_random_uuid()
