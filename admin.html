@@ -2943,6 +2943,7 @@
                     dataEvento: d.data_evento, 
                     local: d.local,
                     qtdPessoas: d.qtd_pessoas,
+                    pacote_escolhido: d.pacote_escolhido, // <--- ADICIONE ESTA LINHA!
                     valorPessoa: d.valor_pessoa,
                     extras: d.extras,
                     total: d.total,
@@ -3036,29 +3037,59 @@
             }
         };
 
+        // ==========================================
+        // FUNÇÃO: CARREGAR (POPULAR) ORÇAMENTO SALVO NA TELA
+        // ==========================================
         window.popularOrcamento = (id) => {
-            const d = orcamentosCache.find(o => o.id === id);
+            const d = window.orcamentosCache.find(o => o.id === id);
             if (!d) return;
 
-            document.getElementById('orcIdHidden').value = d.id;
-            document.getElementById('orcNumeroDisplay').innerText = d.numero;
-            document.getElementById('orcCliente').value = d.cliente;
-            document.getElementById('orcData').value = d.dataEvento;
-            document.getElementById('orcLocal').value = d.local;
-            document.getElementById('orcQtdPessoas').value = d.qtdPessoas;
-            document.getElementById('orcValorPessoa').value = d.valorPessoa;
-            document.getElementById('orcExtras').value = d.extras;
-            document.getElementById('orcTotalDisplay').innerText = d.total;
+            // 1. Preenche os campos textuais de forma segura (só preenche se o campo existir na tela)
+            const el = (idElemento) => document.getElementById(idElemento);
 
-            // MARCAR DRINKS SALVOS
+            if (el('orcIdHidden')) el('orcIdHidden').value = d.id;
+            if (el('orcNumeroDisplay')) el('orcNumeroDisplay').innerText = d.numero || 'Novo';
+            if (el('orcCliente')) el('orcCliente').value = d.cliente || '';
+            if (el('orcData')) el('orcData').value = d.dataEvento || '';
+            if (el('orcLocal')) el('orcLocal').value = d.local || '';
+            if (el('orcQtdPessoas')) el('orcQtdPessoas').value = d.qtdPessoas || '';
+            if (el('orcExtras')) el('orcExtras').value = d.extras || 0;
+
+            // Carrega o pacote se existir no banco (para exibir os cadeados corretos)
+            if (el('orcPacote') && d.pacote_escolhido) {
+                el('orcPacote').value = d.pacote_escolhido;
+            }
+
+            // 2. Formata os valores de exibição com a máscara de dinheiro
+            const formataDinheiro = (v) => typeof formatCurrency === 'function' ? formatCurrency(parseFloat(v||0)) : `R$ ${parseFloat(v||0).toFixed(2)}`;
+            
+            if (el('orcTotalDisplay')) {
+                el('orcTotalDisplay').innerText = formataDinheiro(d.total);
+            }
+            if (el('orcPrecoPessoaDisplay')) {
+                el('orcPrecoPessoaDisplay').innerText = `(${formataDinheiro(d.valorPessoa)} por pessoa)`;
+            }
+
+            // 3. Atualiza a tela para aplicar os cadeados antes de marcar os drinks
+            if (typeof window.renderLibOrcamento === 'function') {
+                window.renderLibOrcamento();
+            }
+
+            // 4. MARCAR DRINKS SALVOS NO BANCO
             document.querySelectorAll('.chk-drink-orc').forEach(c => c.checked = false);
-            if (d.drinks) {
+            
+            if (d.drinks && Array.isArray(d.drinks)) {
                 d.drinks.forEach(item => {
                     const chk = document.getElementById(`orc_chk_${item.id}`);
+                    // Marca o checkbox se ele existir (e ignora se o drink foi excluído do cardápio principal)
                     if (chk) chk.checked = true;
                 });
             }
-            window.countOrcDrinks();
+            
+            // 5. Reconta os drinks selecionados
+            if (typeof window.countOrcDrinks === 'function') {
+                window.countOrcDrinks();
+            }
         };
 
         // SALVAR COM NUMERAÇÃO AUTOMÁTICA
