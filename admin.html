@@ -4541,27 +4541,35 @@
         };
 
         // =======================================================
-        //  5.4 NOVO: GERADOR DE PDF DE ORÇAMENTO (V63 - FINAL)
+        //  5.4 NOVO: GERADOR DE PDF DE ORÇAMENTO (V63 - REVISADO)
         // =======================================================
         window.gerarPDFOrcamento = () => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // 5.4.1 DADOS
-            const cliente = document.getElementById('orcCliente').value || "Cliente";
-            let data = document.getElementById('orcData').value;
+            // 5.4.1 DADOS COLETADOS DE FORMA SEGURA (EVITA ERROS DE NULL)
+            const cliente = document.getElementById('orcCliente')?.value || "Cliente";
+            let data = document.getElementById('orcData')?.value;
             if (data) { const p = data.split('-'); data = `${p[2]}/${p[1]}/${p[0]}`; } else { data = "A definir"; }
-            const local = document.getElementById('orcLocal').value || "A definir";
-            const qtd = document.getElementById('orcQtdPessoas').value;
-            const valorPessoa = document.getElementById('orcValorPessoa').value;
-            const extras = document.getElementById('orcExtras').value;
-            const total = document.getElementById('orcTotalDisplay').innerText;
-            const numOrc = document.getElementById('orcNumeroDisplay').innerText;
+            const local = document.getElementById('orcLocal')?.value || "A definir";
+            const qtd = parseInt(document.getElementById('orcQtdPessoas')?.value) || 0;
+            
+            // Extração e tratamento do preço por pessoa calculado da tela
+            const textoPessoaRaw = document.getElementById('orcPrecoPessoaDisplay')?.innerText || '0';
+            const valorPessoaNumerico = parseFloat(textoPessoaRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
+            const valorPessoaFormatado = typeof formatCurrency === 'function' ? formatCurrency(valorPessoaNumerico) : `R$ ${valorPessoaNumerico.toFixed(2)}`;
+
+            const extrasRaw = document.getElementById('orcExtras')?.value || '0';
+            const extras = parseFloat(extrasRaw) || 0;
+            
+            const total = document.getElementById('orcTotalDisplay')?.innerText || 'R$ 0,00';
+            const numOrc = document.getElementById('orcNumeroDisplay')?.innerText || 'Novo';
 
             // 5.4.2 SEPARAÇÃO DOS DRINKS
             const selecionados = [];
+            const biblioteca = window.bibliotecaGlobal || [];
             document.querySelectorAll('.chk-drink-orc:checked').forEach(chk => {
-                const drink = bibliotecaGlobal.find(d => d.id === chk.value);
+                const drink = biblioteca.find(d => d.id == chk.value);
                 if (drink) selecionados.push(drink);
             });
             const alcoolicos = selecionados.filter(d => d.tipo !== 'Sem Álcool' && d.tipo !== 'Mocktail');
@@ -4587,25 +4595,22 @@
             // BLOCO 1: COCKTAILS (ALCOÓLICOS)
             y += 20;
             if (alcoolicos.length > 0) {
-                // COR ALTERADA: AZUL CLARO (#d1e7fc)
                 doc.setFillColor(209, 231, 252);
                 doc.rect(20, y, 170, 8, 'F');
-                doc.setTextColor(44, 62, 80); // TEXTO AZUL ESCURO
+                doc.setTextColor(44, 62, 80);
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(10);
                 doc.text("COQUETÉIS CLÁSSICOS & AUTORAIS", 105, y + 5, null, null, "center");
-                y += 12; // MENOS ESPAÇO
+                y += 12;
                 doc.setTextColor(0, 0, 0);
 
                 alcoolicos.forEach(d => {
                     if (y > 270) { doc.addPage(); y = 20; }
 
-                    // NOME
                     doc.setFont("helvetica", "bold");
-                    doc.setFontSize(10); // MENOR
+                    doc.setFontSize(10);
                     doc.text(`• ${d.nome}`, 25, y);
 
-                    // TÉCNICA E CLASSIFICAÇÃO
                     doc.setFont("helvetica", "normal");
                     doc.setFontSize(9);
                     doc.setTextColor(100);
@@ -4613,11 +4618,11 @@
                     doc.text(d.classificacao || 'Geral', 135, y);
 
                     doc.setTextColor(0);
-                    y += 6; // MAIS COMPACTO
+                    y += 6;
                 });
             }
 
-            // BLOCO 2: MOCKTAILS (CORRIGIDO)
+            // BLOCO 2: MOCKTAILS
             if (mocktails.length > 0) {
                 y += 8; if (y > 260) { doc.addPage(); y = 20; }
                 doc.setFillColor(39, 174, 96); doc.rect(20, y, 170, 8, 'F');
@@ -4645,14 +4650,14 @@
 
             y += 10;
 
-            // VERIFICA SE VAI ATROPELAR O RODAPÉ (V63)
+            // VERIFICA SE VAI ATROPELAR O RODAPÉ
             if (y > 220) { doc.addPage(); y = 30; }
 
             doc.setDrawColor(0); doc.setLineWidth(0.5); doc.line(20, y, 190, y); y += 10;
             doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("INVESTIMENTO ESTIMADO", 20, y);
             y += 8;
             doc.setFontSize(9); doc.setFont("helvetica", "normal");
-            doc.text(`Base: ${qtd} convidados x R$ ${valorPessoa}`, 20, y);
+            doc.text(`Base: ${qtd} convidados x ${valorPessoaFormatado}`, 20, y);
             if (extras > 0) { y += 5; doc.text(`+ Taxas/Extras: R$ ${parseFloat(extras).toFixed(2)}`, 20, y); }
 
             y += 10; doc.setFillColor(240, 240, 240); doc.roundedRect(60, y - 8, 90, 16, 2, 2, 'F');
@@ -4664,6 +4669,7 @@
             doc.save(`Proposta_${cliente}.pdf`);
         };
 
+        // Mantém as funções da equipe intactas abaixo
         window.abrirModalEquipe = (id) => { document.getElementById('modalEquipe').style.display = 'flex'; document.getElementById('eqTitulo').innerText = id ? '✏️ Editar' : '👤 Novo'; document.getElementById('eqId').value = id || ''; if (!id) ['eqNome', 'eqTel', 'eqCPF', 'eqData', 'eqIdade', 'eqTaxa', 'eqAdicional'].forEach(i => document.getElementById(i).value = ''); };
         window.fecharModalEquipe = () => document.getElementById('modalEquipe').style.display = 'none';
         onSnapshot(collection(db, "equipe"), (s) => { const l = document.getElementById('lista-equipe'); l.innerHTML = ''; s.forEach(d => { const b = d.data(); l.innerHTML += `<tr><td><b>${b.nome}</b><br><small style="color:#666">${b.funcao || ''}</small></td><td>${b.telefone}</td><td>${b.funcao}</td><td>R$ ${parseFloat(b.taxa || 0).toFixed(2)}</td><td>R$ ${parseFloat(b.adicional || 0).toFixed(2)}</td><td style="text-align:right"><button onclick="editarEquipe('${d.id}','${b.nome}','${b.telefone}','${b.cpf}','${b.dataNasc}','${b.sexo}','${b.funcao}','${b.taxa}','${b.adicional}')" class="btn-edit">✏️</button><button onclick="delEq('${d.id}')" class="btn-trash">🗑️</button></td></tr>`; }); });
