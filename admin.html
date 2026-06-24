@@ -1260,6 +1260,8 @@
                         <div style="display:flex; gap:10px; margin-top:15px;">
                             <button onclick="salvarOrcamento()" class="btn-success" style="flex:1;">💾 SALVAR</button>
                             <button onclick="gerarPDFOrcamento()" class="btn-primary" style="flex:1;">📄 PDF</button>
+                            <button type="button" onclick="window.duplicarOrcamento()" class="btn btn-warning" style="margin-right: 10px;">📋 Duplicar Orçamento
+                        </button>
                         </div>
                         <button onclick="limparOrcamento()" class="btn-info" style="margin-top:10px; width:100%;">Limpar
                             / Novo</button>
@@ -3185,6 +3187,34 @@
             }
         };
         
+
+        // ==========================================
+        // FUNÇÃO: DUPLICAR ORÇAMENTO (USAR COMO MOLDE)
+        // ==========================================
+        window.duplicarOrcamento = () => {
+            const idAtual = document.getElementById('orcIdHidden')?.value;
+            
+            if (!idAtual) {
+                return alert("Você precisa carregar um orçamento salvo primeiro para poder duplicá-lo!");
+            }
+
+            // 1. Apaga o ID oculto. Isso obriga o banco a criar uma nova linha (INSERT) em vez de atualizar.
+            document.getElementById('orcIdHidden').value = '';
+            
+            // 2. Muda o texto do cabeçalho para o usuário saber que virou um rascunho novo
+            const displayNumero = document.getElementById('orcNumeroDisplay');
+            if (displayNumero) {
+                displayNumero.innerText = 'Novo (Cópia)';
+            }
+
+            // 3. (Opcional) Limpa a data para não correr o risco de salvar com a data do evento antigo
+            const inputData = document.getElementById('orcData');
+            if (inputData) {
+                inputData.value = '';
+            }
+
+            alert("📋 Orçamento duplicado!\n\nEle agora é um rascunho novo. Altere os dados necessários (como a data) e clique em Salvar para gerar uma nova proposta.");
+        };
         
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO
