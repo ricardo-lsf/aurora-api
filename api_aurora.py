@@ -2316,7 +2316,7 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
             SELECT 
                 id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, 
-                extras, total, drinks_selecionados, status, custo_estimado  -- <--- ADICIONE AQUI
+                extras, total, drinks_selecionados, status, custo_estimado, valor_sugerido  -- <--- ADICIONE AQUI
             FROM budgets 
             WHERE account_id = %s
             ORDER BY numero DESC 
@@ -2354,6 +2354,7 @@ class NovoOrcamentoInput(BaseModel):
     pacote_escolhido: str  # 100% alinhado com a coluna 8
     drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
     custo_estimado: float
+    valor_sugerido: float
 
 # ==========================================
 # ROTA: SALVAR NOVO OU ATUALIZAR ORÇAMENTO
@@ -2375,7 +2376,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                     cliente = %s, data_evento = %s, local = %s, 
                     qtd_pessoas = %s, pacote_escolhido = %s, valor_pessoa = %s, 
                     extras = %s, total = %s, drinks_selecionados = %s, 
-                    custo_estimado = %s
+                    custo_estimado = %s, valor_sugerido = %s
                 WHERE id = %s AND account_id = %s
                 RETURNING numero;
             """
@@ -2383,7 +2384,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                 orc.cliente, orc.data_evento if orc.data_evento else None,
                 orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
                 orc.valor_pessoa, orc.extras, orc.total, 
-                drinks_jsonb, orc.custo_estimado,
+                drinks_jsonb, orc.custo_estimado, orc.valor_sugerido,
                 orc.id, orc.account_id
             ))
             
@@ -2405,8 +2406,8 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                 INSERT INTO budgets (
                     account_id, numero, cliente, data_evento, local, 
                     qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
-                    drinks_selecionados, status, custo_estimado
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    drinks_selecionados, status, custo_estimado, valor_sugerido
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
             """
             cur.execute(query_insert, (
@@ -2414,7 +2415,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                 orc.data_evento if orc.data_evento else None,
                 orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
                 orc.valor_pessoa, orc.extras, orc.total, 
-                drinks_jsonb, "Pendente", orc.custo_estimado
+                drinks_jsonb, "Pendente", orc.custo_estimado, orc.valor_sugerido
             ))
             
             id_final = cur.fetchone()[0]

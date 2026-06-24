@@ -2964,7 +2964,8 @@
                     valorPessoa: d.valor_pessoa,
                     extras: d.extras,
                     total: d.total,
-                    custoEstimado: d.custo_estimado, // <--- ADICIONE ESTA LINHA!
+                    custoEstimado: d.custo_estimado, 
+                    valorSugerido: d.valor_sugerido,
                     drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || [])
                 }));
 
@@ -3020,6 +3021,10 @@
             
             const orcNumeroDisplay = document.getElementById('orcNumeroDisplay');
             if (orcNumeroDisplay) orcNumeroDisplay.innerText = 'Novo';
+
+            // Dentro da sua função de limpeza, garanta que essa linha exista:
+            const sugeridoDisplay = document.getElementById('orcSugeridoDisplay');
+            if (sugeridoDisplay) sugeridoDisplay.innerText = 'R$ 0,00';
 
             // 2. Limpa os campos de digitação de forma segura (ignorando os que não existem)
             const camposParaLimpar = ['orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcExtras'];
@@ -3094,11 +3099,12 @@
             if (el('orcPrecoPessoaDisplay')) {
                 el('orcPrecoPessoaDisplay').innerText = `(${formataDinheiro(d.valorPessoa)} por pessoa)`;
             }
-            // NOVA LINHA: Devolvendo o Custo Estimado para a tela
             if (el('orcCustoDisplay')) {
                 el('orcCustoDisplay').innerText = formataDinheiro(d.custoEstimado);
             }
-
+            if (el('orcSugeridoDisplay')) {
+                el('orcSugeridoDisplay').innerText = formataDinheiro(d.valorSugerido);
+            }
             if (el('orcValorNegociado')) {
                 el('orcValorNegociado').value = parseFloat(d.total || 0).toFixed(2);
                 window.recalcularValorPorPessoa(); // Força o recálculo do "por pessoa" ao carregar
@@ -3161,6 +3167,10 @@
             const textoCustoRaw = document.getElementById('orcCustoDisplay')?.innerText || '0';
             const custoNumerico = parseFloat(textoCustoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
 
+            // Procure onde capturamos os valores da tela e adicione esta linha:
+            const textoSugeridoRaw = document.getElementById('orcSugeridoDisplay')?.innerText || '0';
+            const sugeridoNumerico = parseFloat(textoSugeridoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
+
             // Captura o ID oculto (Se for novo, ele pega vazio e manda null pro Python)
             const idHidden = document.getElementById('orcIdHidden')?.value || null;
 
@@ -3177,7 +3187,8 @@
                 total: totalNumerico,
                 pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze',
                 drinks: selecionados,
-                custo_estimado: custoNumerico
+                custo_estimado: custoNumerico,
+                valor_sugerido: sugeridoNumerico
             };
 
             try {
