@@ -1243,7 +1243,7 @@
                                 <span style="color: #10b981; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;">Valor Final Fechado</span>
                                 <div style="display: flex; align-items: center; margin-top: 4px;">
                                     <span style="color: #10b981; font-size: 20px; font-weight: bold; margin-right: 5px;">R$</span>
-                                    <input type="number" step="0.01" id="orcValorNegociado" onkeyup="window.recalcularValorPorPessoa()" onchange="window.recalcularValorPorPessoa()" style="background: transparent; border: none; border-bottom: 1px dashed #10b981; color: #10b981; font-size: 20px; font-weight: bold; width: 100%; outline: none; box-shadow: none;" placeholder="0.00">
+                                    <input type="text" id="orcValorNegociado" oninput="window.mascaraNegociacao(this)" style="background: transparent; border: none; border-bottom: 1px dashed #10b981; color: #10b981; font-size: 20px; font-weight: bold; width: 100%; outline: none; box-shadow: none;" placeholder="0,00">
                                 </div>
                                 <small id="orcPrecoPessoaDisplay" style="display: block; color: #10b981; font-size: 12px; margin-top: 6px;">(R$ 0,00 por pessoa)</small>
                                 
@@ -3244,21 +3244,39 @@
         };
         
         // ==========================================
-        // FUNÇÃO: RECALCULAR COM BASE NO VALOR NEGOCIADO
+        // MÁSCARA DE MOEDA (DIGITAÇÃO EM TEMPO REAL) E RECÁLCULO
+        // ==========================================
+        window.mascaraNegociacao = (input) => {
+            let v = input.value.replace(/\D/g, ''); // Remove tudo que não é número
+            if (v === '') v = '0';
+            
+            // Formata para Real (ex: 304000 vira 3.040,00)
+            v = (parseInt(v) / 100).toFixed(2) + '';
+            v = v.replace(".", ",");
+            v = v.replace(/(\d)(\d{3})(\d{3}),/g, "$1.$2.$3,");
+            v = v.replace(/(\d)(\d{3}),/g, "$1.$2,");
+            
+            input.value = v; // Devolve formatado para a tela
+            
+            window.recalcularValorPorPessoa(); // Chama o recálculo
+        };
+
+        // ==========================================
+        // FUNÇÃO ATUALIZADA: RECALCULAR COM O NOVO FORMATO
         // ==========================================
         window.recalcularValorPorPessoa = () => {
-            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas')?.value) || 1; // Evita divisão por zero
-            const valorNegociado = parseFloat(document.getElementById('orcValorNegociado')?.value) || 0;
+            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas')?.value) || 1;
             
-            // Faz a conta reversa
+            // Pega o texto formatado (3.040,00) e transforma em número de banco (3040.00) para a matemática
+            const textoNegociado = document.getElementById('orcValorNegociado')?.value || '0';
+            const valorNegociado = parseFloat(textoNegociado.replace(/\./g, '').replace(',', '.')) || 0;
+            
             const valorPessoa = valorNegociado / (qtdPessoas > 0 ? qtdPessoas : 1);
             const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
             
-            // Atualiza a telinha de "por pessoa"
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if (txtPessoa) txtPessoa.innerText = `(${formata(valorPessoa)} por pessoa)`;
             
-            // Alimenta silenciosamente o campo oculto que o seu botão de Salvar e PDF leem
             const txtTotal = document.getElementById('orcTotalDisplay');
             if (txtTotal) txtTotal.innerText = formata(valorNegociado);
         };
@@ -4707,7 +4725,7 @@
                     doc.setFontSize(9);
                     doc.setTextColor(100);
                     doc.text(d.tecnica || 'Clássico', 90, y);
-                    doc.text(d.classificacao || 'Geral', 135, y);
+                    doc.text(d.categoria || 'Geral', 135, y);
 
                     doc.setTextColor(0);
                     y += 6;
@@ -4733,7 +4751,7 @@
                     doc.setFontSize(9);
                     doc.setTextColor(100);
                     doc.text(d.tecnica || 'Montado', 90, y);
-                    doc.text(d.classificacao || '-', 135, y);
+                    doc.text(d.categoria || '-', 135, y);
 
                     doc.setTextColor(0);
                     y += 6;
