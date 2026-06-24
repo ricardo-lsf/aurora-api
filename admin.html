@@ -1227,16 +1227,29 @@
                             </div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; margin-top: 20px; background: #1e1e2d; padding: 15px; border-radius: 8px; border-left: 4px solid #10b981;">
-                            <div>
-                                <span style="color: #aaa; font-size: 12px; display: block;">Custo Estimado (Bebidas + Mão de Obra)</span>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; background: #1e1e2d; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
+    
+                            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px;">
+                                <span style="color: #aaa; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Custo Base (Insumos + Equipe)</span>
                                 <span id="orcCustoDisplay" style="color: #e11d48; font-size: 18px; font-weight: bold;">R$ 0,00</span>
                             </div>
-                            <div style="text-align: right;">
-                                <span style="color: #aaa; font-size: 12px; display: block;">Valor Sugerido para Venda</span>
-                                <span id="orcTotalDisplay" style="color: #10b981; font-size: 24px; font-weight: bold;">R$ 0,00</span>
-                                <small id="orcPrecoPessoaDisplay" style="display: block; color: #60a5fa; font-size: 11px;">(R$ 0,00 por pessoa)</small>
+
+                            <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px;">
+                                <span style="color: #aaa; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Sugerido pelo Sistema</span>
+                                <span id="orcSugeridoDisplay" style="color: #60a5fa; font-size: 18px; font-weight: bold;">R$ 0,00</span>
                             </div>
+
+                            <div style="background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">
+                                <span style="color: #10b981; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;">Valor Final Fechado</span>
+                                <div style="display: flex; align-items: center; margin-top: 4px;">
+                                    <span style="color: #10b981; font-size: 20px; font-weight: bold; margin-right: 5px;">R$</span>
+                                    <input type="number" step="0.01" id="orcValorNegociado" onkeyup="window.recalcularValorPorPessoa()" onchange="window.recalcularValorPorPessoa()" style="background: transparent; border: none; border-bottom: 1px dashed #10b981; color: #10b981; font-size: 20px; font-weight: bold; width: 100%; outline: none; box-shadow: none;" placeholder="0.00">
+                                </div>
+                                <small id="orcPrecoPessoaDisplay" style="display: block; color: #10b981; font-size: 12px; margin-top: 6px;">(R$ 0,00 por pessoa)</small>
+                                
+                                <span id="orcTotalDisplay" style="display: none;">R$ 0,00</span>
+                            </div>
+                            
                         </div>
 
 
@@ -2903,7 +2916,9 @@
             const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
             
             document.getElementById('orcCustoDisplay').innerText = formata(custoTotalOperacao);
-            document.getElementById('orcTotalDisplay').innerText = formata(valorVendaTotal);
+            document.getElementById('orcSugeridoDisplay').innerText = formata(valorVendaTotal);
+            document.getElementById('orcValorNegociado').value = valorVendaTotal.toFixed(2);
+            window.recalcularValorPorPessoa();
             
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if(txtPessoa) txtPessoa.innerText = `(${formata(valorPorPessoaFinal)} por pessoa)`;
@@ -3027,6 +3042,12 @@
             const custoDisplay = document.getElementById('orcCustoDisplay');
             if (custoDisplay) custoDisplay.innerText = 'R$ 0,00';
 
+            const sugeridoDisplay = document.getElementById('orcSugeridoDisplay');
+            if (sugeridoDisplay) sugeridoDisplay.innerText = 'R$ 0,00';
+            
+            const inputNegociado = document.getElementById('orcValorNegociado');
+            if (inputNegociado) inputNegociado.value = '';
+
             // 5. Desmarca todos os drinks e zera a contagem
             document.querySelectorAll('.chk-drink-orc').forEach(c => c.checked = false);
             
@@ -3063,6 +3084,7 @@
                 el('orcPacote').value = d.pacote_escolhido;
             }
 
+            
             /// 2. Formata os valores de exibição com a máscara de dinheiro
             const formataDinheiro = (v) => typeof formatCurrency === 'function' ? formatCurrency(parseFloat(v||0)) : `R$ ${parseFloat(v||0).toFixed(2)}`;
             
@@ -3075,6 +3097,11 @@
             // NOVA LINHA: Devolvendo o Custo Estimado para a tela
             if (el('orcCustoDisplay')) {
                 el('orcCustoDisplay').innerText = formataDinheiro(d.custoEstimado);
+            }
+
+            if (el('orcValorNegociado')) {
+                el('orcValorNegociado').value = parseFloat(d.total || 0).toFixed(2);
+                window.recalcularValorPorPessoa(); // Força o recálculo do "por pessoa" ao carregar
             }
 
             // 3. Atualiza a tela para aplicar os cadeados antes de marcar os drinks
@@ -3215,6 +3242,27 @@
 
             alert("📋 Orçamento duplicado!\n\nEle agora é um rascunho novo. Altere os dados necessários (como a data) e clique em Salvar para gerar uma nova proposta.");
         };
+        
+        // ==========================================
+        // FUNÇÃO: RECALCULAR COM BASE NO VALOR NEGOCIADO
+        // ==========================================
+        window.recalcularValorPorPessoa = () => {
+            const qtdPessoas = parseInt(document.getElementById('orcQtdPessoas')?.value) || 1; // Evita divisão por zero
+            const valorNegociado = parseFloat(document.getElementById('orcValorNegociado')?.value) || 0;
+            
+            // Faz a conta reversa
+            const valorPessoa = valorNegociado / (qtdPessoas > 0 ? qtdPessoas : 1);
+            const formata = (v) => typeof formatCurrency === 'function' ? formatCurrency(v) : `R$ ${v.toFixed(2)}`;
+            
+            // Atualiza a telinha de "por pessoa"
+            const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
+            if (txtPessoa) txtPessoa.innerText = `(${formata(valorPessoa)} por pessoa)`;
+            
+            // Alimenta silenciosamente o campo oculto que o seu botão de Salvar e PDF leem
+            const txtTotal = document.getElementById('orcTotalDisplay');
+            if (txtTotal) txtTotal.innerText = formata(valorNegociado);
+        };
+       
         
         // ============================================================
         // 4. BIBLIOTECA DE DRINKS (POSTGRESQL + RENDER API) - COMPLETO
