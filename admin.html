@@ -3204,12 +3204,21 @@
                 if (resultado.status === "sucesso") {
                     alert(`🎉 ${resultado.mensagem}`);
                     
+                    // 1. Atualiza o número visual (ex: ORC-0005)
                     const displayNumero = document.getElementById('orcNumeroDisplay');
                     if (displayNumero) displayNumero.innerText = resultado.numero_gerado;
                     
+                    // 📍 A CORREÇÃO ENTRA AQUI: Guarda o ID que o Python acabou de criar
+                    const idHidden = document.getElementById('orcIdHidden');
+                    if (idHidden && resultado.budget_id) {
+                        idHidden.value = resultado.budget_id; // <--- O carimbo que faltava!
+                    }
+                    
+                    // 2. Recarrega a lista lateral para o orçamento aparecer lá
                     if (window.carregarOrcamentosSalvos) window.carregarOrcamentosSalvos();
+                    
                 } else {
-                    alert("Erro ao salvar orçamento: " + JSON.stringify(resultado.detail));
+                    alert(`❌ Erro: ${resultado.mensagem}`);
                 }
 
                 if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = "💾 SALVAR ORÇAMENTO"; }
