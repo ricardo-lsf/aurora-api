@@ -2342,6 +2342,7 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
 
 # 1. MODELO DE ENTRADA CORRIGIDO CONFORME A TABELA BUDGET
 class NovoOrcamentoInput(BaseModel):
+    id: Optional[str] = None  # <--- NOVA LINHA AQUI
     account_id: str
     cliente: str
     data_evento: Optional[str] = None
@@ -2355,7 +2356,7 @@ class NovoOrcamentoInput(BaseModel):
     custo_estimado: float
 
 # ==========================================
-# ROTA: SALVAR NOVO ORÇAMENTO NA TABELA BUDGET
+# ROTA: SALVAR NOVO OU ATUALIZAR ORÇAMENTO
 # ==========================================
 @app.post("/orcamentos")
 def salvar_orcamento(orc: NovoOrcamentoInput):
@@ -2365,46 +2366,69 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
     
     try:
         cur = conn.cursor()
-        
-        # 1. GERADOR DE NUMERAÇÃO AUTOMÁTICA SEQUENCIAL (Lendo da tabela budgets)
-        cur.execute("SELECT COUNT(*) FROM budgets WHERE account_id = %s;", (orc.account_id,))
-        total_existente = cur.fetchone()[0]
-        proximo_numero = f"ORC-{str(total_existente + 1).zfill(4)}"
-        
-        # 2. PREPARAÇÃO DO JSONB
-        # Transforma a lista de dicionários do Python em uma String JSON válida para o banco
         drinks_jsonb = json.dumps(orc.drinks)
-        
-        # 3. SQL LIMPO (id e created_at rodam no automático pelo Postgres)
-        query_budget = """
-            INSERT INTO budgets (
-                account_id, numero, cliente, data_evento, local, 
-                qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
-                drinks_selecionados, status, custo_estimado
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """
-        
-        cur.execute(query_budget, (
-            orc.account_id, proximo_numero, orc.cliente, 
-            orc.data_evento if orc.data_evento else None,
-            orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
-            orc.valor_pessoa, orc.extras, orc.total, 
-            drinks_jsonb, "Pendente", orc.custo_estimado  # <--- INCLUA AQUI NO FINAL
-        ))
-        
-        # Captura o ID gerado automaticamente pelo gen_random_uuid()
-        id_gerado = cur.fetchone()[0]
-        
+
+        # FLUXO 1: ATUALIZAR ORÇAMENTO EXISTENTE
+        if orc.id:
+            query_update = """
+                UPDATE budgets SET
+                    cliente = %s, data_evento = %s, local = %s, 
+                    qtd_pessoas = %s, pacote_escolhido = %s, valor_pessoa = %s, 
+                    extras = %s, total = %s, drinks_selecionados = %s, 
+                    custo_estimado = %s
+                WHERE id = %s AND account_id = %s
+                RETURNING numero;
+            """
+            cur.execute(query_update, (
+                orc.cliente, orc.data_evento if orc.data_evento else None,
+                orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
+                orc.valor_pessoa, orc.extras, orc.total, 
+                drinks_jsonb, orc.custo_estimado,
+                orc.id, orc.account_id
+            ))
+            
+            resultado = cur.fetchone()
+            if not resultado:
+                raise HTTPException(status_code=404, detail="Orçamento não encontrado para atualização.")
+                
+            numero_final = resultado[0]
+            mensagem_final = f"Orçamento {numero_final} atualizado com sucesso!"
+            id_final = orc.id
+
+        # FLUXO 2: CRIAR NOVO ORÇAMENTO
+        else:
+            cur.execute("SELECT COUNT(*) FROM budgets WHERE account_id = %s;", (orc.account_id,))
+            total_existente = cur.fetchone()[0]
+            numero_final = f"ORC-{str(total_existente + 1).zfill(4)}"
+            
+            query_insert = """
+                INSERT INTO budgets (
+                    account_id, numero, cliente, data_evento, local, 
+                    qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
+                    drinks_selecionados, status, custo_estimado
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """
+            cur.execute(query_insert, (
+                orc.account_id, numero_final, orc.cliente, 
+                orc.data_evento if orc.data_evento else None,
+                orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
+                orc.valor_pessoa, orc.extras, orc.total, 
+                drinks_jsonb, "Pendente", orc.custo_estimado
+            ))
+            
+            id_final = cur.fetchone()[0]
+            mensagem_final = f"Novo orçamento {numero_final} criado com sucesso!"
+
         conn.commit()
         cur.close()
         conn.close()
         
         return {
             "status": "sucesso",
-            "mensagem": f"Orçamento {proximo_numero} do cliente {orc.cliente} salvo com sucesso!",
-            "budgets_id": str(id_gerado),
-            "numero_gerado": proximo_numero
+            "mensagem": mensagem_final,
+            "budget_id": str(id_final),
+            "numero_gerado": numero_final
         }
         
     except Exception as e:

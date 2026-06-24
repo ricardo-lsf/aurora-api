@@ -3132,9 +3132,13 @@
             const textoCustoRaw = document.getElementById('orcCustoDisplay')?.innerText || '0';
             const custoNumerico = parseFloat(textoCustoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
 
+            // Captura o ID oculto (Se for novo, ele pega vazio e manda null pro Python)
+            const idHidden = document.getElementById('orcIdHidden')?.value || null;
+
             // 3. Monta o payload exato esperado pelo Pydantic
             const dados = {
-                account_id: 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362', // Mantenha a sua constante aqui
+                id: idHidden, // <--- A MÁGICA ACONTECE AQUI
+                account_id: 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362', 
                 cliente: clienteInput.value.trim(),
                 data_evento: document.getElementById('orcData')?.value || null,
                 local: document.getElementById('orcLocal')?.value || '',
@@ -3144,7 +3148,7 @@
                 total: totalNumerico,
                 pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze',
                 drinks: selecionados,
-                custo_estimado: custoNumerico // <--- A PEÇA QUE FALTAVA PARA EVITAR O ERRO 422!
+                custo_estimado: custoNumerico
             };
 
             try {
