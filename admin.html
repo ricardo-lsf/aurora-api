@@ -2991,13 +2991,49 @@
         });
 
         
+        // ==========================================
+        // FUNÇÃO PARA LIMPAR TELA PARA NOVO ORÇAMENTO
+        // ==========================================
         window.limparOrcamento = () => {
-            document.getElementById('orcIdHidden').value = '';
-            document.getElementById('orcNumeroDisplay').innerText = 'Novo';
-            ['orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcValorPessoa', 'orcExtras'].forEach(id => document.getElementById(id).value = '');
-            document.getElementById('orcTotalDisplay').innerText = 'R$ 0,00';
+            // 1. Reseta os IDs e o número principal
+            const orcIdHidden = document.getElementById('orcIdHidden');
+            if (orcIdHidden) orcIdHidden.value = '';
+            
+            const orcNumeroDisplay = document.getElementById('orcNumeroDisplay');
+            if (orcNumeroDisplay) orcNumeroDisplay.innerText = 'Novo';
+
+            // 2. Limpa os campos de digitação de forma segura (ignorando os que não existem)
+            const camposParaLimpar = ['orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcExtras'];
+            camposParaLimpar.forEach(id => {
+                const elemento = document.getElementById(id);
+                if (elemento) elemento.value = '';
+            });
+
+            // 3. Reseta o pacote para o padrão (opcional, mas recomendado para evitar confusão no próximo orçamento)
+            const pacoteSelect = document.getElementById('orcPacote');
+            if (pacoteSelect) pacoteSelect.value = 'bronze';
+
+            // 4. Zera os displays de cálculo (innerText)
+            const totalDisplay = document.getElementById('orcTotalDisplay');
+            if (totalDisplay) totalDisplay.innerText = 'R$ 0,00';
+            
+            const precoPessoaDisplay = document.getElementById('orcPrecoPessoaDisplay');
+            if (precoPessoaDisplay) precoPessoaDisplay.innerText = '';
+            
+            const custoDisplay = document.getElementById('orcCustoDisplay');
+            if (custoDisplay) custoDisplay.innerText = 'R$ 0,00';
+
+            // 5. Desmarca todos os drinks e zera a contagem
             document.querySelectorAll('.chk-drink-orc').forEach(c => c.checked = false);
-            window.countOrcDrinks();
+            
+            if (typeof window.countOrcDrinks === 'function') {
+                window.countOrcDrinks();
+            }
+
+            // 6. Atualiza a lista de drinks na tela para aplicar os cadeados do pacote padrão novamente
+            if (typeof window.renderLibOrcamento === 'function') {
+                window.renderLibOrcamento();
+            }
         };
 
         window.popularOrcamento = (id) => {
