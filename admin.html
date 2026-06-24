@@ -3061,7 +3061,7 @@
                 el('orcPacote').value = d.pacote_escolhido;
             }
 
-            // 2. Formata os valores de exibição com a máscara de dinheiro
+            /// 2. Formata os valores de exibição com a máscara de dinheiro
             const formataDinheiro = (v) => typeof formatCurrency === 'function' ? formatCurrency(parseFloat(v||0)) : `R$ ${parseFloat(v||0).toFixed(2)}`;
             
             if (el('orcTotalDisplay')) {
@@ -3069,6 +3069,10 @@
             }
             if (el('orcPrecoPessoaDisplay')) {
                 el('orcPrecoPessoaDisplay').innerText = `(${formataDinheiro(d.valorPessoa)} por pessoa)`;
+            }
+            // NOVA LINHA: Devolvendo o Custo Estimado para a tela
+            if (el('orcCustoDisplay')) {
+                el('orcCustoDisplay').innerText = formataDinheiro(d.custoEstimado);
             }
 
             // 3. Atualiza a tela para aplicar os cadeados antes de marcar os drinks
@@ -3117,16 +3121,20 @@
                 return alert("Selecione pelo menos um drink para o orçamento!");
             }
 
-            // 2. Formatações numéricas para o banco de dados (Removendo máscaras de R$)
+            // Formatações numéricas para o banco de dados (Removendo máscaras de R$)
             const textoTotalRaw = document.getElementById('orcTotalDisplay')?.innerText || '0';
             const totalNumerico = parseFloat(textoTotalRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
 
             const textoPessoaRaw = document.getElementById('orcPrecoPessoaDisplay')?.innerText || '0';
             const valorPessoaNumerico = parseFloat(textoPessoaRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
 
-            // 3. Monta o payload exato esperado pelo Pydantic (Campos id e created_at ocultados de propósito)
+            // NOVA LINHA: Lendo o Custo Estimado da tela
+            const textoCustoRaw = document.getElementById('orcCustoDisplay')?.innerText || '0';
+            const custoNumerico = parseFloat(textoCustoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
+
+            // 3. Monta o payload exato esperado pelo Pydantic
             const dados = {
-                account_id: ACCOUNT_ID,
+                account_id: 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362', // Mantenha a sua constante aqui
                 cliente: clienteInput.value.trim(),
                 data_evento: document.getElementById('orcData')?.value || null,
                 local: document.getElementById('orcLocal')?.value || '',
@@ -3134,8 +3142,9 @@
                 valor_pessoa: valorPessoaNumerico,
                 extras: parseFloat(document.getElementById('orcExtras')?.value) || 0,
                 total: totalNumerico,
-                pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze', // Nome da coluna corrigido aqui!
-                drinks: selecionados // Vai direto como array de objetos para virar jsonb
+                pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze',
+                drinks: selecionados,
+                custo_estimado: custoNumerico // <--- A PEÇA QUE FALTAVA PARA EVITAR O ERRO 422!
             };
 
             try {
