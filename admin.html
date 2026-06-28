@@ -4799,7 +4799,11 @@
         // Variável Global
         window.dadosExportacao = [];
 
-        // CORREÇÃO V70: Relatório com Data e Hora separadas
+        // ==========================================
+        // 6. ANALYTICS V55 (COM RESGATE VIA POSTGRESQL)
+        // ==========================================
+        window.dadosExportacao = [];
+
         window.gerarRelatorio = async () => {
             const selectEvent = document.getElementById('select-evento-analise');
             const eid = selectEvent.value;
@@ -4813,60 +4817,57 @@
             window.dadosExportacao = []; // Limpa anterior
 
             try {
-                let q;
-                if (eid === 'ALL') {
-                    q = query(collectionGroup(db, "vendas"), orderBy("hora", "desc"));
-                } else {
-                    q = query(collection(db, "eventos", eid, "vendas"), orderBy("hora", "desc"));
-                }
+                // 📍 A MÁGICA: Fetch na nossa API Python (Substitua a URL pela sua do Render)
+                const response = await fetch(`https://aurora-api-zj8e.onrender.com/vendas?event_id=${eid}`);
+                if (!response.ok) throw new Error("Erro na resposta do servidor");
+                
+                const json = await response.json();
+                const vendas = json.dados;
 
-                const s = await getDocs(q);
-
-                if (s.empty) return alert("Nenhuma venda encontrada.");
+                if (!vendas || vendas.length === 0) return alert("Nenhuma venda encontrada.");
 
                 let fat = 0, custo = 0, totalQtd = 0;
                 const dc = {}, hc = {}, clientes = {};
                 const tbodyAudit = document.getElementById('lista-vendas-audit');
                 if (tbodyAudit) tbodyAudit.innerHTML = '';
 
-                s.forEach(d => {
-                    const v = d.data();
-
+                // O LOOP AGORA RODA NO ARRAY DO POSTGRESQL
+                vendas.forEach(v => {
                     if (filterVal === 'all' || v.usuario === filterVal) {
-                        const p = parseFloat(v.preco || 0), c = parseFloat(v.custo || 0);
+                        const p = v.preco; 
+                        const c = v.custo;
                         fat += p; custo += c; totalQtd++;
 
-                        // --- PREPARAÇÃO CSV (AJUSTADO) ---
-                        // 1. Nome do Evento
                         let nomeEventoReal = nomeEventoSelecionado;
                         if (eid === 'ALL') {
-                            const idEventoDoDoc = d.ref.path.split('/')[1];
-                            const eventoEncontrado = listaEventosCache.find(e => e.id === idEventoDoDoc);
-                            nomeEventoReal = eventoEncontrado ? eventoEncontrado.nome : `ID: ${idEventoDoDoc}`;
+                            const eventoEncontrado = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === v.event_id) : null;
+                            nomeEventoReal = eventoEncontrado ? eventoEncontrado.nome : `ID: ${v.event_id}`;
                         }
 
-                        // 2. Separar Data e Hora
-                        let rawDate = v.hora && v.hora.toDate ? v.hora.toDate() : new Date();
+                        // 📍 NOVA CONVERSÃO DE DATA: De string ISO (Postgres) para JS Date
+                        let rawDate = v.hora ? new Date(v.hora) : new Date();
                         let dataStr = rawDate.toLocaleDateString('pt-BR');
                         let horaStr = rawDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
                         window.dadosExportacao.push({
                             data: dataStr,
-                            hora: horaStr,  // CAMPO NOVO
+                            hora: horaStr,  
                             evento: nomeEventoReal,
-                            cliente: v.cliente || 'Balcão/Anônimo',
+                            cliente: 'Balcão/Anônimo', // Adaptado para a nova estrutura
                             drink: v.drink,
-                            bartender: v.usuario || 'Sistema',
+                            bartender: v.usuario,
                             valor: p.toFixed(2).replace('.', ','),
                             custo: c.toFixed(2).replace('.', ','),
                             lucro: (p - c).toFixed(2).replace('.', ',')
                         });
-                        // --- FIM PREPARAÇÃO ---
 
                         // 6.1 LÓGICA GRÁFICOS (MANTIDA IGUAL)
-                        if (!dc[v.drink]) dc[v.drink] = { qtd: 0, val: 0 }; dc[v.drink].qtd++; dc[v.drink].val += p;
-                        const nomeCliente = v.cliente || 'Balcão/Anônimo';
-                        if (!clientes[nomeCliente]) clientes[nomeCliente] = { qtd: 0, val: 0 }; clientes[nomeCliente].qtd++; clientes[nomeCliente].val += p;
+                        if (!dc[v.drink]) dc[v.drink] = { qtd: 0, val: 0 }; 
+                        dc[v.drink].qtd++; dc[v.drink].val += p;
+                        
+                        const nomeCliente = 'Balcão/Anônimo';
+                        if (!clientes[nomeCliente]) clientes[nomeCliente] = { qtd: 0, val: 0 }; 
+                        clientes[nomeCliente].qtd++; clientes[nomeCliente].val += p;
 
                         let hLabel;
                         if (periodo === '10') {
@@ -4878,12 +4879,12 @@
                         hc[hLabel] = (hc[hLabel] || 0) + 1;
 
                         if (eid !== 'ALL' && totalQtd <= 50 && tbodyAudit) {
-                            tbodyAudit.innerHTML += '<tr><td>' + horaStr + '</td><td><b>' + v.drink + '</b></td><td>' + (v.usuario || '?') + '</td><td>R$ ' + p.toFixed(2) + '</td><td><button onclick="excluirVenda(\'' + d.id + '\')" class="btn-trash">🗑️</button></td></tr>';
+                            tbodyAudit.innerHTML += '<tr><td>' + horaStr + '</td><td><b>' + v.drink + '</b></td><td>' + v.usuario + '</td><td>R$ ' + p.toFixed(2) + '</td><td><button onclick="excluirVenda(\'' + v.id + '\')" class="btn-trash">🗑️</button></td></tr>';
                         }
                     }
                 });
 
-                // 6.2 ATUALIZA TELA (Mantido igual)
+                // 6.2 ATUALIZA TELA (KPIs e Gráficos MANTIDOS)
                 document.getElementById('kpi-fat').innerText = 'R$ ' + fat.toFixed(2);
                 document.getElementById('kpi-custo').innerText = 'R$ ' + custo.toFixed(2);
                 document.getElementById('kpi-lucro').innerText = 'R$ ' + (fat - custo).toFixed(2);
@@ -4904,16 +4905,12 @@
                 const listaClientes = document.getElementById('lista-top-clientes');
                 if (listaClientes) {
                     listaClientes.innerHTML = '';
-                    const sortedClientes = Object.entries(clientes)
-                        .sort(([, a], [, b]) => b.qtd - a.qtd); // Sem limite, mostra todo mundo
-
+                    const sortedClientes = Object.entries(clientes).sort(([, a], [, b]) => b.qtd - a.qtd);
                     sortedClientes.forEach(([nome, dados], index) => {
-                        // Destaque para o TOP 3
-                        let corPos = '#333';
-                        let icone = '';
-                        if (index === 0) { corPos = '#f1c40f'; icone = '👑 '; } // Ouro
-                        if (index === 1) { corPos = '#95a5a6'; icone = '🥈 '; } // Prata
-                        if (index === 2) { corPos = '#cd7f32'; icone = '🥉 '; } // Bronze
+                        let corPos = '#333'; let icone = '';
+                        if (index === 0) { corPos = '#f1c40f'; icone = '👑 '; } 
+                        if (index === 1) { corPos = '#95a5a6'; icone = '🥈 '; } 
+                        if (index === 2) { corPos = '#cd7f32'; icone = '🥉 '; } 
 
                         listaClientes.innerHTML += `
                         <tr style="${index < 3 ? 'background:#fffbf0' : ''}">
@@ -4921,12 +4918,13 @@
                             <td><b>${nome}</b></td>
                             <td style="color:#3498db; font-weight:bold;">${dados.qtd}</td>
                             <td style="color:#27ae60;">R$ ${dados.val.toFixed(2)}</td>
-                        </tr>
-                    `;
+                        </tr>`;
                     });
                 }
-
-            } catch (e) { console.error(e); if (e.message.includes("requires an index")) alert("⚠️ Crie o índice Global no Firebase (link no Console F12)."); else alert("Erro: " + e.message); }
+            } catch (e) { 
+                console.error(e); 
+                alert("Erro ao carregar Analytics: " + e.message); 
+            }
         };
 
         window.carregarBartenders = async (eid) => { if (!eid) return; const s = await getDocs(collection(db, "eventos", eid, "vendas")); const usersSet = new Set(); s.forEach(d => usersSet.add(d.data().usuario || 'Desconhecido')); const selBar = document.getElementById('filterBartender'); while (selBar.options.length > 1) selBar.remove(1); usersSet.forEach(u => selBar.add(new Option(u, u))); };

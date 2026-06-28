@@ -2437,3 +2437,59 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             conn.rollback()
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# ROTA: ANALYTICS E RELATÓRIO DE VENDAS
+# ==========================================
+@app.get("/vendas")
+def relatorio_vendas(event_id: str = 'ALL'):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        # Fazemos um LEFT JOIN para buscar o nome do Drink baseado no cocktail_id
+        query = """
+            SELECT 
+                s.id, s.event_id, s.price, s.frozen_cost, 
+                s.created_at, s.user_name, c.nome
+            FROM sales s
+            LEFT JOIN cocktails c ON s.cocktail_id = c.id
+        """
+        params = []
+        
+        # Filtra por evento específico ou puxa o global
+        if event_id != 'ALL':
+            query += " WHERE s.event_id = %s"
+            params.append(event_id)
+            
+        query += " ORDER BY s.created_at DESC;"
+        
+        cur.execute(query, tuple(params))
+        rows = cur.fetchall()
+        
+        vendas = []
+        for r in rows:
+            vendas.append({
+                "id": str(r[0]),
+                "event_id": str(r[1]) if r[1] else "",
+                "preco": float(r[2]) if r[2] else 0.0,
+                "custo": float(r[3]) if r[3] else 0.0,
+                # Converte o Timestamp do Postgres para string ISO que o JS entende
+                "hora": r[4].isoformat() if r[4] else None, 
+                "usuario": r[5] if r[5] else "Sistema",
+                "drink": r[6] if r[6] else "Drink Avulso/Excluído"
+            })
+            
+        cur.close()
+        conn.close()
+        
+        return {"status": "sucesso", "dados": vendas}
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        raise HTTPException(status_code=400, detail=str(e))
