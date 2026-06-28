@@ -4904,7 +4904,18 @@
 
                 const ctxH = document.getElementById('chartHorario').getContext('2d');
                 if (window.chartH instanceof Chart) window.chartH.destroy();
-                const sH = Object.keys(hc).sort();
+                // Ordenação cronológica para eventos que cruzam a madrugada
+                const sH = Object.keys(hc).sort((a, b) => {
+                    let [horaA, minA] = a.split(':').map(Number);
+                    let [horaB, minB] = b.split(':').map(Number);
+
+                    // Se for madrugada (antes do meio-dia), joga pro fim da fila somando 24h
+                    if (horaA < 12) horaA += 24;
+                    if (horaB < 12) horaB += 24;
+
+                    // Compara o tempo total em minutos
+                    return (horaA * 60 + minA) - (horaB * 60 + minB);
+                });
                 window.chartH = new Chart(ctxH, { type: 'line', data: { labels: sH, datasets: [{ label: 'Vendas (' + periodo + ' min)', data: sH.map(h => hc[h]), borderColor: '#3498db', fill: true }] }, options: { responsive: true, maintainAspectRatio: false } });
 
                 const listaClientes = document.getElementById('lista-top-clientes');
