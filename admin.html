@@ -4817,9 +4817,14 @@
             window.dadosExportacao = []; // Limpa anterior
 
             try {
-                // 📍 A MÁGICA: Fetch na nossa API Python (Substitua a URL pela sua do Render)
+                // 📍 A MÁGICA: Fetch na nossa API Python
                 const response = await fetch(`https://aurora-api-zj8e.onrender.com/vendas?event_id=${eid}`);
-                if (!response.ok) throw new Error("Erro na resposta do servidor");
+                
+                // Se der erro, ele lê a mensagem exata que o Python mandou e joga na tela
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || "Erro desconhecido no servidor");
+                }
                 
                 const json = await response.json();
                 const vendas = json.dados;

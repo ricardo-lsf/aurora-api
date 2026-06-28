@@ -2455,7 +2455,7 @@ def relatorio_vendas(event_id: str = 'ALL'):
         query = """
             SELECT 
                 s.id, s.event_id, s.price, s.frozen_cost, 
-                s.created_at, s.user_name, c.nome
+                s.created_at, s.user_name, c.name  -- 📍 CORRIGIDO DE 'c.nome' PARA 'c.name'
             FROM sales s
             LEFT JOIN cocktails c ON s.cocktail_id = c.id
         """
@@ -2463,7 +2463,7 @@ def relatorio_vendas(event_id: str = 'ALL'):
         
         # Filtra por evento específico ou puxa o global
         if event_id != 'ALL':
-            query += " WHERE s.event_id = %s"
+            query += " WHERE s.event_id = %s::uuid"  # 📍 MANTIVE O ::uuid PARA PREVENIR ERROS DE TIPO
             params.append(event_id)
             
         query += " ORDER BY s.created_at DESC;"
