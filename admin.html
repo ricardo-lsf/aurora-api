@@ -4059,7 +4059,9 @@
                 valorHoraExtra: limparMoeda(document.getElementById('finValorExtra')?.value),
                 valorCustosAdicionais: limparMoeda(document.getElementById('finCustoExtra')?.value),
                 descCustosAdicionais: document.getElementById('finDescCustoExtra')?.value || "",
-                sinalPerc: parseFloat(document.getElementById('finSinalPerc')?.value) || 0
+                sinalPerc: parseFloat(document.getElementById('finSinalPerc')?.value) || 0,
+                contratante: document.getElementById('detContratante').value,
+                cnpj_cpf: document.getElementById('detCnpjCpf').value
             };
 
             try {

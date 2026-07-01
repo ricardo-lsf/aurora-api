@@ -43,6 +43,8 @@ class EventoUpdate(BaseModel):
     valorCustosAdicionais: Optional[float] = 0.0
     descCustosAdicionais: Optional[str] = ""
     sinalPerc: Optional[float] = 0.0
+    contratante: Optional[str] = None
+    cnpj_cpf: Optional[str] = None
 
 # ... (suas configurações de app e rotas antigas) ...
 
