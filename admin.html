@@ -1094,9 +1094,11 @@
                         style="margin-top:15px; padding:15px; background:#f8f9fa; border:1px solid #ddd; border-radius:4px;">
                         <h4 style="margin:0 0 10px 0;">📝 Dados do Evento</h4>
                         <div class="event-details-grid">
+                            <div><label>Contratante (Empresa/Cliente)</label><input type="text" id="detContratante" placeholder="Ex: Nome da Empresa"></div>
+                            <div><label>CNPJ / CPF</label><input type="text" id="detCnpjCpf" placeholder="000.000.000-00"></div>
+                            
                             <div><label>Responsável</label><input type="text" id="detResp"></div>
-                            <div><label>Telefone</label><input type="text" id="detTel" onkeyup="mascaraTelefone(this)">
-                            </div>
+                            <div><label>Telefone</label><input type="text" id="detTel" onkeyup="mascaraTelefone(this)"></div>
                             <div><label>Data</label><input type="date" id="detData"></div>
                             <div><label>Local</label><input type="text" id="detLocal"></div>
                         </div>
@@ -4620,9 +4622,14 @@
 
             const colorPrimary = [44, 62, 80]; const colorGray = [245, 245, 245]; const colorGreen = [39, 174, 96]; const colorRed = [192, 57, 43];
             
-            // 📍 A CORREÇÃO ENTRA AQUI: Captura o texto e remove os status do sistema
+            // 1. LIMPEZA DO TÍTULO DO EVENTO (Tratando o bug do "NO AR")
             let eventoRaw = document.getElementById('titulo-evento').innerText;
             const evento = eventoRaw.replace('🟢 NO AR', '').replace('🔴 OFFLINE', '').trim();
+            
+            // 2. CAPTURA DOS NOVOS CAMPOS
+            const contratante = document.getElementById('detContratante') ? document.getElementById('detContratante').value || "Não informado" : "Não informado";
+            const docIdentificacao = document.getElementById('detCnpjCpf') ? document.getElementById('detCnpjCpf').value || "Não informado" : "Não informado";
+            
             const responsavel = document.getElementById('detResp').value || "Não informado";
             let dataEventoRaw = document.getElementById('detData').value, dataEventoF = new Date().toLocaleDateString();
             if (dataEventoRaw) { let parts = dataEventoRaw.split('-'); dataEventoF = `${parts[2]}/${parts[1]}/${parts[0]}`; }
@@ -4636,10 +4643,28 @@
             doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.text("NOTA DE PRESTAÇÃO DE SERVIÇO", 50, 20);
             doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text("Excelência em Coquetelaria & Eventos", 50, 27);
             doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.text(`Emissão: ${new Date().toLocaleDateString()}`, 185, 27, null, null, "right");
-            let y = 50; doc.setFillColor(...colorGray); doc.rect(15, y, 180, 25, 'F');
-            doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont("helvetica", "bold"); doc.text("EVENTO:", 20, y + 8); doc.text("RESPONSÁVEL:", 20, y + 18); doc.text("DATA DO EVENTO:", 130, y + 8);
-            doc.setFont("helvetica", "normal"); doc.text(evento, 40, y + 8); doc.text(responsavel, 50, y + 18); doc.text(dataEventoF, 170, y + 8);
-            y += 35; doc.setFillColor(230, 230, 230); doc.rect(15, y, 180, 8, 'F');
+            
+            // 📍 CABEÇALHO CINZA EXPANDIDO (Altura agora é 35)
+            let y = 50; doc.setFillColor(...colorGray); doc.rect(15, y, 180, 35, 'F');
+            doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont("helvetica", "bold"); 
+            
+            // ROTULOS FIXOS
+            doc.text("EVENTO:", 20, y + 8); 
+            doc.text("DATA DO EVENTO:", 130, y + 8);
+            doc.text("CONTRATANTE:", 20, y + 18);   // 📍 LINHA NOVA ESQUERDA
+            doc.text("CNPJ/CPF:", 130, y + 18);     // 📍 LINHA NOVA DIREITA
+            doc.text("RESPONSÁVEL:", 20, y + 28);   // 📍 DESCIDO PARA Y+28
+            
+            // DADOS DINÂMICOS
+            doc.setFont("helvetica", "normal"); 
+            doc.text(evento, 40, y + 8); 
+            doc.text(dataEventoF, 170, y + 8);
+            doc.text(contratante, 52, y + 18);           // 📍 VALOR NOVO
+            doc.text(docIdentificacao, 152, y + 18);     // 📍 VALOR NOVO
+            doc.text(responsavel, 50, y + 28);           // 📍 DESCIDO PARA Y+28
+            
+            // 📍 EMPURRA O RESTO DA NOTA PARA BAIXO (Soma 45 no Y em vez de 35)
+            y += 45; doc.setFillColor(230, 230, 230); doc.rect(15, y, 180, 8, 'F');
             doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text("DESCRIÇÃO DO SERVIÇO / CUSTO", 20, y + 5); doc.text("VALOR (R$)", 190, y + 5, null, null, "right");
             y += 15; doc.setFont("helvetica", "normal"); doc.setFontSize(10);
             doc.text(`Serviço de Open Bar - Contrato Base (${duracao})`, 20, y); doc.text(contrato, 190, y, null, null, "right"); doc.line(15, y + 2, 195, y + 2);
