@@ -276,7 +276,9 @@ def atualizar_evento(event_id: str, dados: EventoUpdate):
                 extra_hour_value = %s,
                 extra_costs_value = %s,
                 extra_costs_desc = %s,
-                upfront_perc = %s
+                upfront_perc = %s,
+                contratante = %s,
+                cnpj_cpf = %s
             WHERE id = %s
         """
         
@@ -297,6 +299,8 @@ def atualizar_evento(event_id: str, dados: EventoUpdate):
             dados.valorCustosAdicionais,
             dados.descCustosAdicionais,
             dados.sinalPerc,
+            dados.contratante,
+            dados.cnpj_cpf,
             event_id # O ID vai por último para o WHERE
         )
         
