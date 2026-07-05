@@ -2499,3 +2499,71 @@ def relatorio_vendas(event_id: str = 'ALL'):
         if conn:
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+
+from pydantic import BaseModel
+from typing import List
+
+class ItemRetorno(BaseModel):
+    ingredient_id: str
+    returned_quantity: float
+
+class PayloadRetorno(BaseModel):
+    itens: List[ItemRetorno]
+
+# ==========================================
+# FECHAMENTO DE ESTOQUE (LOGÍSTICA REVERSA)
+# ==========================================
+@app.post("/events/{event_id}/retorno-estoque")
+def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        for item in payload.itens:
+            # 1. Lê a situação atual daquele insumo no evento
+            cur.execute("""
+                SELECT quantity_sent, quantity_returned 
+                FROM event_stocks 
+                WHERE event_id = %s AND ingredient_id = %s
+            """, (event_id, item.ingredient_id))
+            
+            row = cur.fetchone()
+            if not row:
+                continue # Se o insumo não foi enviado pro evento, pula
+                
+            qtd_sent = float(row[0] or 0)
+            old_returned = float(row[1] or 0)
+            new_returned = float(item.returned_quantity)
+            
+            # 2. A Mágica Matemática
+            delta_return = new_returned - old_returned # O quanto mudou desde a última vez
+            new_used = qtd_sent - new_returned         # O consumo real final
+            
+            # 3. Atualiza o histórico do evento (event_stocks)
+            cur.execute("""
+                UPDATE event_stocks 
+                SET quantity_returned = %s, quantity_used = %s 
+                WHERE event_id = %s AND ingredient_id = %s
+            """, (new_returned, new_used, event_id, item.ingredient_id))
+            
+            # 4. Atualiza o estoque central físico (ingredients) - Usando só a diferença!
+            cur.execute("""
+                UPDATE ingredients 
+                SET current_stock = current_stock + %s 
+                WHERE id = %s
+            """, (delta_return, item.ingredient_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Estoque conciliado com sucesso!"}
+        
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        print("Erro na conciliação de estoque:", str(e))
+        raise HTTPException(status_code=400, detail=str(e))

@@ -1986,6 +1986,39 @@
         </div>
     </div>
 
+    <div id="modal-devolucao" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div style="background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #8e44ad; padding-bottom: 10px;">
+                <h3 id="modal-devolucao-titulo" style="margin: 0; color: #2c3e50;">📥 Devolução de Estoque</h3>
+                <button onclick="fecharModalDevolucao()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #7f8c8d;">&times;</button>
+            </div>
+
+            <input type="hidden" id="modal-devolucao-evento-id">
+
+            <p style="font-size: 13px; color: #7f8c8d; margin-bottom: 15px;">
+                Digite a quantidade física de cada insumo que retornou para a base central. O sistema calculará o consumo real automaticamente.
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                    <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
+                        <th style="padding: 8px;">Insumo</th>
+                        <th style="padding: 8px; text-align: center;">Enviado</th>
+                        <th style="padding: 8px; text-align: center;">Retornou (Base)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-devolucao-corpo">
+                    </tbody>
+            </table>
+
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="fecharModalDevolucao()" style="background: #bdc3c7; color: white; border: none; padding: 10px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;">Cancelar</button>
+                <button onclick="enviarDevolucaoEstoque()" style="background: #8e44ad; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer;">💾 Confirmar Devolução</button>
+            </div>
+        </div>
+    </div>
+
     
 <script type="module">
 
@@ -6424,6 +6457,109 @@
                 }
             } catch (e) {
                 console.error("Erro no espião de estoque:", e);
+            }
+        };
+
+        // ============================================================
+        // FUNÇÕES DO MODAL DE DEVOLUÇÃO DE ESTOQUE
+        // ============================================================
+
+        // 1. Abre o Modal e busca o que foi enviado para a festa
+        window.abrirModalDevolucao = async (id, nome) => {
+            document.getElementById('modal-devolucao-evento-id').value = id;
+            document.getElementById('modal-devolucao-titulo').innerText = `📥 Devolução: ${nome}`;
+            
+            const corpoTabela = document.getElementById('tabela-devolucao-corpo');
+            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#7f8c8d;">🔎 Buscando insumos enviados...</td></tr>`;
+            
+            // Exibe o modal na tela usando Flexbox
+            document.getElementById('modal-devolucao').style.display = 'flex';
+
+            try {
+                // Rota que busca a lista de ingredientes vinculados a esse evento na tabela event_stocks
+                // (Certifique-se de que sua API possui uma rota GET para listar o estoque atual do evento)
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id}/stocks`);
+                if (!resposta.ok) throw new Error("Falha ao carregar estoque enviado.");
+
+                const itens = await resposta.json();
+                corpoTabela.innerHTML = ""; // Limpa o carregando
+
+                if (itens.length === 0) {
+                    corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b; font-weight:bold;">⚠️ Nenhum insumo foi carregado neste caminhão ainda!</td></tr>`;
+                    return;
+                }
+
+                // Monta as linhas da tabela dinamicamente
+                itens.forEach(item => {
+                    corpoTabela.innerHTML += `
+                        <tr style="border-bottom: 1px solid #eee;" class="linha-insumo-retorno" data-id="${item.ingredient_id}">
+                            <td style="padding: 10px; font-weight: 500;">
+                                ${item.ingredient_name} <br>
+                                <small style="color:#95a5a6;">${item.brand || ''}</small>
+                            </td>
+                            <td style="padding: 10px; text-align: center; color: #2980b9; font-weight: bold;">
+                                ${item.quantity_sent} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                <input type="number" step="0.01" class="input-qtd-retornada" value="${item.quantity_returned || 0}" 
+                                    style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #8e44ad;">
+                            </td>
+                        </tr>
+                    `;
+                });
+
+            } catch (erro) {
+                console.error("Erro ao abrir devolução:", erro);
+                corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b;">❌ Erro ao carregar os dados.</td></tr>`;
+            }
+        };
+
+        // 2. Fecha o Modal
+        window.fecharModalDevolucao = () => {
+            document.getElementById('modal-devolucao').style.display = 'none';
+        };
+
+        // 3. Junta tudo da tela e dispara o POST para o motor Python
+        window.enviarDevolucaoEstoque = async () => {
+            const eid = document.getElementById('modal-devolucao-evento-id').value;
+            const linhas = document.querySelectorAll('.linha-insumo-retorno');
+            
+            let listaItens = [];
+            
+            // Varre a tabela capturando o ID do ingrediente e o valor digitado
+            linhas.forEach(linha => {
+                const ingId = linha.getAttribute('data-id');
+                const qtdRetornada = parseFloat(linha.querySelector('.input-qtd-retornada').value) || 0;
+                
+                listaItens.append({
+                    ingredient_id: ingId,
+                    returned_quantity: qtdRetornada
+                });
+            });
+
+            const payload = { itens: listaItens };
+
+            try {
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eid}/retorno-estoque`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resposta.ok) {
+                    const err = await resposta.json();
+                    throw new Error(err.detail || "Falha ao processar devolução");
+                }
+
+                alert("✅ Estoque conciliado e devolvido à base central com sucesso!");
+                fecharModalDevolucao();
+                
+                // Se você tiver uma função que atualiza a listagem de estoques na tela, chame-a aqui
+                if (window.carregarEstoqueGeral) window.carregarEstoqueGeral();
+
+            } catch (e) {
+                console.error("Erro ao enviar devolução:", e);
+                alert("Erro na devolução: " + e.message);
             }
         };
 
