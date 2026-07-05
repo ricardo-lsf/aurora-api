@@ -3799,15 +3799,24 @@
                         ? `<span style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 8px; box-shadow: 0 0 5px #e74c3c; animation: pulse 2s infinite;">🔴 NO AR</span>` 
                         : '';
 
-                    // ==========================================
-                    // AJUSTE 3: BOTÃO DE CARGA CONDICIONAL
-                    // Só aparece se o evento estiver "No Ar" (Ativo e Aberto)
-                    // ==========================================
+                    // ============================================================
+                    // AJUSTE 3: BOTÕES DE LOGÍSTICA CONDICIONAIS (CARGA E DEVOLUÇÃO)
+                    // Só aparecem se o evento estiver "No Ar" (Ativo e Aberto)
+                    // ============================================================
                     let isNoAr = (ev.is_active === true && ev.status === 'aberto');
+                    
+                    // Substituímos o botão único por um contêiner com 2 botões dividindo o espaço (flex: 1)
                     let botaoCargaHTML = isNoAr 
-                        ? `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="margin-top: 10px; width: 100%; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer;">🚚 CARREGAR CAMINHÃO</button>`
+                        ? `<div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
+                            <button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                📤 CARGA
+                            </button>
+                            <button onclick="event.stopPropagation(); abrirModalDevolucao('${ev.id}', '${ev.name}')" style="flex: 1; background: #8e44ad; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                📥 DEVOLUÇÃO
+                            </button>
+                           </div>`
                         : ''; 
-                    // Obs: o event.stopPropagation() impede que o clique no botão abra os detalhes do evento por baixo.
+                    // Obs: o event.stopPropagation() em ambos impede que o clique abra os detalhes do evento por baixo.
 
                     if (listaDiv) {
                         listaDiv.innerHTML += `
@@ -3820,8 +3829,6 @@
                                     <span style="background: ${corStatus}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; text-transform: uppercase;">${ev.status}</span>
                                     
                                     ${isNoAr ? `<span id="radar-badge-${ev.id}" onclick="event.stopPropagation(); abrirAlertaEstoqueFesta('${ev.id}')" style="background-color: #6b7280; color: white; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: bold; cursor: pointer; margin-left: 8px; transition: 0.3s;">🔎 Checando...</span>` : ''}
-
-
                                 </div>
                                 ${botaoCargaHTML}
                             </div>
