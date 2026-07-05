@@ -6531,7 +6531,7 @@
                 const ingId = linha.getAttribute('data-id');
                 const qtdRetornada = parseFloat(linha.querySelector('.input-qtd-retornada').value) || 0;
                 
-                listaItens.append({
+                listaItens.push({
                     ingredient_id: ingId,
                     returned_quantity: qtdRetornada
                 });

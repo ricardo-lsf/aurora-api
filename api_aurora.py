@@ -2567,3 +2567,55 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
             conn.close()
         print("Erro na conciliação de estoque:", str(e))
         raise HTTPException(status_code=400, detail=str(e))
+
+# ==========================================
+# LISTAR ESTOQUE ENVIADO PARA O EVENTO (GET)
+# ==========================================
+@app.get("/events/{event_id}/stocks")
+def listar_estoque_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    
+    try:
+        cur = conn.cursor()
+        
+        # Fazemos um JOIN para trazer o nome do insumo e a unidade direto da tabela ingredients
+        query = """
+            SELECT 
+                es.ingredient_id,
+                i.name AS ingredient_name,
+                i.brand,
+                i.measurement_unit AS unit,
+                es.quantity_sent,
+                es.quantity_returned
+            FROM event_stocks es
+            JOIN ingredients i ON es.ingredient_id = i.id
+            WHERE es.event_id = %s
+        """
+        
+        cur.execute(query, (event_id,))
+        rows = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+        
+        # Monta o JSON perfeitamente estruturado para o frontend ler
+        estoque_evento = []
+        for r in rows:
+            estoque_evento.append({
+                "ingredient_id": str(r[0]),
+                "ingredient_name": r[1],
+                "brand": r[2] or "",
+                "unit": r[3],
+                "quantity_sent": float(r[4] or 0),
+                "quantity_returned": float(r[5] or 0)
+            })
+            
+        return estoque_evento
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        print("Erro ao listar estoque do evento:", str(e))
+        raise HTTPException(status_code=400, detail=str(e))
