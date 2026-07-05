@@ -2005,7 +2005,8 @@
                     <tr style="background: #f8f9fa; text-align: left; border-bottom: 2px solid #ddd;">
                         <th style="padding: 8px;">Insumo</th>
                         <th style="padding: 8px; text-align: center;">Enviado</th>
-                        <th style="padding: 8px; text-align: center;">Retornou (Base)</th>
+                        <th style="padding: 8px; text-align: center;">Consumido (App)</th>
+                        <th style="padding: 8px; text-align: center;">Sobra Física</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-devolucao-corpo">
@@ -6491,6 +6492,13 @@
 
                 // Monta as linhas da tabela dinamicamente
                 itens.forEach(item => {
+                    // 📍 A MÁGICA ACONTECE AQUI:
+                    let sobraTeorica = item.quantity_sent - item.quantity_used;
+                    if (sobraTeorica < 0) sobraTeorica = 0; // Garante que não fique negativo
+                    
+                    // Se já houver um retorno salvo antes, usa ele. Se não, usa a sobra teórica.
+                    let valorExibicao = item.quantity_returned > 0 ? item.quantity_returned : sobraTeorica;
+
                     corpoTabela.innerHTML += `
                         <tr style="border-bottom: 1px solid #eee;" class="linha-insumo-retorno" data-id="${item.ingredient_id}">
                             <td style="padding: 10px; font-weight: 500;">
@@ -6500,8 +6508,11 @@
                             <td style="padding: 10px; text-align: center; color: #2980b9; font-weight: bold;">
                                 ${item.quantity_sent} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
                             </td>
+                            <td style="padding: 10px; text-align: center; color: #e67e22; font-weight: bold;">
+                                ${item.quantity_used} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
+                            </td>
                             <td style="padding: 10px; text-align: center;">
-                                <input type="number" step="0.01" class="input-qtd-retornada" value="${item.quantity_returned || 0}" 
+                                <input type="number" step="0.01" class="input-qtd-retornada" value="${valorExibicao}" 
                                     style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #8e44ad;">
                             </td>
                         </tr>

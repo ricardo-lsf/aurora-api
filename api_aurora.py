@@ -2538,18 +2538,17 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
             old_returned = float(row[1] or 0)
             new_returned = float(item.returned_quantity)
             
-            # 2. A Mágica Matemática
-            delta_return = new_returned - old_returned # O quanto mudou desde a última vez
-            new_used = qtd_sent - new_returned         # O consumo real final
+            # 2. A Mágica Matemática (Calcula apenas o Delta do que já estava no estoque central)
+            delta_return = new_returned - old_returned 
             
-            # 3. Atualiza o histórico do evento (event_stocks)
+            # 3. Atualiza o histórico do evento (APENAS o retorno, preserva o quantity_used!)
             cur.execute("""
                 UPDATE event_stocks 
-                SET quantity_returned = %s, quantity_used = %s 
+                SET quantity_returned = %s 
                 WHERE event_id = %s AND ingredient_id = %s
-            """, (new_returned, new_used, event_id, item.ingredient_id))
+            """, (new_returned, event_id, item.ingredient_id))
             
-            # 4. Atualiza o estoque central físico (ingredients) - Usando só a diferença!
+            # 4. Atualiza o estoque central físico
             cur.execute("""
                 UPDATE ingredients 
                 SET current_stock = current_stock + %s 
@@ -2588,7 +2587,8 @@ def listar_estoque_evento(event_id: str):
                 i.brand,
                 i.measurement_unit AS unit,
                 es.quantity_sent,
-                es.quantity_returned
+                es.quantity_returned,
+                es.quantity_used
             FROM event_stocks es
             JOIN ingredients i ON es.ingredient_id = i.id
             WHERE es.event_id = %s
@@ -2610,6 +2610,7 @@ def listar_estoque_evento(event_id: str):
                 "unit": r[3],
                 "quantity_sent": float(r[4] or 0),
                 "quantity_returned": float(r[5] or 0)
+                "quantity_used": float(r[6] or 0)
             })
             
         return estoque_evento
