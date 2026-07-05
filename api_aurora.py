@@ -2609,7 +2609,7 @@ def listar_estoque_evento(event_id: str):
                 "brand": r[2] or "",
                 "unit": r[3],
                 "quantity_sent": float(r[4] or 0),
-                "quantity_returned": float(r[5] or 0)
+                "quantity_returned": float(r[5] or 0),
                 "quantity_used": float(r[6] or 0)
             })
             
