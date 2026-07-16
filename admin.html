@@ -3767,12 +3767,168 @@
         window.carregarBiblioteca();
 
         // ============================================================
-        // 5. EVENTOS
+        // ESPIÃO DE ESTOQUE: Checa os insumos sem o gestor precisar clicar
+        // (COLADO ANTES DA RENDERIZAÇÃO DOS EVENTOS)
+        // ============================================================
+        window.checarEstoqueSilencioso = async function(idDaFesta) {
+            try {
+                // 📍 CORREÇÃO AQUI: Usando o API_BASE dinâmico!
+                const resposta = await fetch(`${API_BASE}/events/${idDaFesta}/inventory-status`);
+                const dados = await resposta.json();
+                
+                // Procura a flag específica dessa festa pelo ID
+                const badge = document.getElementById(`radar-badge-${idDaFesta}`);
+                if (!badge) return;
+
+                if (dados.status === "sucesso") {
+                    
+                    if (!dados.insumos || dados.insumos.length === 0) {
+                        badge.innerHTML = "📦 SEM ESTOQUE";
+                        badge.style.backgroundColor = "#64748b"; 
+                        badge.style.boxShadow = "none";
+                        badge.style.animation = "none";
+                        return; 
+                    }
+
+                    let temCritico = false;
+                    dados.insumos.forEach(item => {
+                        const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
+                        if (percentual <= 20) temCritico = true; 
+                    });
+
+                    if (temCritico) {
+                        badge.innerHTML = "🚨 ESTOQUE CRÍTICO";
+                        badge.style.backgroundColor = "#e11d48"; 
+                        badge.style.boxShadow = "0 0 8px rgba(225,29,72,0.8)";
+                        badge.style.animation = "piscar-alerta 1.5s infinite"; 
+                    } else {
+                        badge.innerHTML = "✅ ESTOQUE OK";
+                        badge.style.backgroundColor = "#10b981"; 
+                        badge.style.boxShadow = "none";
+                        badge.style.animation = "none";
+                    }
+                }
+            } catch (e) {
+                console.error("Erro no espião de estoque:", e);
+            }
+        };
+
+        // ============================================================
+        // FUNÇÕES DO MODAL DE DEVOLUÇÃO DE ESTOQUE
         // ============================================================
 
-        // 🗑️ ADEUS FIREBASE: O "Ouvido" antigo e a variável global eventoAtivoNoApp 
-        // foram removidos daqui, pois agora somos 100% PostgreSQL!
+        // 1. Abre o Modal e busca o que foi enviado para a festa
+        window.abrirModalDevolucao = async (id, nome) => {
+            document.getElementById('modal-devolucao-evento-id').value = id;
+            document.getElementById('modal-devolucao-titulo').innerText = `📥 Devolução: ${nome}`;
+            
+            const corpoTabela = document.getElementById('tabela-devolucao-corpo');
+            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#7f8c8d;">🔎 Buscando insumos enviados...</td></tr>`;
+            
+            // Exibe o modal na tela usando Flexbox
+            document.getElementById('modal-devolucao').style.display = 'flex';
 
+            try {
+                // Rota que busca a lista de ingredientes vinculados a esse evento na tabela event_stocks
+                // (Certifique-se de que sua API possui uma rota GET para listar o estoque atual do evento)
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id}/stocks`);
+                if (!resposta.ok) throw new Error("Falha ao carregar estoque enviado.");
+
+                const itens = await resposta.json();
+                corpoTabela.innerHTML = ""; // Limpa o carregando
+
+                if (itens.length === 0) {
+                    corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b; font-weight:bold;">⚠️ Nenhum insumo foi carregado neste caminhão ainda!</td></tr>`;
+                    return;
+                }
+
+                // Monta as linhas da tabela dinamicamente
+                itens.forEach(item => {
+                    // 📍 A MÁGICA ACONTECE AQUI:
+                    let sobraTeorica = item.quantity_sent - item.quantity_used;
+                    if (sobraTeorica < 0) sobraTeorica = 0; // Garante que não fique negativo
+                    
+                    // Se já houver um retorno salvo antes, usa ele. Se não, usa a sobra teórica.
+                    let valorExibicao = item.quantity_returned > 0 ? item.quantity_returned : sobraTeorica;
+
+                    corpoTabela.innerHTML += `
+                        <tr style="border-bottom: 1px solid #eee;" class="linha-insumo-retorno" data-id="${item.ingredient_id}">
+                            <td style="padding: 10px; font-weight: 500;">
+                                ${item.ingredient_name} <br>
+                                <small style="color:#95a5a6;">${item.brand || ''}</small>
+                            </td>
+                            <td style="padding: 10px; text-align: center; color: #2980b9; font-weight: bold;">
+                                ${item.quantity_sent} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
+                            </td>
+                            <td style="padding: 10px; text-align: center; color: #e67e22; font-weight: bold;">
+                                ${item.quantity_used} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                <input type="number" step="0.01" class="input-qtd-retornada" value="${valorExibicao}" 
+                                    style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #8e44ad;">
+                            </td>
+                        </tr>
+                    `;
+                });
+
+            } catch (erro) {
+                console.error("Erro ao abrir devolução:", erro);
+                corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b;">❌ Erro ao carregar os dados.</td></tr>`;
+            }
+        };
+
+        // 2. Fecha o Modal
+        window.fecharModalDevolucao = () => {
+            document.getElementById('modal-devolucao').style.display = 'none';
+        };
+
+        // 3. Junta tudo da tela e dispara o POST para o motor Python
+        window.enviarDevolucaoEstoque = async () => {
+            const eid = document.getElementById('modal-devolucao-evento-id').value;
+            const linhas = document.querySelectorAll('.linha-insumo-retorno');
+            
+            let listaItens = [];
+            
+            // Varre a tabela capturando o ID do ingrediente e o valor digitado
+            linhas.forEach(linha => {
+                const ingId = linha.getAttribute('data-id');
+                const qtdRetornada = parseFloat(linha.querySelector('.input-qtd-retornada').value) || 0;
+                
+                listaItens.push({
+                    ingredient_id: ingId,
+                    returned_quantity: qtdRetornada
+                });
+            });
+
+            const payload = { itens: listaItens };
+
+            try {
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eid}/retorno-estoque`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resposta.ok) {
+                    const err = await resposta.json();
+                    throw new Error(err.detail || "Falha ao processar devolução");
+                }
+
+                alert("✅ Estoque conciliado e devolvido à base central com sucesso!");
+                fecharModalDevolucao();
+                
+                // Se você tiver uma função que atualiza a listagem de estoques na tela, chame-a aqui
+                if (window.carregarEstoqueGeral) window.carregarEstoqueGeral();
+
+            } catch (e) {
+                console.error("Erro ao enviar devolução:", e);
+                alert("Erro na devolução: " + e.message);
+            }
+        };
+
+        // ============================================================
+        // 5. EVENTOS
+        // ============================================================
         // ============================================================
         // BUSCAR E LISTAR EVENTOS (POSTGRESQL)
         // ============================================================
@@ -3784,7 +3940,8 @@
             if (sA) sA.innerHTML = '<option value="">-- Escolha --</option><option value="ALL" style="font-weight:bold; color:#2980b9;">🌟 TODOS OS EVENTOS (Global)</option>';
 
             try {
-                const resposta = await fetch("https://aurora-api-zj8e.onrender.com/events");
+                // 📍 CORRIGIDO: Puxa só os eventos da agência logada usando as variáveis globais
+                const resposta = await fetch(`${API_BASE}/events?account_id=${ACCOUNT_ID}`);
                 if (!resposta.ok) throw new Error("Erro ao buscar eventos do servidor");
 
                 const dados = await resposta.json();
@@ -4835,13 +4992,22 @@
             doc.save(`Proposta_${cliente}.pdf`);
         };
 
-        // Mantém as funções da equipe intactas abaixo
-        window.abrirModalEquipe = (id) => { document.getElementById('modalEquipe').style.display = 'flex'; document.getElementById('eqTitulo').innerText = id ? '✏️ Editar' : '👤 Novo'; document.getElementById('eqId').value = id || ''; if (!id) ['eqNome', 'eqTel', 'eqCPF', 'eqData', 'eqIdade', 'eqTaxa', 'eqAdicional'].forEach(i => document.getElementById(i).value = ''); };
+        // ============================================================
+        // MÓDULO EQUIPE (Em fila de migração para o PostgreSQL)
+        // ============================================================
+        window.abrirModalEquipe = (id) => { 
+            document.getElementById('modalEquipe').style.display = 'flex'; 
+        };
         window.fecharModalEquipe = () => document.getElementById('modalEquipe').style.display = 'none';
-        onSnapshot(collection(db, "equipe"), (s) => { const l = document.getElementById('lista-equipe'); l.innerHTML = ''; s.forEach(d => { const b = d.data(); l.innerHTML += `<tr><td><b>${b.nome}</b><br><small style="color:#666">${b.funcao || ''}</small></td><td>${b.telefone}</td><td>${b.funcao}</td><td>R$ ${parseFloat(b.taxa || 0).toFixed(2)}</td><td>R$ ${parseFloat(b.adicional || 0).toFixed(2)}</td><td style="text-align:right"><button onclick="editarEquipe('${d.id}','${b.nome}','${b.telefone}','${b.cpf}','${b.dataNasc}','${b.sexo}','${b.funcao}','${b.taxa}','${b.adicional}')" class="btn-edit">✏️</button><button onclick="delEq('${d.id}')" class="btn-trash">🗑️</button></td></tr>`; }); });
-        window.salvarEquipe = async () => { const id = document.getElementById('eqId').value, tel = document.getElementById('eqTel').value; const d = { nome: document.getElementById('eqNome').value, telefone: tel, cpf: document.getElementById('eqCPF').value, dataNasc: document.getElementById('eqData').value, sexo: document.getElementById('eqSexo').value, funcao: document.getElementById('eqFuncao').value, taxa: parseFloat(document.getElementById('eqTaxa').value) || 0, adicional: parseFloat(document.getElementById('eqAdicional').value) || 0 }; if (!d.nome || !d.telefone) return alert("Obrigatórios: Nome e Telefone"); if (!id) { const q = query(collection(db, "equipe"), where("telefone", "==", tel)); const c = await getDocs(q); if (!c.empty) return alert("Telefone já existe!"); await addDoc(collection(db, "equipe"), d); } else await updateDoc(doc(db, "equipe", id), d); fecharModalEquipe(); };
-        window.editarEquipe = (id, n, t, c, d, s, f, tx, ad) => { window.abrirModalEquipe(id); document.getElementById('eqNome').value = n; document.getElementById('eqTel').value = t; document.getElementById('eqCPF').value = c; document.getElementById('eqData').value = d; document.getElementById('eqSexo').value = s; document.getElementById('eqFuncao').value = f; document.getElementById('eqTaxa').value = tx; document.getElementById('eqAdicional').value = ad; calcIdade(); };
-        window.delEq = async (id) => await deleteDoc(doc(db, "equipe", id));
+        
+        // Removemos o onSnapshot do Firebase daqui!
+
+        window.salvarEquipe = async () => { 
+            alert("🚧 O Módulo de Equipe está sendo migrado para o novo Banco de Dados (PostgreSQL). Estará disponível em breve!"); 
+            fecharModalEquipe(); 
+        };
+        window.editarEquipe = () => { alert("Em migração..."); };
+        window.delEq = async (id) => { alert("Em migração..."); };
 
         // 6. ANALYTICS V55 (COM RESGATE)
 
@@ -6384,174 +6550,7 @@
             };
         };
 
-        // ============================================================
-        // ESPIÃO DE ESTOQUE: Checa os insumos sem o gestor precisar clicar
-        // ============================================================
-        window.checarEstoqueSilencioso = async function(idDaFesta) {
-            try {
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${idDaFesta}/inventory-status`);
-                const dados = await resposta.json();
-                
-                // Procura a flag específica dessa festa pelo ID
-                const badge = document.getElementById(`radar-badge-${idDaFesta}`);
-                if (!badge) return;
-
-                if (dados.status === "sucesso") {
-                    
-                    // ==========================================
-                    // 1. CHECAGEM INICIAL: TEM ALGUMA CARGA?
-                    // Se o array de insumos estiver vazio, o caminhão não passou aqui.
-                    // ==========================================
-                    if (!dados.insumos || dados.insumos.length === 0) {
-                        badge.innerHTML = "📦 SEM ESTOQUE";
-                        badge.style.backgroundColor = "#64748b"; // Cinza chumbo/azulado, neutro
-                        badge.style.boxShadow = "none";
-                        badge.style.animation = "none";
-                        return; // 🛑 Para a execução aqui, não precisa calcular o resto!
-                    }
-
-                    // ==========================================
-                    // 2. SE PASSOU DAQUI, TEM ESTOQUE. VAMOS CAÇAR O GARGALO!
-                    // ==========================================
-                    let temCritico = false;
-                    
-                    dados.insumos.forEach(item => {
-                        const percentual = item.enviado > 0 ? (item.saldo / item.enviado) * 100 : 0;
-                        if (percentual <= 20) temCritico = true; // Achou um gargalo!
-                    });
-
-                    // ==========================================
-                    // 3. ATUALIZA A FLAG PARA OK OU CRÍTICO
-                    // ==========================================
-                    if (temCritico) {
-                        badge.innerHTML = "🚨 ESTOQUE CRÍTICO";
-                        badge.style.backgroundColor = "#e11d48"; // Vermelho Alerta
-                        badge.style.boxShadow = "0 0 8px rgba(225,29,72,0.8)";
-                        badge.style.animation = "piscar-alerta 1.5s infinite"; 
-                    } else {
-                        badge.innerHTML = "✅ ESTOQUE OK";
-                        badge.style.backgroundColor = "#10b981"; // Verde Seguro
-                        badge.style.boxShadow = "none";
-                        badge.style.animation = "none";
-                    }
-                }
-            } catch (e) {
-                console.error("Erro no espião de estoque:", e);
-            }
-        };
-
-        // ============================================================
-        // FUNÇÕES DO MODAL DE DEVOLUÇÃO DE ESTOQUE
-        // ============================================================
-
-        // 1. Abre o Modal e busca o que foi enviado para a festa
-        window.abrirModalDevolucao = async (id, nome) => {
-            document.getElementById('modal-devolucao-evento-id').value = id;
-            document.getElementById('modal-devolucao-titulo').innerText = `📥 Devolução: ${nome}`;
-            
-            const corpoTabela = document.getElementById('tabela-devolucao-corpo');
-            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#7f8c8d;">🔎 Buscando insumos enviados...</td></tr>`;
-            
-            // Exibe o modal na tela usando Flexbox
-            document.getElementById('modal-devolucao').style.display = 'flex';
-
-            try {
-                // Rota que busca a lista de ingredientes vinculados a esse evento na tabela event_stocks
-                // (Certifique-se de que sua API possui uma rota GET para listar o estoque atual do evento)
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id}/stocks`);
-                if (!resposta.ok) throw new Error("Falha ao carregar estoque enviado.");
-
-                const itens = await resposta.json();
-                corpoTabela.innerHTML = ""; // Limpa o carregando
-
-                if (itens.length === 0) {
-                    corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b; font-weight:bold;">⚠️ Nenhum insumo foi carregado neste caminhão ainda!</td></tr>`;
-                    return;
-                }
-
-                // Monta as linhas da tabela dinamicamente
-                itens.forEach(item => {
-                    // 📍 A MÁGICA ACONTECE AQUI:
-                    let sobraTeorica = item.quantity_sent - item.quantity_used;
-                    if (sobraTeorica < 0) sobraTeorica = 0; // Garante que não fique negativo
-                    
-                    // Se já houver um retorno salvo antes, usa ele. Se não, usa a sobra teórica.
-                    let valorExibicao = item.quantity_returned > 0 ? item.quantity_returned : sobraTeorica;
-
-                    corpoTabela.innerHTML += `
-                        <tr style="border-bottom: 1px solid #eee;" class="linha-insumo-retorno" data-id="${item.ingredient_id}">
-                            <td style="padding: 10px; font-weight: 500;">
-                                ${item.ingredient_name} <br>
-                                <small style="color:#95a5a6;">${item.brand || ''}</small>
-                            </td>
-                            <td style="padding: 10px; text-align: center; color: #2980b9; font-weight: bold;">
-                                ${item.quantity_sent} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
-                            </td>
-                            <td style="padding: 10px; text-align: center; color: #e67e22; font-weight: bold;">
-                                ${item.quantity_used} <span style="font-size:11px; font-weight:normal;">${item.unit || 'un'}</span>
-                            </td>
-                            <td style="padding: 10px; text-align: center;">
-                                <input type="number" step="0.01" class="input-qtd-retornada" value="${valorExibicao}" 
-                                    style="width: 80px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; color: #8e44ad;">
-                            </td>
-                        </tr>
-                    `;
-                });
-
-            } catch (erro) {
-                console.error("Erro ao abrir devolução:", erro);
-                corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b;">❌ Erro ao carregar os dados.</td></tr>`;
-            }
-        };
-
-        // 2. Fecha o Modal
-        window.fecharModalDevolucao = () => {
-            document.getElementById('modal-devolucao').style.display = 'none';
-        };
-
-        // 3. Junta tudo da tela e dispara o POST para o motor Python
-        window.enviarDevolucaoEstoque = async () => {
-            const eid = document.getElementById('modal-devolucao-evento-id').value;
-            const linhas = document.querySelectorAll('.linha-insumo-retorno');
-            
-            let listaItens = [];
-            
-            // Varre a tabela capturando o ID do ingrediente e o valor digitado
-            linhas.forEach(linha => {
-                const ingId = linha.getAttribute('data-id');
-                const qtdRetornada = parseFloat(linha.querySelector('.input-qtd-retornada').value) || 0;
-                
-                listaItens.push({
-                    ingredient_id: ingId,
-                    returned_quantity: qtdRetornada
-                });
-            });
-
-            const payload = { itens: listaItens };
-
-            try {
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eid}/retorno-estoque`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!resposta.ok) {
-                    const err = await resposta.json();
-                    throw new Error(err.detail || "Falha ao processar devolução");
-                }
-
-                alert("✅ Estoque conciliado e devolvido à base central com sucesso!");
-                fecharModalDevolucao();
-                
-                // Se você tiver uma função que atualiza a listagem de estoques na tela, chame-a aqui
-                if (window.carregarEstoqueGeral) window.carregarEstoqueGeral();
-
-            } catch (e) {
-                console.error("Erro ao enviar devolução:", e);
-                alert("Erro na devolução: " + e.message);
-            }
-        };
+        
 
 
     </script>
