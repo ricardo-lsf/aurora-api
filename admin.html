@@ -2070,40 +2070,9 @@
         // ============================================================
         // 0. VARIÁVEIS GLOBAIS E CREDENCIAIS (SEMPRE NO TOPO)
         // ============================================================
-        const ACCOUNT_ID = "a57c20f3-526a-41f4-8b95-d4cd7cd2e362"; 
+        const ACCOUNT_ID = localStorage.getItem('account_id'); // 📍 Agora puxa do login!
         const API_BASE = "https://aurora-api-zj8e.onrender.com";
-
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, setDoc, query, orderBy, writeBatch, where, getDocs, limit, getDoc, serverTimestamp, increment, collectionGroup, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-        // ⚠️ COLE SUA CONFIG AQUI ⚠️
-        const firebaseConfig = {
-            apiKey: "AIzaSyBu8y9RQMv9fbxORcRLAZN4OlA1IEXyZUU",
-            authDomain: "aurora-bar-system.firebaseapp.com",
-            projectId: "aurora-bar-system",
-            storageBucket: "aurora-bar-system.firebasestorage.app",
-            messagingSenderId: "380441809814",
-            appId: "1:380441809814:web:ad008f37d30a5b0abe03b7"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-
-        // A variável db que você já tem no seu código
-        // const db = getFirestore(app); 
-
-        enableIndexedDbPersistence(db)
-            .then(() => {
-                console.log("Persistência offline do Firebase ativada com sucesso!");
-            })
-            .catch((err) => {
-                if (err.code == 'failed-precondition') {
-                    console.warn("Múltiplas abas abertas. A persistência só funciona em uma aba por vez.");
-                } else if (err.code == 'unimplemented') {
-                    console.warn("O navegador atual não suporta persistência offline.");
-                }
-            });
+        // 🔥 Todo o código do Firebase (firebaseConfig, getFirestore, etc) foi removido daqui!
 
 
 
@@ -2801,10 +2770,10 @@
         
         window.carregarDrinksParaOrcamento = async function() {
             try {
-                // Recupera o ID da conta ativo
-                const accountId = 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362';
+                // Recupera o ID da conta ativo (do Login)
+                const accountId = ACCOUNT_ID; 
                 
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/drinks/${accountId}`);
+                const resposta = await fetch(`${API_BASE}/drinks/${accountId}`);
                 if (!resposta.ok) throw new Error(`Erro no servidor: Status ${resposta.status}`);
 
                 const jsonResposta = await resposta.json();
@@ -2986,8 +2955,8 @@
             l.innerHTML = '<p style="text-align:center; color:#999">Carregando orçamentos... ⏳</p>';
 
             try {
-                // 📍 AJUSTE 1 APLICADO AQUI: Adicionado o parâmetro account_id na URL
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/orcamentos?account_id=a57c20f3-526a-41f4-8b95-d4cd7cd2e362`);
+                // 📍 AJUSTE: Buscando os orçamentos da agência logada
+                const resposta = await fetch(`${API_BASE}/orcamentos?account_id=${ACCOUNT_ID}`);
                 
                 // NOVO BLOCO: Lendo a fofoca exata do erro que o Python mandou
                 if (!resposta.ok) {
@@ -3220,7 +3189,7 @@
             // 3. Monta o payload exato esperado pelo Pydantic
             const dados = {
                 id: idHidden, // <--- A MÁGICA ACONTECE AQUI
-                account_id: 'a57c20f3-526a-41f4-8b95-d4cd7cd2e362', 
+                account_id: ACCOUNT_ID,
                 cliente: clienteInput.value.trim(),
                 data_evento: document.getElementById('orcData')?.value || null,
                 local: document.getElementById('orcLocal')?.value || '',
