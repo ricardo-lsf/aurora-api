@@ -14,6 +14,18 @@ import json
 app = FastAPI(title="Aurora Bartenders API")
 
 # ==========================================
+# ROTAS DO FRONTEND (Telas HTML)
+# ==========================================
+@app.get("/login.html")
+def abrir_tela_login():
+    return FileResponse("login.html")
+
+@app.get("/admin.html")  # Aproveite e já libere o painel também!
+def abrir_tela_admin():
+    return FileResponse("admin.html")
+
+
+# ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA (CORS)
 # ==========================================
 app.add_middleware(
