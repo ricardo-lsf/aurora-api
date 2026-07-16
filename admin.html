@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aurora Admin V77 (Versão Completa e Estavel)</title>
 
+    <script>
+        // Verifica se o usuário tem o token de acesso salvo
+        const token = localStorage.getItem('aurora_token');
+        
+        // Se não tiver, chuta de volta para a tela de login
+        if (!token) {
+            window.location.replace('login.html');
+        }
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
