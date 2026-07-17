@@ -1797,7 +1797,10 @@ def create_event(event: EventCreate):
 # NOSSA DÉCIMA SÉTIMA ROTA: LISTAR EVENTOS (ADMIN)
 # ==========================================
 @app.get("/events")
-def list_events():
+def list_events(account_id: str): # 📍 AGORA EXIGE A IDENTIFICAÇÃO DA AGÊNCIA
+    if not account_id:
+        raise HTTPException(status_code=400, detail="O account_id é obrigatório para listar os eventos.")
+        
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -1805,8 +1808,13 @@ def list_events():
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Traz todos os eventos ordenados pela data (os mais recentes primeiro)
-        cur.execute("SELECT * FROM events ORDER BY event_date DESC;")
+        # 📍 O MODO SAAS ATIVADO: Filtra estritamente pela agência (account_id)
+        cur.execute("""
+            SELECT * FROM events 
+            WHERE account_id = %s 
+            ORDER BY event_date DESC;
+        """, (account_id,))
+        
         eventos = cur.fetchall()
         
         cur.close()
