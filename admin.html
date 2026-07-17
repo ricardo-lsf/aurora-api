@@ -1045,6 +1045,16 @@
 
 <body>
 
+    <!-- 📍 IDENTIFICAÇÃO DO USUÁRIO -->
+    <div id="box-identificacao" style="background-color: #1e293b; padding: 15px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #8e44ad;">
+        <div style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: bold; margin-bottom: 5px;">Usuário Logado</div>
+        <div id="user-email-display" style="color: #f8fafc; font-weight: bold; font-size: 14px; margin-bottom: 3px;">Carregando...</div>
+        <div id="user-agency-display" style="color: #64748b; font-size: 10px; margin-bottom: 12px; word-break: break-all;">ID: ...</div>
+        <button onclick="fazerLogout()" style="width: 100%; background: #e11d48; color: white; border: none; padding: 6px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
+            🚪 SAIR DO SISTEMA
+        </button>
+    </div>
+
     <div class="mobile-header">
         <button class="btn-hamburger" onclick="toggleMenu()">☰</button>
         <span style="font-weight:bold; font-size:1.2em;">Aurora Admin</span>
@@ -2030,7 +2040,7 @@
         </div>
     </div>
 
-    
+
 <script type="module">
 
 
@@ -6550,10 +6560,28 @@
             };
         };
 
-        
-
 
     </script>
+
+        // ==========================================
+        // IDENTIFICAÇÃO DE USUÁRIO E LOGOUT
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const email = localStorage.getItem('aurora_user_email') || 'Usuário Desconhecido';
+            const accountId = localStorage.getItem('account_id') || 'Sem Agência';
+            
+            const emailEl = document.getElementById('user-email-display');
+            const agencyEl = document.getElementById('user-agency-display');
+            
+            if(emailEl) emailEl.innerText = email;
+            if(agencyEl) agencyEl.innerText = `ID: ${accountId}`;
+        });
+
+        window.fazerLogout = () => {
+            // 📍 A MÁGICA DA SEGURANÇA: Apaga o token e a agência do navegador!
+            localStorage.clear(); 
+            window.location.replace('login.html');
+        };
 
 </body>
 
