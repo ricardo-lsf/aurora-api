@@ -48,33 +48,45 @@
             erroDiv.style.display = 'none';
 
             try {
-                // Chama a API nativa de autenticação do Supabase
+                // 1. Gera o Token (Crachá principal)
                 const resposta = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'apikey': SUPABASE_ANON_KEY
-                    },
+                    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
                     body: JSON.stringify({ email, password })
                 });
-
+                
                 const dados = await resposta.json();
+                if (!resposta.ok) throw new Error("Erro no login");
 
-                if (!resposta.ok) {
-                    throw new Error(dados.error_description || "Erro no login");
+                // 2. 📍 A MÁGICA: Busca a agência a qual este usuário pertence!
+                const perfilResposta = await fetch(`${SUPABASE_URL}/rest/v1/user_profiles?select=account_id&user_id=eq.${dados.user.id}`, {
+                    method: 'GET',
+                    headers: { 
+                        'apikey': SUPABASE_ANON_KEY, 
+                        'Authorization': `Bearer ${dados.access_token}` 
+                    }
+                });
+                
+                const perfilDados = await perfilResposta.json();
+
+                // Se o usuário não tiver uma agência vinculada, bloqueia na porta!
+                if (!perfilDados || perfilDados.length === 0) {
+                    throw new Error("Perfil ou Agência não encontrados no banco.");
                 }
 
-                // Salva o Token (Crachá) e os dados do usuário no navegador
+                // 3. Salva TUDO no navegador de forma correta
                 localStorage.setItem('aurora_token', dados.access_token);
                 localStorage.setItem('aurora_user_id', dados.user.id);
                 localStorage.setItem('aurora_user_email', dados.user.email);
+                localStorage.setItem('account_id', perfilDados[0].account_id); // Injeta o ID dinâmico
 
-                // Redireciona para o painel principal
+                // 4. Libera a entrada
                 window.location.href = 'admin.html';
 
             } catch (erro) {
-                console.error(erro);
-                erroDiv.innerText = "Credenciais inválidas. Tente novamente.";
+                console.error("Falha na autenticação:", erro);
+                localStorage.clear(); // Limpa o cache se algo der errado
+                erroDiv.innerText = "Credenciais inválidas ou agência não vinculada.";
                 erroDiv.style.display = 'block';
             }
         }
