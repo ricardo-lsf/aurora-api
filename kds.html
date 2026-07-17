@@ -93,6 +93,8 @@
         // 1. CONFIGURAÇÕES INICIAIS
         // ==========================================
         const API_BASE = "https://aurora-api-zj8e.onrender.com";
+        const ACCOUNT_ID = localStorage.getItem('account_id'); // 📍 Captura a agência logada
+        
         const CHAVE_MEMORIA = 'aurora_kds_evento_id';
         const CHAVE_NOME = 'aurora_kds_evento_nome';
         let eventoAtualID = localStorage.getItem(CHAVE_MEMORIA);
@@ -101,6 +103,12 @@
         // 2. LÓGICA DE INICIALIZAÇÃO (CADEADO)
         // ==========================================
         async function iniciarKDS() {
+            // Trava de segurança: Se o tablet não tiver feito login no admin, bloqueia!
+            if (!ACCOUNT_ID) {
+                document.body.innerHTML = '<h2 style="color:red; text-align:center; margin-top: 50px;">🔒 Acesso Negado. Faça login no sistema Aurora primeiro.</h2>';
+                return;
+            }
+
             const nomeEvento = localStorage.getItem(CHAVE_NOME);
 
             if (eventoAtualID) {
@@ -122,12 +130,14 @@
             }
         }
 
-        // Busca equipe do Postgres
+        // Busca equipe do Postgres (Agência isolada)
         async function carregarOperadores() {
             const sel = document.getElementById('kdsOperador');
             try {
-                const res = await fetch(`${API_BASE}/team`); 
+                // 📍 AJUSTE: Passando o ID da Agência
+                const res = await fetch(`${API_BASE}/team?account_id=${ACCOUNT_ID}`); 
                 const data = await res.json();
+
                 if(data && data.length > 0) {
                     data.forEach(d => {
                         // Corrigido para d.nome garantindo o match com a tabela STAFF
@@ -140,7 +150,8 @@
         async function buscarEventosNoRadar() {
             const divLista = document.getElementById('lista-eventos-ativos');
             try {
-                const res = await fetch(`${API_BASE}/events/active`);
+                // 📍 AJUSTE: Buscando só as festas ATIVAS da SUA Agência!
+                const res = await fetch(`${API_BASE}/events/active?account_id=${ACCOUNT_ID}`);
                 const data = await res.json();
                 
                 if (data.status === "sucesso" && data.dados.length > 0) {

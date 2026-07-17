@@ -174,7 +174,10 @@ def icon_512():
 # ==========================================
 @app.get("/events/active")
 @app.get("/eventos-ativos")
-def listar_eventos_ativos():
+def listar_eventos_ativos(account_id: str): # 📍 1. EXIGE O ID DA AGÊNCIA AQUI
+    if not account_id:
+        raise HTTPException(status_code=400, detail="account_id é obrigatório para listar eventos ativos")
+
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -182,14 +185,20 @@ def listar_eventos_ativos():
     try:
         cur = conn.cursor()
         
-        # O CADEADO DUPLO: Exatamente como você pediu!
-        # Só vai pro celular do bartender se o Gerente ativou (TRUE) E o bar abriu ('aberto')
-        cur.execute("SELECT id, name FROM events WHERE is_active = TRUE AND status = 'aberto'")
+        # 📍 2. O CADEADO TRIPLO: Ativado (TRUE), Aberto ('aberto') E da Agência Certa!
+        cur.execute("""
+            SELECT id, name 
+            FROM events 
+            WHERE is_active = TRUE 
+            AND status = 'aberto' 
+            AND account_id = %s
+        """, (account_id,))
         
         eventos = cur.fetchall()
         cur.close()
         conn.close()
 
+        # O seu tratamento de formatação continua intacto!
         dados_formatados = []
         for e in eventos:
             if isinstance(e, dict):
