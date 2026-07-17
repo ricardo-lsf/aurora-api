@@ -637,59 +637,59 @@ def ver_cardapio_publico(url_slug: str):
         raise HTTPException(status_code=400, detail=str(e))
         
         
-""" # ==========================================
-# NOSSA TERCEIRA ROTA: CRIAR UM NOVO EVENTO
-# ==========================================
-@app.post("/events/")
-def criar_evento(evento: NovoEvento):
-    conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+# # ==========================================
+# # NOSSA TERCEIRA ROTA: CRIAR UM NOVO EVENTO
+# # ==========================================
+# @app.post("/events/")
+# def criar_evento(evento: NovoEvento):
+#     conn = get_db_connection()
+#     if not conn:
+#         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
     
-    try:
-        cur = conn.cursor()
+#     try:
+#         cur = conn.cursor()
         
-        # O Python gera um UUID novinho para essa festa
-        novo_event_id = str(uuid.uuid4())
+#         # O Python gera um UUID novinho para essa festa
+#         novo_event_id = str(uuid.uuid4())
         
-        # O comando de inserção (usando %s para segurança contra hackers)
-        query = """
-            INSERT INTO events (id, account_id, event_name, event_date, custom_url_slug, status)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """
+#         # O comando de inserção (usando %s para segurança contra hackers)
+#         query = """
+#             INSERT INTO events (id, account_id, event_name, event_date, custom_url_slug, status)
+#             VALUES (%s, %s, %s, %s, %s, %s)
+#             RETURNING id;
+#         """
         
-        # A tupla com os valores exatos que vieram do aplicativo
-        valores = (
-            novo_event_id, 
-            evento.account_id, 
-            evento.event_name, 
-            evento.event_date, 
-            evento.custom_url_slug, 
-            evento.status
-        )
+#         # A tupla com os valores exatos que vieram do aplicativo
+#         valores = (
+#             novo_event_id, 
+#             evento.account_id, 
+#             evento.event_name, 
+#             evento.event_date, 
+#             evento.custom_url_slug, 
+#             evento.status
+#         )
         
-        cur.execute(query, valores)
+#         cur.execute(query, valores)
         
-        # O COMANDO MÁGICO: No INSERT, precisamos dar "Commit" para salvar de verdade!
-        conn.commit()
+#         # O COMANDO MÁGICO: No INSERT, precisamos dar "Commit" para salvar de verdade!
+#         conn.commit()
         
-        cur.close()
-        conn.close()
+#         cur.close()
+#         conn.close()
         
-        # Devolvemos uma resposta de sucesso para o aplicativo
-        return {
-            "status": "sucesso", 
-            "mensagem": "Festa criada com sucesso!", 
-            "event_id": novo_event_id,
-            "link_do_cardapio": f"aurorabartenders.com/{evento.custom_url_slug}"
-        }
+#         # Devolvemos uma resposta de sucesso para o aplicativo
+#         return {
+#             "status": "sucesso", 
+#             "mensagem": "Festa criada com sucesso!", 
+#             "event_id": novo_event_id,
+#             "link_do_cardapio": f"aurorabartenders.com/{evento.custom_url_slug}"
+#         }
         
-    except Exception as e:
-        # Se der qualquer erro (ex: slug duplicado), desfazemos a operação
-        conn.rollback() 
-        conn.close()
-        raise HTTPException(status_code=400, detail=str(e)) """
+#     except Exception as e:
+#         # Se der qualquer erro (ex: slug duplicado), desfazemos a operação
+#         conn.rollback() 
+#         conn.close()
+#         raise HTTPException(status_code=400, detail=str(e))
         
         
 # ==========================================
