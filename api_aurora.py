@@ -257,7 +257,7 @@ def buscar_detalhes_evento(event_id: str):
 
 class EventCreate(BaseModel):
     nome: str
-    account_id: Optional[str] = "a57c20f3-526a-41f4-8b95-d4cd7cd2e362" # <--- O Pulo do Gato!
+    account_id: str # <--- AGORA É OBRIGATÓRIO E SEM PADRÃO!
     responsavel: Optional[str] = ""
     telefone: Optional[str] = ""
     dataEvento: Optional[date] = None
@@ -267,7 +267,7 @@ class EventCreate(BaseModel):
     extH: Optional[int] = 0
     extM: Optional[int] = 0
     termino: Optional[time] = None
-    local: Optional[str] = ""   
+    local: Optional[str] = ""
 
 # ==========================================
 # ATUALIZAR DADOS DO EVENTO (SALVAR EDIÇÃO)
@@ -637,7 +637,7 @@ def ver_cardapio_publico(url_slug: str):
         raise HTTPException(status_code=400, detail=str(e))
         
         
-# ==========================================
+""" # ==========================================
 # NOSSA TERCEIRA ROTA: CRIAR UM NOVO EVENTO
 # ==========================================
 @app.post("/events/")
@@ -689,7 +689,7 @@ def criar_evento(evento: NovoEvento):
         # Se der qualquer erro (ex: slug duplicado), desfazemos a operação
         conn.rollback() 
         conn.close()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) """
         
         
 # ==========================================

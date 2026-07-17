@@ -4069,21 +4069,22 @@
 
 
         // ============================================================
-        // SALVAR NOVO EVENTO (POSTGRESQL)
+        // SALVAR NOVO EVENTO (POSTGRESQL) - USANDO A ROTA 16 COMPLETA
         // ============================================================
         window.salvarNovoEvento = async () => {
             const btnSalvar = document.querySelector("#modalNovoEvento .btn-primary");
             const n = document.getElementById('mNome').value;
             if (!n) return alert("Por favor, preencha o nome do evento!");
 
-            // Trava o botão para não clicar duas vezes sem querer
             if (btnSalvar) {
                 btnSalvar.disabled = true;
                 btnSalvar.innerText = "Salvando...";
                 btnSalvar.style.opacity = "0.5";
             }
 
+            // O PACOTE COMPLETO: Agora com o crachá da agência!
             const dadosEvento = {
+                account_id: localStorage.getItem('account_id'), // 📍 A PEÇA QUE FALTAVA
                 nome: n,
                 responsavel: document.getElementById('mResp').value || "",
                 telefone: document.getElementById('mTel').value || "",
@@ -4098,16 +4099,20 @@
             };
 
             try {
-                const resposta = await fetch("https://aurora-api-zj8e.onrender.com/events/new", {
+                // 📍 Conectando na sua rota 16 usando a variável global
+                const resposta = await fetch(`${API_BASE}/events/new`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(dadosEvento)
                 });
 
-                if (!resposta.ok) throw new Error("Falha ao salvar evento no banco de dados.");
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Falha ao salvar evento no banco de dados.");
+                }
 
                 window.fecharModal();
-                alert("✅ Evento criado com sucesso no PostgreSQL!");
+                alert("✅ Evento criado com sucesso e vinculado à sua agência!");
 
                 // Atualiza a lista na hora para mostrar o novo evento
                 window.renderizarListaEventos();
@@ -4115,7 +4120,6 @@
             } catch (e) {
                 alert("Erro ao salvar: " + e.message);
             } finally {
-                // Devolve o botão ao normal
                 if (btnSalvar) {
                     btnSalvar.disabled = false;
                     btnSalvar.innerText = "+ NOVO EVENTO";
@@ -4136,7 +4140,7 @@
         if(event && event.currentTarget) event.currentTarget.style.border = '2px solid #2980b9';
 
         try {
-            const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id}`);
+            const resposta = await fetch(`${API_BASE}/events/${id}`);
             if (!resposta.ok) throw new Error("Evento não encontrado no banco.");
 
             const ev = await resposta.json();
@@ -4258,7 +4262,7 @@
                 btn.innerText = "Salvando...";
 
                 // Manda um "PUT" (Atualizar) para o Python
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}`, {
+                const resposta = await fetch(`${API_BASE}/events/${eventoID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
