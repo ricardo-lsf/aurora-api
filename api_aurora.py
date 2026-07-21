@@ -1726,35 +1726,103 @@ def registrar_estorno(event_id: str, cocktail_id: str):
     
    
 # ==========================================
-# NOSSA DÉCIMA QUINTA ROTA: LOGIN DA EQUIPE (STAFF)
+# MÓDULO DE EQUIPE (STAFF) - MULTI-TENANT
 # ==========================================
+from typing import Optional
+from pydantic import BaseModel
+
+class NovoMembro(BaseModel):
+    account_id: str
+    name: str
+    phone: str
+    role: Optional[str] = "bartender"
+    status: Optional[str] = "ativo"
+
+# 1. ROTA DE LOGIN DO FREELANCER (Agora com cadeado da Agência!)
 @app.get("/login/{phone}")
-def login_staff(phone: str):
+def login_staff(phone: str, account_id: str): 
+    if not account_id:
+        raise HTTPException(status_code=400, detail="account_id é obrigatório para login")
+
     conn = get_db_connection()
-    if not conn:
-        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
-    
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Busca o funcionário pelo telefone e verifica se está ativo
-        cur.execute("SELECT id, name, role FROM staff WHERE phone = %s AND status = 'ativo';", (phone,))
+        # O funcionário precisa estar ativo e pertencer à agência certa
+        cur.execute("""
+            SELECT id, name, role 
+            FROM staff 
+            WHERE phone = %s AND account_id = %s AND status = 'ativo';
+        """, (phone, account_id))
+        
         user = cur.fetchone()
         
-        cur.close()
-        conn.close()
-        
         if user:
-            # Se achou, devolve sucesso e os dados da pessoa
             return {"status": "sucesso", "usuario": user}
         else:
-            # Se não achou, devolve erro 404
-            raise HTTPException(status_code=404, detail="Telefone não cadastrado ou inativo")
+            raise HTTPException(status_code=404, detail="Telefone não encontrado nesta agência ou inativo")
             
     except Exception as e:
-        if conn:
-            conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+# 2. ROTA PARA LISTAR A EQUIPE (Usada no KDS e no Admin)
+@app.get("/team")
+@app.get("/staff") # Aceita os dois nomes para não quebrar nada no Frontend
+def listar_equipe(account_id: str):
+    if not account_id:
+        raise HTTPException(status_code=400, detail="account_id é obrigatório")
+        
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Puxa a equipe filtrada pela agência
+        cur.execute("""
+            SELECT id, name, role, phone, status 
+            FROM staff 
+            WHERE account_id = %s AND status = 'ativo'
+            ORDER BY name ASC
+        """, (account_id,))
+        
+        equipe = cur.fetchall()
+        
+        # Retornamos a lista direta para não quebrar o "data.forEach" que já existe lá no seu kds.html
+        return equipe 
+        
+    except Exception as e:
+        print(f"Erro ao buscar equipe: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+# 3. ROTA PARA ADICIONAR NOVO MEMBRO (Pelo Admin)
+@app.post("/team")
+def adicionar_membro(membro: NovoMembro):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            INSERT INTO staff (account_id, name, phone, role, status)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (membro.account_id, membro.name, membro.phone, membro.role, membro.status))
+        
+        novo_id = cur.fetchone()['id']
+        conn.commit()
+        return {"status": "sucesso", "id": novo_id}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
     
 # ==========================================
 # NOSSA DÉCIMA SEXTA ROTA: CRIAR NOVO EVENTO (ADMIN)
@@ -2315,24 +2383,7 @@ def atualizar_status_pedido(order_id: str, payload: dict):
         cur.close()
         conn.close()
 
-# ==========================================
-# ROTA: LISTAR EQUIPE (STAFF)
-# ==========================================
-@app.get("/team")
-def listar_equipe():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # ATENÇÃO AQUI: Verifique se a coluna do nome na tabela STAFF se chama 'name', 'nome', etc.
-        # Vou assumir 'name' como padrão do Supabase, mas ajuste se for 'nome'.
-        cur.execute("SELECT name FROM STAFF ORDER BY name ASC")
-        return cur.fetchall()
-    except Exception as e:
-        print(f"Erro ao buscar equipe (STAFF): {e}")
-        return []
-    finally:
-        cur.close()
-        conn.close()
+
 
 # ==========================================
 # ROTA: LISTAR ORÇAMENTOS SALVOS DA CONTA (GET)
