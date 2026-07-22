@@ -5033,12 +5033,30 @@
         
         window.equipeAtiva = []; // Guarda a lista na memória para facilitar a edição
 
-        window.abrirModalEquipe = (id = null) => { 
+        window.abrirModalEquipe = () => { 
+            // 1. Esvazia todos os campos de texto, números e datas
             document.getElementById('eqId').value = '';
             document.getElementById('eqNome').value = '';
             document.getElementById('eqTel').value = '';
-            document.getElementById('eqFuncao').value = 'Bartender';
+            document.getElementById('eqCPF').value = '';
+            document.getElementById('eqData').value = '';
             
+            // Verifica se o campo idade existe na tela para não dar erro ao limpar
+            const inputIdade = document.getElementById('eqIdade');
+            if (inputIdade) inputIdade.value = '';
+            
+            document.getElementById('eqTaxa').value = '';
+            document.getElementById('eqAdicional').value = '';
+            
+            // 2. Volta as caixas de seleção (Selects) para a opção padrão
+            document.getElementById('eqFuncao').value = 'Bartender';
+            document.getElementById('eqSexo').value = 'M';
+            
+            // 3. Destrava o botão (caso tenha ficado de uma ação anterior)
+            const btn = document.getElementById('btnSalvarEquipe');
+            if (btn) { btn.innerText = 'SALVAR'; btn.disabled = false; }
+            
+            // 4. Ajusta o título e exibe o modal
             document.getElementById('eqTitulo').innerText = '👤 Novo Membro';
             document.getElementById('modalEquipe').style.display = 'flex'; 
         };
