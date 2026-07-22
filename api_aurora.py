@@ -1827,16 +1827,16 @@ def listar_equipe(account_id: str):
             cur.close()
             conn.close()
 
-# 3. ROTA PARA ADICIONAR NOVO MEMBRO
+# 3. ROTA PARA ADICIONAR NOVO MEMBRO (Admin)
 @app.post("/team")
 def adicionar_membro(membro: NovoMembro):
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # VERIFICAÇÃO DE CPF DUPLICADO
+        # VERIFICAÇÃO DE CPF DUPLICADO (Com cast ::uuid para evitar erro 500 do Postgres)
         if membro.cpf and membro.cpf.strip() != "":
-            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s", (membro.cpf, membro.account_id))
+            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s::uuid", (membro.cpf, membro.account_id))
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Este CPF já está cadastrado para outro membro na sua agência.")
 
@@ -1844,7 +1844,7 @@ def adicionar_membro(membro: NovoMembro):
         
         cur.execute("""
             INSERT INTO staff (account_id, name, phone, role, status, cpf, birth_date, gender, base_fee, additional_fee)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (membro.account_id, membro.name, membro.phone, membro.role, membro.status, 
               membro.cpf, dt_nasc, membro.gender, membro.base_fee, membro.additional_fee))
@@ -1854,25 +1854,26 @@ def adicionar_membro(membro: NovoMembro):
         return {"status": "sucesso", "id": novo_id}
     except HTTPException as he:
         if conn: conn.rollback()
-        raise he # Repassa o erro 400 limpo para o frontend
+        raise he 
     except Exception as e:
         if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"ERRO NO POST /team: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro no banco de dados: {str(e)}")
     finally:
         if conn:
             cur.close()
             conn.close()
 
-# 4. ROTA PARA ATUALIZAR (EDITAR) MEMBRO
+# 4. ROTA PARA ATUALIZAR (EDITAR) MEMBRO (Admin)
 @app.put("/team/{membro_id}")
 def atualizar_membro(membro_id: int, membro: EditaMembro):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
         
-        # VERIFICAÇÃO DE CPF DUPLICADO (Ignorando o próprio membro)
+        # VERIFICAÇÃO DE CPF DUPLICADO (Com cast explícito ::uuid)
         if membro.cpf and membro.cpf.strip() != "":
-            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s AND id != %s", (membro.cpf, membro.account_id, membro_id))
+            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s::uuid AND id != %s", (membro.cpf, membro.account_id, membro_id))
             if cur.fetchone():
                 raise HTTPException(status_code=400, detail="Este CPF já pertence a outro membro da equipe.")
 
@@ -1882,7 +1883,7 @@ def atualizar_membro(membro_id: int, membro: EditaMembro):
             UPDATE staff 
             SET name = %s, phone = %s, role = %s, cpf = %s, 
                 birth_date = %s, gender = %s, base_fee = %s, additional_fee = %s
-            WHERE id = %s AND account_id = %s
+            WHERE id = %s AND account_id = %s::uuid
         """, (membro.name, membro.phone, membro.role, membro.cpf, dt_nasc, 
               membro.gender, membro.base_fee, membro.additional_fee, membro_id, membro.account_id))
         
@@ -1890,10 +1891,11 @@ def atualizar_membro(membro_id: int, membro: EditaMembro):
         return {"status": "sucesso"}
     except HTTPException as he:
         if conn: conn.rollback()
-        raise he # Repassa o erro 400 limpo para o frontend
+        raise he 
     except Exception as e:
         if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"ERRO NO PUT /team: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro no banco de dados: {str(e)}")
     finally:
         if conn: conn.close()
 
