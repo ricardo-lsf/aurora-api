@@ -14,30 +14,8 @@ import json
 app = FastAPI(title="Aurora Bartenders API")
 
 # ==========================================
-# ROTAS DO FRONTEND (Telas HTML)
+# CLASSES
 # ==========================================
-@app.get("/login.html")
-def abrir_tela_login():
-    return FileResponse("login.html")
-
-@app.get("/admin.html")  # Aproveite e já libere o painel também!
-def abrir_tela_admin():
-    return FileResponse("admin.html")
-
-
-# ==========================================
-# CONFIGURAÇÃO DE SEGURANÇA (CORS)
-# ==========================================
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Permite que qualquer front-end (até o seu localhost) acesse a API
-    allow_credentials=True,
-    allow_methods=["*"],  # Permite todos os comandos (GET, POST, etc.)
-    allow_headers=["*"],  # Permite qualquer formato de cabeçalho
-)
-
-# Libera a pasta de imagens para acesso público
-app.mount("/imagens", StaticFiles(directory="imagens"), name="imagens")
 
 class EventoUpdate(BaseModel):
     responsavel: Optional[str] = ""
@@ -65,6 +43,171 @@ class NovaRegraPacote(BaseModel):
     categoria_generica: str
     pacote: str
     real_ingredient_id: str
+
+class EventCreate(BaseModel):
+    nome: str
+    account_id: str # <--- AGORA É OBRIGATÓRIO E SEM PADRÃO!
+    responsavel: Optional[str] = ""
+    telefone: Optional[str] = ""
+    dataEvento: Optional[date] = None
+    horaEvento: Optional[time] = None
+    durH: Optional[int] = 4
+    durM: Optional[int] = 0
+    extH: Optional[int] = 0
+    extM: Optional[int] = 0
+    termino: Optional[time] = None
+    local: Optional[str] = ""
+
+# O "Molde" (Schema) para criar um evento
+class NovoEvento(BaseModel):
+    account_id: str
+    event_name: str
+    event_date: str          # Formato esperado: 'YYYY-MM-DD'
+    custom_url_slug: str     # Ex: 'niver-do-heitor'
+    status: Optional[str] = 'confirmed' # Se o app não mandar, assume 'confirmed'
+
+class NovoInsumo(BaseModel):
+    account_id: str
+    name: str
+    brand: Optional[str] = ""
+    type_name: str
+    measurement_unit: str
+    package_quantity: float
+    current_cost_price: float # Adicionado para salvar o preço inicial
+
+class NovaCompra(BaseModel):
+    ingredient_id: str
+    packages_bought: float
+    total_paid: float
+    supplier_name: Optional[str] = "Não informado"
+
+
+class PedidoSimulacaoCusto(BaseModel):
+    account_id: str
+    drink_ids: List[str]
+    pacote: str  # Ex: 'bronze', 'prata', 'ouro', 'diamante'
+
+class IngredienteReceita(BaseModel):
+    ingredient_id: str
+    quantity: float # Ex: 50 (para 50ml)
+
+class NovoCocktail(BaseModel):
+    account_id: str
+    name: str
+    preparation_steps: Optional[str] = ""
+    category: str
+    technique: Optional[str] = "Montado"     # <--- ADICIONADO!
+    drink_type: Optional[str] = "Cocktail"   # <--- ADICIONADO!
+    sale_price: float
+    image_url: Optional[str] = ""
+    min_package_level: int = 1
+    recipe: List[IngredienteReceita]
+
+class EdicaoInsumo(BaseModel):
+    name: str
+    brand: Optional[str] = ""
+    type_name: str
+    measurement_unit: str
+    package_quantity: float
+    current_cost_price: float
+
+class NovoMenu(BaseModel):
+    # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
+    drinks: List[str] 
+
+class ItemCarga(BaseModel):
+    ingredient_id: str
+    quantity: float
+
+class CargaEventoBody(BaseModel):
+    event_id: str
+    itens: List[ItemCarga] # 🛑 O molde agora usa "items" (com m) para bater com o JS!
+
+# 1. O Molde do que o seu PDV (index.html) vai enviar para a API
+class NovaVenda(BaseModel):
+    event_id: str
+    cocktail_id: str
+    price: float  # Se for Open Bar, o PDV vai mandar 0.00. Se for Cash Bar, manda o valor pago.
+    user_name: Optional[str] = "Bartender"
+
+class EstornoVenda(BaseModel):
+    sale_id: str
+    event_id: str
+
+class NovoMembro(BaseModel):
+    account_id: str
+    name: str
+    phone: str
+    role: Optional[str] = "Bartender"
+    status: Optional[str] = "ativo"
+    cpf: Optional[str] = ""
+    birth_date: Optional[str] = None
+    gender: Optional[str] = ""
+    base_fee: Optional[float] = 0.0
+    additional_fee: Optional[float] = 0.0
+
+class EditaMembro(BaseModel):
+    account_id: str
+    name: str
+    phone: str
+    role: str
+
+class EventStatus(BaseModel):
+    status: str
+
+# Molde para receber a atualização de estoque
+class EstoqueDrink(BaseModel):
+    quantidade: int
+
+# 1. MODELO DE ENTRADA CORRIGIDO CONFORME A TABELA BUDGET
+class NovoOrcamentoInput(BaseModel):
+    id: Optional[str] = None  # <--- NOVA LINHA AQUI
+    account_id: str
+    cliente: str
+    data_evento: Optional[str] = None
+    local: Optional[str] = None
+    qtd_pessoas: int
+    valor_pessoa: float
+    extras: float
+    total: float
+    pacote_escolhido: str  # 100% alinhado com a coluna 8
+    drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
+    custo_estimado: float
+    valor_sugerido: float
+
+class ItemRetorno(BaseModel):
+    ingredient_id: str
+    returned_quantity: float
+
+class PayloadRetorno(BaseModel):
+    itens: List[ItemRetorno]
+
+# ==========================================
+# ROTAS DO FRONTEND (Telas HTML)
+# ==========================================
+@app.get("/login.html")
+def abrir_tela_login():
+    return FileResponse("login.html")
+
+@app.get("/admin.html")  # Aproveite e já libere o painel também!
+def abrir_tela_admin():
+    return FileResponse("admin.html")
+
+
+# ==========================================
+# CONFIGURAÇÃO DE SEGURANÇA (CORS)
+# ==========================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permite que qualquer front-end (até o seu localhost) acesse a API
+    allow_credentials=True,
+    allow_methods=["*"],  # Permite todos os comandos (GET, POST, etc.)
+    allow_headers=["*"],  # Permite qualquer formato de cabeçalho
+)
+
+# Libera a pasta de imagens para acesso público
+app.mount("/imagens", StaticFiles(directory="imagens"), name="imagens")
+
 
 # ==========================================
 # ROTA DE REGRAS: SALVAR / ATUALIZAR REGRA DE PACOTE
@@ -255,20 +398,6 @@ def buscar_detalhes_evento(event_id: str):
         print("Erro ao buscar evento:", e)
         raise HTTPException(status_code=500, detail="Falha interna no servidor")
 
-class EventCreate(BaseModel):
-    nome: str
-    account_id: str # <--- AGORA É OBRIGATÓRIO E SEM PADRÃO!
-    responsavel: Optional[str] = ""
-    telefone: Optional[str] = ""
-    dataEvento: Optional[date] = None
-    horaEvento: Optional[time] = None
-    durH: Optional[int] = 4
-    durM: Optional[int] = 0
-    extH: Optional[int] = 0
-    extM: Optional[int] = 0
-    termino: Optional[time] = None
-    local: Optional[str] = ""
-
 # ==========================================
 # ATUALIZAR DADOS DO EVENTO (SALVAR EDIÇÃO)
 # ==========================================
@@ -350,38 +479,6 @@ def atualizar_evento(event_id: str, dados: EventoUpdate):
         print("Erro no PUT /events:", str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
-
-# O "Molde" (Schema) para criar um evento
-class NovoEvento(BaseModel):
-    account_id: str
-    event_name: str
-    event_date: str          # Formato esperado: 'YYYY-MM-DD'
-    custom_url_slug: str     # Ex: 'niver-do-heitor'
-    status: Optional[str] = 'confirmed' # Se o app não mandar, assume 'confirmed'
-
-# ==========================================
-# NOVOS MOLDES: INSUMOS E COMPRAS
-# ==========================================
-class NovoInsumo(BaseModel):
-    account_id: str
-    name: str
-    brand: Optional[str] = ""
-    type_name: str
-    measurement_unit: str
-    package_quantity: float
-    current_cost_price: float # Adicionado para salvar o preço inicial
-
-class NovaCompra(BaseModel):
-    ingredient_id: str
-    packages_bought: float
-    total_paid: float
-    supplier_name: Optional[str] = "Não informado"
-
-
-class PedidoSimulacaoCusto(BaseModel):
-    account_id: str
-    drink_ids: List[str]
-    pacote: str  # Ex: 'bronze', 'prata', 'ouro', 'diamante'
 
 # ==========================================
 # ROTA DE INTELIGÊNCIA: SIMULADOR DE CUSTO POR PACOTE
@@ -501,32 +598,6 @@ def criar_insumo(insumo: NovoInsumo):
         cur.close()
         conn.close()
 
-# ==========================================
-# NOVOS MOLDES: A FICHA TÉCNICA DO DRINK
-# ==========================================
-class IngredienteReceita(BaseModel):
-    ingredient_id: str
-    quantity: float # Ex: 50 (para 50ml)
-
-class NovoCocktail(BaseModel):
-    account_id: str
-    name: str
-    preparation_steps: Optional[str] = ""
-    category: str
-    technique: Optional[str] = "Montado"     # <--- ADICIONADO!
-    drink_type: Optional[str] = "Cocktail"   # <--- ADICIONADO!
-    sale_price: float
-    image_url: Optional[str] = ""
-    min_package_level: int = 1
-    recipe: List[IngredienteReceita]
-
-class EdicaoInsumo(BaseModel):
-    name: str
-    brand: Optional[str] = ""
-    type_name: str
-    measurement_unit: str
-    package_quantity: float
-    current_cost_price: float
 
 
 # Função para conectar no banco (Agora segura!)
@@ -692,25 +763,6 @@ def ver_cardapio_publico(url_slug: str):
 #         raise HTTPException(status_code=400, detail=str(e))
         
         
-# ==========================================
-# O "MOLDE" DA LISTA DE DRINKS
-# ==========================================
-class NovoMenu(BaseModel):
-    # Uma lista contendo os UUIDs dos drinks, na ordem em que devem aparecer na tela
-    drinks: List[str] 
-
-# ==========================================
-# O "MOLDE" PARA MULTIPLOS INSUMOS
-# ==========================================
-class ItemCarga(BaseModel):
-    ingredient_id: str
-    quantity: float
-
-class CargaEventoBody(BaseModel):
-    event_id: str
-    itens: List[ItemCarga] # 🛑 O molde agora usa "items" (com m) para bater com o JS!
-
-
 # ==========================================
 # CARREGAR ESTOQUE DO CAMINHÃO (BLINDADO)
 # ==========================================
@@ -1125,13 +1177,6 @@ def listar_tipos_insumos():
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# 1. O Molde do que o seu PDV (index.html) vai enviar para a API
-class NovaVenda(BaseModel):
-    event_id: str
-    cocktail_id: str
-    price: float  # Se for Open Bar, o PDV vai mandar 0.00. Se for Cash Bar, manda o valor pago.
-    user_name: Optional[str] = "Bartender"
-
 # ==========================================
 # ROTA MESTRA: REGISTRAR VENDA (PDV)
 # ==========================================
@@ -1214,9 +1259,6 @@ def registrar_venda(payload: NovaVenda):
 # ==========================================
 # ROTA MESTRA 2: ESTORNAR VENDA E DEVOLVER ESTOQUE
 # ==========================================
-class EstornoVenda(BaseModel):
-    sale_id: str
-    event_id: str
 
 @app.post("/sales/cancel")
 def estornar_venda(payload: EstornoVenda):
@@ -1728,17 +1770,8 @@ def registrar_estorno(event_id: str, cocktail_id: str):
 # ==========================================
 # MÓDULO DE EQUIPE (STAFF) - MULTI-TENANT
 # ==========================================
-from typing import Optional
-from pydantic import BaseModel
 
-class NovoMembro(BaseModel):
-    account_id: str
-    name: str
-    phone: str
-    role: Optional[str] = "bartender"
-    status: Optional[str] = "ativo"
-
-# 1. ROTA DE LOGIN DO FREELANCER (Agora com cadeado da Agência!)
+# 1. ROTA DE LOGIN DO FREELANCER (KDS)
 @app.get("/login/{phone}")
 def login_staff(phone: str, account_id: str): 
     if not account_id:
@@ -1747,8 +1780,6 @@ def login_staff(phone: str, account_id: str):
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # O funcionário precisa estar ativo e pertencer à agência certa
         cur.execute("""
             SELECT id, name, role 
             FROM staff 
@@ -1761,7 +1792,6 @@ def login_staff(phone: str, account_id: str):
             return {"status": "sucesso", "usuario": user}
         else:
             raise HTTPException(status_code=404, detail="Telefone não encontrado nesta agência ou inativo")
-            
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
@@ -1769,24 +1799,76 @@ def login_staff(phone: str, account_id: str):
             cur.close()
             conn.close()
 
-class EditaMembro(BaseModel):
-    account_id: str
-    name: str
-    phone: str
-    role: str
+# 2. ROTA PARA LISTAR A EQUIPE (Admin)
+@app.get("/team")
+@app.get("/staff") # Aceita os dois nomes
+def listar_equipe(account_id: str):
+    if not account_id:
+        raise HTTPException(status_code=400, detail="account_id é obrigatório")
+        
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Trazendo a equipe com os campos novos!
+        cur.execute("""
+            SELECT id, name, role, phone, status, cpf, 
+                   TO_CHAR(birth_date, 'YYYY-MM-DD') as birth_date, 
+                   gender, base_fee, additional_fee 
+            FROM staff 
+            WHERE account_id = %s AND status = 'ativo'
+            ORDER BY name ASC
+        """, (account_id,))
+        
+        return cur.fetchall() 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
-# 2. ROTA PARA ATUALIZAR (EDITAR) MEMBRO
+# 3. ROTA PARA ADICIONAR NOVO MEMBRO (Admin)
+@app.post("/team")
+def adicionar_membro(membro: NovoMembro):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # Tratamento da data para não dar erro no banco
+        dt_nasc = None if not membro.birth_date or membro.birth_date.strip() == "" else membro.birth_date
+        
+        cur.execute("""
+            INSERT INTO staff (account_id, name, phone, role, status, cpf, birth_date, gender, base_fee, additional_fee)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (membro.account_id, membro.name, membro.phone, membro.role, membro.status, 
+              membro.cpf, dt_nasc, membro.gender, membro.base_fee, membro.additional_fee))
+        
+        novo_id = cur.fetchone()['id']
+        conn.commit()
+        return {"status": "sucesso", "id": novo_id}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+
+# 4. ROTA PARA ATUALIZAR (EDITAR) MEMBRO (Admin)
 @app.put("/team/{membro_id}")
 def atualizar_membro(membro_id: int, membro: EditaMembro):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        # Atualiza apenas se o membro pertencer à agência correta
+        dt_nasc = None if not membro.birth_date or membro.birth_date.strip() == "" else membro.birth_date
+        
         cur.execute("""
             UPDATE staff 
-            SET name = %s, phone = %s, role = %s
+            SET name = %s, phone = %s, role = %s, cpf = %s, 
+                birth_date = %s, gender = %s, base_fee = %s, additional_fee = %s
             WHERE id = %s AND account_id = %s
-        """, (membro.name, membro.phone, membro.role, membro_id, membro.account_id))
+        """, (membro.name, membro.phone, membro.role, membro.cpf, dt_nasc, 
+              membro.gender, membro.base_fee, membro.additional_fee, membro_id, membro.account_id))
         
         conn.commit()
         return {"status": "sucesso"}
@@ -1796,13 +1878,12 @@ def atualizar_membro(membro_id: int, membro: EditaMembro):
     finally:
         if conn: conn.close()
 
-# 3. ROTA PARA EXCLUIR (SOFT DELETE)
+# 5. ROTA PARA EXCLUIR (SOFT DELETE) (Admin)
 @app.delete("/team/{membro_id}")
 def deletar_membro(membro_id: int, account_id: str):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        # Em vez de apagar, mudamos o status para 'inativo'
         cur.execute("""
             UPDATE staff 
             SET status = 'inativo'
@@ -1816,61 +1897,6 @@ def deletar_membro(membro_id: int, account_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
-
-# 4. ROTA PARA LISTAR A EQUIPE (Usada no KDS e no Admin)
-@app.get("/team")
-@app.get("/staff") # Aceita os dois nomes para não quebrar nada no Frontend
-def listar_equipe(account_id: str):
-    if not account_id:
-        raise HTTPException(status_code=400, detail="account_id é obrigatório")
-        
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Puxa a equipe filtrada pela agência
-        cur.execute("""
-            SELECT id, name, role, phone, status 
-            FROM staff 
-            WHERE account_id = %s AND status = 'ativo'
-            ORDER BY name ASC
-        """, (account_id,))
-        
-        equipe = cur.fetchall()
-        
-        # Retornamos a lista direta para não quebrar o "data.forEach" que já existe lá no seu kds.html
-        return equipe 
-        
-    except Exception as e:
-        print(f"Erro ao buscar equipe: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-
-# 5. ROTA PARA ADICIONAR NOVO MEMBRO (Pelo Admin)
-@app.post("/team")
-def adicionar_membro(membro: NovoMembro):
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("""
-            INSERT INTO staff (account_id, name, phone, role, status)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (membro.account_id, membro.name, membro.phone, membro.role, membro.status))
-        
-        novo_id = cur.fetchone()['id']
-        conn.commit()
-        return {"status": "sucesso", "id": novo_id}
-    except Exception as e:
-        if conn: conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
     
 # ==========================================
 # NOSSA DÉCIMA SEXTA ROTA: CRIAR NOVO EVENTO (ADMIN)
@@ -1955,8 +1981,6 @@ def list_events(account_id: str): # 📍 AGORA EXIGE A IDENTIFICAÇÃO DA AGÊNC
 # ==========================================
 # NOVOS MOLDES PARA AS AÇÕES DOS BOTÕES
 # ==========================================
-class EventStatus(BaseModel):
-    status: str
 
 # 1. ROTA PARA MUDAR STATUS (Encerrar / Reabrir)
 @app.patch("/events/{event_id}/status")
@@ -2021,9 +2045,6 @@ def deletar_evento(event_id: str):
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     
-# Molde para receber a atualização de estoque
-class EstoqueDrink(BaseModel):
-    quantidade: int
 
 # ROTA PARA ATUALIZAR A QUANTIDADE DE UM DRINK NO EVENTO
 @app.patch("/events/{event_id}/menu/{cocktail_id}/quantity")
@@ -2474,22 +2495,6 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# 1. MODELO DE ENTRADA CORRIGIDO CONFORME A TABELA BUDGET
-class NovoOrcamentoInput(BaseModel):
-    id: Optional[str] = None  # <--- NOVA LINHA AQUI
-    account_id: str
-    cliente: str
-    data_evento: Optional[str] = None
-    local: Optional[str] = None
-    qtd_pessoas: int
-    valor_pessoa: float
-    extras: float
-    total: float
-    pacote_escolhido: str  # 100% alinhado com a coluna 8
-    drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
-    custo_estimado: float
-    valor_sugerido: float
-
 # ==========================================
 # ROTA: SALVAR NOVO OU ATUALIZAR ORÇAMENTO
 # ==========================================
@@ -2628,15 +2633,6 @@ def relatorio_vendas(event_id: str = 'ALL'):
             conn.close()
         raise HTTPException(status_code=400, detail=str(e))
 
-from pydantic import BaseModel
-from typing import List
-
-class ItemRetorno(BaseModel):
-    ingredient_id: str
-    returned_quantity: float
-
-class PayloadRetorno(BaseModel):
-    itens: List[ItemRetorno]
 
 # ==========================================
 # FECHAMENTO DE ESTOQUE (LOGÍSTICA REVERSA)

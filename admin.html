@@ -5002,6 +5002,31 @@
             doc.save(`Proposta_${cliente}.pdf`);
         };
 
+        // ==========================================
+        // FUNÇÃO GLOBAL DE VALIDAÇÃO DE CPF
+        // ==========================================
+        window.validarCPF = (cpf) => {
+            cpf = cpf.replace(/[^\d]+/g, ''); // Remove pontos e traços
+            if (cpf == '') return false;
+            
+            // Elimina CPFs inválidos conhecidos (ex: 111.111.111-11)
+            if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+
+            let soma = 0, resto;
+            for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i)) * (11 - i);
+            resto = (soma * 10) % 11;
+            if ((resto == 10) || (resto == 11)) resto = 0;
+            if (resto != parseInt(cpf.substring(9, 10))) return false;
+
+            soma = 0;
+            for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i)) * (12 - i);
+            resto = (soma * 10) % 11;
+            if ((resto == 10) || (resto == 11)) resto = 0;
+            if (resto != parseInt(cpf.substring(10, 11))) return false;
+
+            return true;
+        };
+
         // ============================================================
         // MÓDULO EQUIPE (100% POSTGRESQL MULTI-TENANT)
         // ============================================================
@@ -5044,8 +5069,8 @@
                             <td><strong>${m.name}</strong></td>
                             <td>${m.phone}</td>
                             <td><span style="background:#34495e; color:white; padding:3px 8px; border-radius:12px; font-size:12px;">${m.role || 'Bartender'}</span></td>
-                            <td>-</td>
-                            <td>-</td>
+                            <td>R$ ${(m.base_fee || 0).toFixed(2)}</td>
+                            <td>R$ ${(m.additional_fee || 0).toFixed(2)}</td>
                             <td style="text-align:right">
                                 <button onclick="editarEquipe('${m.id}')" style="background:transparent; border:none; cursor:pointer; font-size:1.2em;" title="Editar">✏️</button>
                                 <button onclick="delEq('${m.id}')" style="background:transparent; border:none; cursor:pointer; font-size:1.2em;" title="Excluir">🗑️</button>
@@ -5058,10 +5083,26 @@
 
         // 2. SALVAR OU ATUALIZAR MEMBRO
         window.salvarEquipe = async () => { 
-            const id = document.getElementById('eqId').value; // Se tiver ID, é edição!
+            const id = document.getElementById('eqId').value;
             const nome = document.getElementById('eqNome').value;
             const telefone = document.getElementById('eqTel').value;
             const funcao = document.getElementById('eqFuncao').value;
+            
+            // Novos campos:
+            const cpf = document.getElementById('eqCPF').value;
+            
+            // Valida o CPF apenas se o usuário tiver digitado alguma coisa
+            // (Isso permite salvar um perfil sem CPF caso ele ainda não tenha o dado)
+            if (cpf && cpf.trim() !== '') {
+                if (!window.validarCPF(cpf)) {
+                    return alert("❌ O CPF digitado é inválido. Por favor, verifique os números!");
+                }
+            }
+            
+            const dataNasc = document.getElementById('eqData').value;
+            const sexo = document.getElementById('eqSexo').value;
+            const taxa = parseFloat(document.getElementById('eqTaxa').value) || 0.0;
+            const adicional = parseFloat(document.getElementById('eqAdicional').value) || 0.0;
             
             if (!nome || !telefone) return alert("Preencha pelo menos o Nome e o Telefone!");
 
@@ -5069,7 +5110,13 @@
                 account_id: localStorage.getItem('account_id'),
                 name: nome,
                 phone: telefone,
-                role: funcao
+                role: funcao,
+                status: 'ativo',
+                cpf: cpf,
+                birth_date: dataNasc,
+                gender: sexo,
+                base_fee: taxa,
+                additional_fee: adicional
             };
 
             try {
@@ -5112,6 +5159,16 @@
             document.getElementById('eqTel').value = membro.phone;
             document.getElementById('eqFuncao').value = membro.role;
             
+            // Novos campos:
+            document.getElementById('eqCPF').value = membro.cpf || '';
+            document.getElementById('eqData').value = membro.birth_date || '';
+            document.getElementById('eqSexo').value = membro.gender || 'M';
+            document.getElementById('eqTaxa').value = membro.base_fee || '';
+            document.getElementById('eqAdicional').value = membro.additional_fee || '';
+            
+            // Dica extra: Se você tiver a função calcIdade(), chame ela aqui para recalcular ao abrir
+            if(typeof calcIdade === 'function') calcIdade();
+            
             document.getElementById('eqTitulo').innerText = '👤 Editar Membro';
             document.getElementById('modalEquipe').style.display = 'flex'; 
         };
@@ -5134,7 +5191,7 @@
             }
         };
 
-        
+
         // 6. ANALYTICS V55 (COM RESGATE)
 
         // CORREÇÃO: Analytics com Histórico de Clientes
