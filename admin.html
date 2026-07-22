@@ -5133,7 +5133,10 @@
                     body: JSON.stringify(dados)
                 });
 
-                if (!resposta.ok) throw new Error("Falha ao salvar no banco");
+                if (!resposta.ok) {
+                    const erroApi = await resposta.json();
+                    throw new Error(erroApi.detail || "Falha ao salvar no banco");
+                }
 
                 alert(id ? "✅ Membro atualizado!" : "✅ Membro salvo com sucesso!");
                 fecharModalEquipe();

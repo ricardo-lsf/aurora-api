@@ -1827,13 +1827,19 @@ def listar_equipe(account_id: str):
             cur.close()
             conn.close()
 
-# 3. ROTA PARA ADICIONAR NOVO MEMBRO (Admin)
+# 3. ROTA PARA ADICIONAR NOVO MEMBRO
 @app.post("/team")
 def adicionar_membro(membro: NovoMembro):
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
-        # Tratamento da data para não dar erro no banco
+        
+        # VERIFICAÇÃO DE CPF DUPLICADO
+        if membro.cpf and membro.cpf.strip() != "":
+            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s", (membro.cpf, membro.account_id))
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="Este CPF já está cadastrado para outro membro na sua agência.")
+
         dt_nasc = None if not membro.birth_date or membro.birth_date.strip() == "" else membro.birth_date
         
         cur.execute("""
@@ -1846,6 +1852,9 @@ def adicionar_membro(membro: NovoMembro):
         novo_id = cur.fetchone()['id']
         conn.commit()
         return {"status": "sucesso", "id": novo_id}
+    except HTTPException as he:
+        if conn: conn.rollback()
+        raise he # Repassa o erro 400 limpo para o frontend
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1854,12 +1863,19 @@ def adicionar_membro(membro: NovoMembro):
             cur.close()
             conn.close()
 
-# 4. ROTA PARA ATUALIZAR (EDITAR) MEMBRO (Admin)
+# 4. ROTA PARA ATUALIZAR (EDITAR) MEMBRO
 @app.put("/team/{membro_id}")
 def atualizar_membro(membro_id: int, membro: EditaMembro):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
+        
+        # VERIFICAÇÃO DE CPF DUPLICADO (Ignorando o próprio membro)
+        if membro.cpf and membro.cpf.strip() != "":
+            cur.execute("SELECT id FROM staff WHERE cpf = %s AND account_id = %s AND id != %s", (membro.cpf, membro.account_id, membro_id))
+            if cur.fetchone():
+                raise HTTPException(status_code=400, detail="Este CPF já pertence a outro membro da equipe.")
+
         dt_nasc = None if not membro.birth_date or membro.birth_date.strip() == "" else membro.birth_date
         
         cur.execute("""
@@ -1872,6 +1888,9 @@ def atualizar_membro(membro_id: int, membro: EditaMembro):
         
         conn.commit()
         return {"status": "sucesso"}
+    except HTTPException as he:
+        if conn: conn.rollback()
+        raise he # Repassa o erro 400 limpo para o frontend
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
