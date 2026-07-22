@@ -1854,8 +1854,8 @@
                         <option>Gerente</option>
                     </select></div>
                 <div class="grid-2"><input type="number" id="eqTaxa" placeholder="Taxa"><input type="number"
-                        id="eqAdicional" placeholder="Add"></div><button onclick="salvarEquipe()" class="btn-success"
-                    style="margin-top:10px;padding:12px">SALVAR</button>
+                        id="eqAdicional" placeholder="Add"></div><button id="btnSalvarEquipe" onclick="salvarEquipe()" 
+                        class="btn-success" style="margin-top:10px;padding:12px">SALVAR</button>
             </div>
         </div>
     </div>
@@ -5083,28 +5083,28 @@
 
         // 2. SALVAR OU ATUALIZAR MEMBRO
         window.salvarEquipe = async () => { 
+            // Captura o botão logo no primeiro milissegundo de forma segura
+            const btn = window.event ? (window.event.currentTarget || window.event.target) : null;
+            
             const id = document.getElementById('eqId').value;
             const nome = document.getElementById('eqNome').value;
             const telefone = document.getElementById('eqTel').value;
             const funcao = document.getElementById('eqFuncao').value;
             
-            // Novos campos:
             const cpf = document.getElementById('eqCPF').value;
-            
-            // Valida o CPF apenas se o usuário tiver digitado alguma coisa
-            // (Isso permite salvar um perfil sem CPF caso ele ainda não tenha o dado)
-            if (cpf && cpf.trim() !== '') {
-                if (!window.validarCPF(cpf)) {
-                    return alert("❌ O CPF digitado é inválido. Por favor, verifique os números!");
-                }
-            }
-            
             const dataNasc = document.getElementById('eqData').value;
             const sexo = document.getElementById('eqSexo').value;
             const taxa = parseFloat(document.getElementById('eqTaxa').value) || 0.0;
             const adicional = parseFloat(document.getElementById('eqAdicional').value) || 0.0;
             
             if (!nome || !telefone) return alert("Preencha pelo menos o Nome e o Telefone!");
+
+            // Validação matemática do CPF
+            if (cpf && cpf.trim() !== '') {
+                if (!window.validarCPF(cpf)) {
+                    return alert("❌ O CPF digitado é inválido. Por favor, verifique os números!");
+                }
+            }
 
             const dados = {
                 account_id: localStorage.getItem('account_id'),
@@ -5120,10 +5120,13 @@
             };
 
             try {
-                const btn = event.currentTarget;
-                btn.innerText = "Salvando..."; btn.disabled = true;
+                // Trava o botão
+                if (btn) {
+                    btn.innerText = "Salvando...";
+                    btn.disabled = true;
+                }
 
-                // Lógica inteligente: Decide entre POST (Criar) e PUT (Editar)
+                // Decide se é Criação (POST) ou Edição (PUT)
                 const metodo = id ? 'PUT' : 'POST';
                 const url = id ? `${API_BASE}/team/${id}` : `${API_BASE}/team`;
 
@@ -5133,6 +5136,7 @@
                     body: JSON.stringify(dados)
                 });
 
+                // Se o Python retornar erro (Ex: CPF duplicado), disparamos a mensagem!
                 if (!resposta.ok) {
                     const erroApi = await resposta.json();
                     throw new Error(erroApi.detail || "Falha ao salvar no banco");
@@ -5143,11 +5147,13 @@
                 window.renderizarEquipe();
 
             } catch (e) {
+                // Aqui o erro do CPF duplicado vai aparecer bonitinho na tela
                 alert("Erro ao salvar: " + e.message);
             } finally {
-                if (event && event.currentTarget) {
-                    event.currentTarget.innerText = "SALVAR";
-                    event.currentTarget.disabled = false;
+                // Destrava o botão com segurança
+                if (btn) {
+                    btn.innerText = "SALVAR";
+                    btn.disabled = false;
                 }
             }
         };
