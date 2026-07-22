@@ -151,6 +151,11 @@ class EditaMembro(BaseModel):
     name: str
     phone: str
     role: str
+    cpf: Optional[str] = ""
+    birth_date: Optional[str] = None
+    gender: Optional[str] = ""
+    base_fee: Optional[float] = 0.0
+    additional_fee: Optional[float] = 0.0
 
 class EventStatus(BaseModel):
     status: str
