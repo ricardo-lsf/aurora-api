@@ -5006,16 +5006,13 @@
         // MÓDULO EQUIPE (100% POSTGRESQL MULTI-TENANT)
         // ============================================================
         
+        window.equipeAtiva = []; // Guarda a lista na memória para facilitar a edição
+
         window.abrirModalEquipe = (id = null) => { 
-            // Limpa o formulário antes de abrir
             document.getElementById('eqId').value = '';
             document.getElementById('eqNome').value = '';
             document.getElementById('eqTel').value = '';
-            document.getElementById('eqCPF').value = '';
-            document.getElementById('eqData').value = '';
-            document.getElementById('eqIdade').value = '';
-            document.getElementById('eqTaxa').value = '';
-            document.getElementById('eqAdicional').value = '';
+            document.getElementById('eqFuncao').value = 'Bartender';
             
             document.getElementById('eqTitulo').innerText = '👤 Novo Membro';
             document.getElementById('modalEquipe').style.display = 'flex'; 
@@ -5023,34 +5020,32 @@
         
         window.fecharModalEquipe = () => document.getElementById('modalEquipe').style.display = 'none';
 
-        // 1. CARREGAR EQUIPE NA TABELA
+        // 1. CARREGAR EQUIPE 
         window.renderizarEquipe = async () => {
             const account_id = localStorage.getItem('account_id');
             const tbody = document.getElementById('lista-equipe');
-            
-            if (!tbody) return; // Se não achou a tabela, aborta
+            if (!tbody) return; 
             
             try {
-                // Chama o Python
                 const resposta = await fetch(`${API_BASE}/team?account_id=${account_id}`);
                 const equipe = await resposta.json();
                 
-                tbody.innerHTML = ''; // Limpa a tabela velha
+                window.equipeAtiva = equipe; // Salva na memória
+                tbody.innerHTML = ''; 
                 
                 if (equipe.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#7f8c8d;">Nenhum membro cadastrado.</td></tr>';
                     return;
                 }
 
-                // Desenha as linhas respeitando as colunas do seu HTML
                 equipe.forEach(m => {
                     tbody.innerHTML += `
                         <tr>
                             <td><strong>${m.name}</strong></td>
                             <td>${m.phone}</td>
                             <td><span style="background:#34495e; color:white; padding:3px 8px; border-radius:12px; font-size:12px;">${m.role || 'Bartender'}</span></td>
-                            <td>-</td> <!-- Espaço da Taxa (Ainda não tem no BD) -->
-                            <td>-</td> <!-- Espaço do Adicional (Ainda não tem no BD) -->
+                            <td>-</td>
+                            <td>-</td>
                             <td style="text-align:right">
                                 <button onclick="editarEquipe('${m.id}')" style="background:transparent; border:none; cursor:pointer; font-size:1.2em;" title="Editar">✏️</button>
                                 <button onclick="delEq('${m.id}')" style="background:transparent; border:none; cursor:pointer; font-size:1.2em;" title="Excluir">🗑️</button>
@@ -5058,55 +5053,48 @@
                         </tr>
                     `;
                 });
-            } catch (e) {
-                console.error("Erro ao carregar equipe:", e);
-            }
+            } catch (e) { console.error("Erro ao carregar equipe:", e); }
         };
 
-        // 2. SALVAR NOVO MEMBRO
+        // 2. SALVAR OU ATUALIZAR MEMBRO
         window.salvarEquipe = async () => { 
+            const id = document.getElementById('eqId').value; // Se tiver ID, é edição!
             const nome = document.getElementById('eqNome').value;
             const telefone = document.getElementById('eqTel').value;
             const funcao = document.getElementById('eqFuncao').value;
             
-            if (!nome || !telefone) {
-                return alert("Por favor, preencha pelo menos o Nome e o Telefone!");
-            }
+            if (!nome || !telefone) return alert("Preencha pelo menos o Nome e o Telefone!");
 
-            // Monta o pacote pro backend (Multi-Tenant ativado)
             const dados = {
                 account_id: localStorage.getItem('account_id'),
                 name: nome,
                 phone: telefone,
-                role: funcao,
-                status: 'ativo'
+                role: funcao
             };
 
             try {
                 const btn = event.currentTarget;
-                const textoOriginal = btn.innerText;
-                btn.innerText = "Salvando...";
-                btn.disabled = true;
+                btn.innerText = "Salvando..."; btn.disabled = true;
 
-                // POST no Python
-                const resposta = await fetch(`${API_BASE}/team`, {
-                    method: 'POST',
+                // Lógica inteligente: Decide entre POST (Criar) e PUT (Editar)
+                const metodo = id ? 'PUT' : 'POST';
+                const url = id ? `${API_BASE}/team/${id}` : `${API_BASE}/team`;
+
+                const resposta = await fetch(url, {
+                    method: metodo,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
                 });
 
                 if (!resposta.ok) throw new Error("Falha ao salvar no banco");
 
-                alert("✅ Membro salvo com sucesso!");
+                alert(id ? "✅ Membro atualizado!" : "✅ Membro salvo com sucesso!");
                 fecharModalEquipe();
-                
-                // Atualiza a tabela na hora
                 window.renderizarEquipe();
 
             } catch (e) {
                 alert("Erro ao salvar: " + e.message);
             } finally {
-                // Devolve o botão ao estado normal
                 if (event && event.currentTarget) {
                     event.currentTarget.innerText = "SALVAR";
                     event.currentTarget.disabled = false;
@@ -5114,14 +5102,39 @@
             }
         };
 
-        // 3. FUNÇÕES PENDENTES (Edição e Exclusão)
+        // 3. EDITAR MEMBRO (Preenche o Modal)
         window.editarEquipe = (id) => { 
-            alert("A edição será conectada na próxima etapa!"); 
+            const membro = window.equipeAtiva.find(m => m.id == id);
+            if(!membro) return;
+
+            document.getElementById('eqId').value = membro.id;
+            document.getElementById('eqNome').value = membro.name;
+            document.getElementById('eqTel').value = membro.phone;
+            document.getElementById('eqFuncao').value = membro.role;
+            
+            document.getElementById('eqTitulo').innerText = '👤 Editar Membro';
+            document.getElementById('modalEquipe').style.display = 'flex'; 
         };
         
+        // 4. EXCLUIR MEMBRO (Soft Delete)
         window.delEq = async (id) => { 
-            alert("A exclusão será conectada na próxima etapa!"); 
+            if(!confirm("Tem certeza que deseja inativar e remover este membro da equipe?")) return;
+            
+            const account_id = localStorage.getItem('account_id');
+            try {
+                const resposta = await fetch(`${API_BASE}/team/${id}?account_id=${account_id}`, {
+                    method: 'DELETE'
+                });
+                if (!resposta.ok) throw new Error("Erro ao excluir.");
+                
+                alert("Membro removido com sucesso!");
+                window.renderizarEquipe(); // Recarrega a tabela atualizada
+            } catch(e) {
+                alert("Erro: " + e.message);
+            }
         };
+
+        
         // 6. ANALYTICS V55 (COM RESGATE)
 
         // CORREÇÃO: Analytics com Histórico de Clientes

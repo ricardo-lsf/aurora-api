@@ -1769,7 +1769,55 @@ def login_staff(phone: str, account_id: str):
             cur.close()
             conn.close()
 
-# 2. ROTA PARA LISTAR A EQUIPE (Usada no KDS e no Admin)
+class EditaMembro(BaseModel):
+    account_id: str
+    name: str
+    phone: str
+    role: str
+
+# 2. ROTA PARA ATUALIZAR (EDITAR) MEMBRO
+@app.put("/team/{membro_id}")
+def atualizar_membro(membro_id: int, membro: EditaMembro):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # Atualiza apenas se o membro pertencer à agência correta
+        cur.execute("""
+            UPDATE staff 
+            SET name = %s, phone = %s, role = %s
+            WHERE id = %s AND account_id = %s
+        """, (membro.name, membro.phone, membro.role, membro_id, membro.account_id))
+        
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+# 3. ROTA PARA EXCLUIR (SOFT DELETE)
+@app.delete("/team/{membro_id}")
+def deletar_membro(membro_id: int, account_id: str):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        # Em vez de apagar, mudamos o status para 'inativo'
+        cur.execute("""
+            UPDATE staff 
+            SET status = 'inativo'
+            WHERE id = %s AND account_id = %s
+        """, (membro_id, account_id))
+        
+        conn.commit()
+        return {"status": "sucesso"}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+# 4. ROTA PARA LISTAR A EQUIPE (Usada no KDS e no Admin)
 @app.get("/team")
 @app.get("/staff") # Aceita os dois nomes para não quebrar nada no Frontend
 def listar_equipe(account_id: str):
@@ -1801,7 +1849,7 @@ def listar_equipe(account_id: str):
             cur.close()
             conn.close()
 
-# 3. ROTA PARA ADICIONAR NOVO MEMBRO (Pelo Admin)
+# 5. ROTA PARA ADICIONAR NOVO MEMBRO (Pelo Admin)
 @app.post("/team")
 def adicionar_membro(membro: NovoMembro):
     conn = get_db_connection()
