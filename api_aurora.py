@@ -2842,3 +2842,28 @@ def clonar_receita(cocktail_id: str, payload: CloneCocktail):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
+
+# ==========================================
+# ROTA DE EXCLUSÃO DE DRINK
+# ==========================================
+@app.delete("/cocktails/{cocktail_id}")
+def deletar_cocktail(cocktail_id: str, account_id: str):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        # O banco de dados faz o trabalho pesado. O ON DELETE CASCADE
+        # vai apagar os ingredientes atrelados a esse ID automaticamente.
+        cur.execute("""
+            DELETE FROM cocktails 
+            WHERE id = %s::uuid AND account_id = %s::uuid
+        """, (cocktail_id, account_id))
+        
+        conn.commit()
+        return {"status": "sucesso", "mensagem": "Ficha técnica excluída."}
+
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()

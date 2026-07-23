@@ -3872,19 +3872,37 @@
 
         // 4.9 EXCLUIR DRINK ---
         window.excluirDrink = async (id, event) => {
-            if (event) event.stopPropagation();
-            if (confirm("Tem certeza que deseja excluir este drink?")) {
-                try {
-                    const res = await fetch(`${API_BASE}/cocktails/${id}`, { method: 'DELETE' });
-                    if (res.ok) {
-                        if (window.idDrinkEditando === id) window.limparFormDrink();
-                        window.carregarBiblioteca();
-                    } else {
-                        alert("Erro ao deletar no servidor.");
-                    }
-                } catch (e) {
-                    alert("Erro de conexão: " + e.message);
+            // Isso impede que o clique na lixeira dispare o clique no card inteiro
+            if (event) event.stopPropagation(); 
+
+            const confirmacao = confirm("🗑️ Tem certeza que deseja excluir esta Ficha Técnica? Essa ação não pode ser desfeita.");
+            if (!confirmacao) return;
+
+            const accountId = localStorage.getItem('account_id');
+
+            try {
+                // Trava o mouse para o cliente não clicar duas vezes
+                document.body.style.cursor = 'wait';
+
+                const resposta = await fetch(`${API_BASE}/cocktails/${id}?account_id=${accountId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Erro ao excluir o drink no servidor.");
                 }
+
+                alert("✅ Drink excluído com sucesso!");
+                
+                // Recarrega a lista para o card sumir da tela na hora
+                // (Se a sua função de buscar os drinks do banco tiver outro nome, ajuste aqui)
+                // window.carregarBibliotecaDoBanco(); 
+
+            } catch (e) {
+                alert("❌ Erro: " + e.message);
+            } finally {
+                document.body.style.cursor = 'default';
             }
         };
         window.delDrinkGlob = window.excluirDrink;
