@@ -3881,7 +3881,6 @@
             const accountId = localStorage.getItem('account_id');
 
             try {
-                // Trava o mouse para o cliente não clicar duas vezes
                 document.body.style.cursor = 'wait';
 
                 const resposta = await fetch(`${API_BASE}/cocktails/${id}?account_id=${accountId}`, {
@@ -3893,11 +3892,13 @@
                     throw new Error(erro.detail || "Erro ao excluir o drink no servidor.");
                 }
 
-                alert("✅ Drink excluído com sucesso!");
+                // === A MÁGICA DA TELA AQUI ===
+                // 1. Filtramos a nossa lista na memória, removendo o drink que tem esse ID
+                window.bibliotecaGlobal = window.bibliotecaGlobal.filter(drink => drink.id !== id);
                 
-                // Recarrega a lista para o card sumir da tela na hora
-                // (Se a sua função de buscar os drinks do banco tiver outro nome, ajuste aqui)
-                // window.carregarBibliotecaDoBanco(); 
+                // 2. Mandamos a tela desenhar os cards de novo (agora sem o excluído!)
+                window.renderizarListaVisual();
+                // ==============================
 
             } catch (e) {
                 alert("❌ Erro: " + e.message);
@@ -3905,8 +3906,6 @@
                 document.body.style.cursor = 'default';
             }
         };
-        window.delDrinkGlob = window.excluirDrink;
-        window.loadDrink = window.carregarDrinkParaEdicao;
 
         // ==========================================
         // INICIALIZA A BIBLIOTECA AO ABRIR A PÁGINA
