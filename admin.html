@@ -1523,6 +1523,23 @@
                         </div>
                     </div>
 
+                    <div id="view-loja" class="view-section" style="display: none;">
+                            <h2 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🛒 Loja Aurora (Marketplace)</h2>
+                            <p style="color: #7f8c8d; margin-bottom: 20px;">Evolua o seu bar adquirindo pacotes prontos de receitas e insumos.</p>
+
+                            <div class="premium-banner">
+                                <div class="premium-banner-info">
+                                    <h2>👑 Pack Masterclass IBA</h2>
+                                    <p>Importe instantaneamente 32 receitas oficiais da International Bartenders Association...</p>
+                                </div>
+                                <div style="text-align: right; min-width: 250px;">
+                                    <div class="premium-price">R$ 97,00</div>
+                                    <button id="btnComprarIBA" class="btn-premium" onclick="comprarPacoteIBA()">📥 Importar Pacote</button>
+                                    <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco</div>
+                                </div>
+                            </div>
+                    </div>
+
                     <label style="margin-top:10px;">Imagem (URL)</label><input type="text" id="globalImg"
                         placeholder="./imagens/foto.jpg" onchange="atualizarPreview(this.value)">
                     <div class="img-preview-box"><img id="previewImg" src="" alt="Preview"><span
@@ -1588,6 +1605,13 @@
                     <div id="lista-biblioteca-visual" style="max-height:500px; overflow-y:auto;"></div>
                 </div>
             </div>
+
+
+
+
+
+
+            
         </div>
 
         <div id="view-estoque" class="view-section">
@@ -2174,27 +2198,6 @@
             </div>
         </div>
     </div>
-
-        <!-- =====================================
-             VIEW: LOJA AURORA
-        ====================================== -->
-        <div id="view-loja" class="view-section" style="display: none;">
-            <h2 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🛒 Loja Aurora (Marketplace)</h2>
-            <p style="color: #7f8c8d; margin-bottom: 20px;">Evolua o seu bar adquirindo pacotes prontos de receitas e insumos.</p>
-
-            <div class="premium-banner">
-                <div class="premium-banner-info">
-                    <h2>👑 Pack Masterclass IBA</h2>
-                    <p>Importe instantaneamente 32 receitas oficiais da International Bartenders Association para o seu sistema. Fichas técnicas completas com fotos, modo de preparo e os 63 insumos necessários vinculados automaticamente ao seu estoque.</p>
-                </div>
-                <div style="text-align: right; min-width: 250px;">
-                    <div class="premium-price">R$ 97,00</div>
-                    <button id="btnComprarIBA" class="btn-premium" onclick="comprarPacoteIBA()">📥 Importar Pacote</button>
-                    <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco de dados</div>
-                </div>
-            </div>
-        </div>
-
 
 <script type="module">
 
