@@ -2867,3 +2867,109 @@ def deletar_cocktail(cocktail_id: str, account_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
+
+class ImportPackPayload(BaseModel):
+    account_id: str           # ID da agência do cliente que está comprando
+    master_account_id: str    # ID da conta Aurora (Onde ficam os drinks perfeitos)
+    sufixo: str = " (Premium)" # Adiciona isso no nome para não dar conflito de nome repetido
+
+# ==========================================
+# ROTA DE MARKETPLACE: IMPORTAR PACOTE
+# ==========================================
+@app.post("/marketplace/import-pack")
+def importar_pacote_premium(payload: ImportPackPayload):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # 1. Busca todos os drinks da conta Mestre (Aurora)
+        cur.execute("""
+            SELECT * FROM cocktails WHERE account_id = %s::uuid
+        """, (payload.master_account_id,))
+        drinks_mestre = cur.fetchall()
+
+        if not drinks_mestre:
+            raise HTTPException(status_code=404, detail="Nenhum drink encontrado no pacote mestre.")
+
+        # Dicionário de tradução de ingredientes: { id_ingrediente_mestre : id_ingrediente_cliente }
+        mapa_ingredientes = {}
+
+        # 2. Loop principal: Clonar os drinks um a um
+        drinks_importados = 0
+        for drink in drinks_mestre:
+            nome_importado = f"{drink['name']}{payload.sufixo}"
+            
+            # Verifica se o cliente já tem um drink com esse exato nome para evitar o erro do UNIQUE
+            cur.execute("SELECT id FROM cocktails WHERE account_id = %s::uuid AND name = %s", 
+                       (payload.account_id, nome_importado))
+            if cur.fetchone():
+                continue # Se já tem, pula esse drink e vai pro próximo
+
+            # Insere o drink para o cliente
+            cur.execute("""
+                INSERT INTO cocktails (
+                    account_id, name, category, drink_type, technique, 
+                    preparation_steps, description, sale_price, image_url, min_package_level
+                ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
+            """, (
+                payload.account_id, nome_importado, drink['category'], drink['drink_type'],
+                drink['technique'], drink['preparation_steps'], drink['description'],
+                drink['sale_price'], drink['image_url'], drink['min_package_level']
+            ))
+            novo_drink_id = cur.fetchone()['id']
+            drinks_importados += 1
+
+            # 3. Puxa a receita (ingredientes) do drink mestre
+            cur.execute("""
+                SELECT * FROM cocktail_ingredients WHERE cocktail_id = %s::uuid
+            """, (drink['id'],))
+            receita_mestre = cur.fetchall()
+
+            for item in receita_mestre:
+                ingrediente_mestre_id = item['ingredient_id']
+                
+                # Se ainda não traduzimos esse ingrediente, temos que buscar ou criar no cliente
+                if ingrediente_mestre_id not in mapa_ingredientes:
+                    cur.execute("SELECT * FROM ingredients WHERE id = %s::uuid", (ingrediente_mestre_id,))
+                    ing_original = cur.fetchone()
+
+                    # Procura se o cliente já tem um ingrediente com o mesmo NOME e TIPO
+                    cur.execute("""
+                        SELECT id FROM ingredients 
+                        WHERE account_id = %s::uuid AND name = %s AND type_id = %s::uuid
+                    """, (payload.account_id, ing_original['name'], ing_original['type_id']))
+                    ing_cliente = cur.fetchone()
+
+                    if ing_cliente:
+                        # O cliente já tem! Usa o ID dele
+                        mapa_ingredientes[ingrediente_mestre_id] = ing_cliente['id']
+                    else:
+                        # O cliente não tem. Cria um ingrediente novo no estoque dele!
+                        cur.execute("""
+                            INSERT INTO ingredients (
+                                account_id, type_id, name, brand, measurement_unit, package_quantity
+                            ) VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s) RETURNING id;
+                        """, (
+                            payload.account_id, ing_original['type_id'], ing_original['name'], 
+                            ing_original['brand'], ing_original['measurement_unit'], ing_original['package_quantity']
+                        ))
+                        mapa_ingredientes[ingrediente_mestre_id] = cur.fetchone()['id']
+
+                # 4. Finalmente, liga o ingrediente traduzido ao novo drink!
+                cur.execute("""
+                    INSERT INTO cocktail_ingredients (cocktail_id, ingredient_id, quantity)
+                    VALUES (%s::uuid, %s::uuid, %s)
+                """, (novo_drink_id, mapa_ingredientes[ingrediente_mestre_id], item['quantity']))
+
+        conn.commit()
+        return {
+            "status": "sucesso", 
+            "mensagem": f"{drinks_importados} fichas técnicas Premium importadas com sucesso!",
+            "ingredientes_processados": len(mapa_ingredientes)
+        }
+
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
