@@ -2947,11 +2947,12 @@ def importar_pacote_premium(payload: ImportPackPayload):
                         # O cliente não tem. Cria um ingrediente novo no estoque dele!
                         cur.execute("""
                             INSERT INTO ingredients (
-                                account_id, type_id, name, brand, measurement_unit, package_quantity
-                            ) VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s) RETURNING id;
+                                account_id, type_id, name, brand, measurement_unit, package_quantity, current_cost_price
+                            ) VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, %s) RETURNING id;
                         """, (
                             payload.account_id, ing_original['type_id'], ing_original['name'], 
-                            ing_original['brand'], ing_original['measurement_unit'], ing_original['package_quantity']
+                            ing_original['brand'], ing_original['measurement_unit'], 
+                            ing_original['package_quantity'], ing_original['current_cost_price'] # <- Preço adicionado aqui!
                         ))
                         mapa_ingredientes[ingrediente_mestre_id] = cur.fetchone()['id']
 
