@@ -3423,7 +3423,7 @@
                         
                         <div class="cocktail-actions">
                             <button onclick="carregarDrinkParaEdicao('${drink.id}')" title="Editar">✏️</button>
-                            <button onclick="clonarReceita('${drink.id}')" title="Clonar Ficha">🐑</button>
+                            <button onclick="clonarReceita('${drink.id}')" title="Clonar Ficha">📋</button>
                             <button onclick="excluirDrink('${drink.id}', event)" title="Excluir">🗑️</button>
                         </div>
                     </div>
@@ -3469,16 +3469,21 @@
 
                 // === 4. A MÁGICA DA TELA INSTANTÂNEA ===
                 if (drinkOriginal) {
-                    // Copia todos os dados do drink original (foto, categoria, etc)
+                    // Copia todos os dados do drink original
                     const drinkClonado = { ...drinkOriginal };
                     
-                    // Atualiza apenas o ID e o Nome para os dados da cópia
+                    // Atualiza o ID e o Nome
                     drinkClonado.id = retorno.novo_cocktail_id;
                     if (drinkClonado.drink_nome) drinkClonado.drink_nome = novoNome;
                     if (drinkClonado.name) drinkClonado.name = novoNome;
                     
-                    // Empurra a cópia para a nossa lista na memória e manda desenhar a tela
-                    window.bibliotecaGlobal.push(drinkClonado);
+                    // 1. Descobre em qual posição da lista está o drink original
+                    const indexOriginal = window.bibliotecaGlobal.findIndex(d => d.id === cocktailId);
+                    
+                    // 2. Fura a fila! Insere o drink clonado exatamente uma posição DEPOIS do original
+                    window.bibliotecaGlobal.splice(indexOriginal + 1, 0, drinkClonado);
+                    
+                    // Manda desenhar a tela
                     window.renderizarListaVisual();
                 }
                 // =======================================
