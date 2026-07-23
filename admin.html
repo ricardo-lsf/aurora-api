@@ -23,6 +23,68 @@
     <style>
 
         /* ===============================
+        LOJA AURORA (MARKETPLACE)
+        ================================== */
+        .premium-banner {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            margin-bottom: 20px;
+            flex-wrap: wrap; /* Para telas menores */
+            gap: 20px;
+        }
+
+        .premium-banner-info h2 {
+            margin: 0 0 10px 0;
+            font-size: 2em;
+            color: #f1c40f; /* Dourado */
+        }
+
+        .premium-banner-info p {
+            margin: 0;
+            font-size: 1.1em;
+            opacity: 0.9;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+
+        .premium-price {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .btn-premium {
+            background: #f39c12;
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .btn-premium:hover {
+            background: #e67e22;
+            transform: scale(1.05);
+        }
+
+        .btn-premium:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+
+        /* ===============================
         GRID DE CARDS DE DRINKS 
         ================================== */
         .cocktail-grid {
@@ -79,9 +141,6 @@
         .cocktail-actions button:hover {
             transform: scale(1.2);
         }
-
-
-
 
 
         * {
@@ -1135,6 +1194,8 @@
             <a onclick="showView('view-ferramentas', this)" class="menu-item"><span class="menu-icon">🛠️</span>
                 Ferramentas</a>
 
+            <li onclick="mudarTela('view-loja')">🛒 Loja</li>
+
         <!-- 📍 IDENTIFICAÇÃO DO USUÁRIO (Versão Compacta de Sidebar) -->
         <div style="margin-top: auto; padding: 15px 10px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center;">
             <div style="color: #94a3b8; font-size: 10px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;">Logado como</div>
@@ -2101,6 +2162,26 @@
             </div>
         </div>
     </div>
+
+    <!-- =====================================
+             VIEW: LOJA AURORA
+        ====================================== -->
+        <div id="view-loja" class="view-section" style="display: none;">
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🛒 Loja Aurora (Marketplace)</h2>
+            <p style="color: #7f8c8d; margin-bottom: 20px;">Evolua o seu bar adquirindo pacotes prontos de receitas e insumos.</p>
+
+            <div class="premium-banner">
+                <div class="premium-banner-info">
+                    <h2>👑 Pack Masterclass IBA</h2>
+                    <p>Importe instantaneamente 32 receitas oficiais da International Bartenders Association para o seu sistema. Fichas técnicas completas com fotos, modo de preparo e os 63 insumos necessários vinculados automaticamente ao seu estoque.</p>
+                </div>
+                <div style="text-align: right; min-width: 250px;">
+                    <div class="premium-price">R$ 97,00</div>
+                    <button id="btnComprarIBA" class="btn-premium" onclick="comprarPacoteIBA()">📥 Importar Pacote</button>
+                    <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco de dados</div>
+                </div>
+            </div>
+        </div>
 
 
 <script type="module">
@@ -6944,6 +7025,63 @@
             localStorage.clear(); 
             window.location.replace('login.html');
         };
+
+        // ==========================================
+        // FUNÇÃO DA LOJA VIRTUAL
+        // ==========================================
+        window.comprarPacoteIBA = async () => {
+            const confirmacao = confirm("💳 Confirmar a aquisição e importação do Pack Masterclass IBA para a sua agência?");
+            if (!confirmacao) return;
+
+            const btn = document.getElementById('btnComprarIBA');
+            const textoOriginal = btn.innerHTML;
+            
+            // Trava o botão para não clicar duas vezes
+            btn.innerHTML = "⏳ Importando (Aguarde)...";
+            btn.disabled = true;
+
+            // ⚠️ COLOQUE AQUI O ID DA CONTA "AURORA OFICIAL" (O COFRE)
+            const masterId = "defbe4d2-aeaa-454f-99b2-064b7e52ccc2"; 
+
+            const dados = {
+                account_id: localStorage.getItem('account_id'),
+                master_account_id: masterId,
+                sufixo: " (IBA)" // Para o cliente saber que essa receita veio do pacote
+            };
+
+            try {
+                const resposta = await fetch(`${API_BASE}/marketplace/import-pack`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Erro ao importar o pacote.");
+                }
+
+                const retorno = await resposta.json();
+                
+                // Sucesso absoluto!
+                alert(`✅ SUCESSO! \n\n${retorno.mensagem}\nForam analisados e adicionados ${retorno.ingredientes_processados} insumos ao seu estoque.`);
+                
+                // Transforma o botão em um selo de "Comprado"
+                btn.innerHTML = "✔️ Pacote Adquirido";
+                btn.style.background = "#27ae60"; // Fica Verde
+                btn.style.boxShadow = "none";
+                
+                // Opcional: Se você tiver uma função que recarrega a biblioteca do banco, chame aqui.
+                // ex: carregarBibliotecaDoBanco();
+                
+            } catch (e) {
+                alert("❌ Erro na transação: " + e.message);
+                // Devolve o botão ao normal em caso de erro
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        };
+
 
     </script>
 
