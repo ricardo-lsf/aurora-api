@@ -35,8 +35,11 @@
             align-items: center;
             box-shadow: 0 8px 16px rgba(0,0,0,0.15);
             margin-bottom: 20px;
-            flex-wrap: wrap; /* Para telas menores */
+            flex-wrap: wrap; 
             gap: 20px;
+            /* 👇 AS DUAS LINHAS NOVAS AQUI 👇 */
+            width: 100%; 
+            box-sizing: border-box;
         }
 
         /* 📍 CLASSE NOVA ADICIONADA: Faz o texto esticar e empurra o bloco de preço para a direita */
@@ -2172,7 +2175,7 @@
         </div>
     </div>
 
-    <!-- =====================================
+        <!-- =====================================
              VIEW: LOJA AURORA
         ====================================== -->
         <div id="view-loja" class="view-section" style="display: none;">
