@@ -21,6 +21,69 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
+
+        /* ===============================
+        GRID DE CARDS DE DRINKS 
+        ================================== */
+        .cocktail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); /* Tamanho ideal para meia tela */
+            gap: 15px;
+            padding: 5px;
+        }
+
+        .cocktail-card {
+            background: #fff;
+            border: 1px solid #eaeaea;
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cocktail-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+        }
+
+        .cocktail-img {
+            width: 100%;
+            height: 130px;
+            object-fit: cover;
+            background: #f4f4f4;
+        }
+
+        .cocktail-info {
+            padding: 12px 10px;
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .cocktail-actions {
+            display: flex;
+            justify-content: space-around;
+            padding: 8px;
+            background: #fcfcfc;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .cocktail-actions button {
+            background: transparent;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .cocktail-actions button:hover {
+            transform: scale(1.2);
+        }
+
+
+
+
+
         * {
             box-sizing: border-box;
         }
@@ -3332,22 +3395,79 @@
             }
         };
 
-        function renderizarListaVisual() {
+        window.renderizarListaVisual = () => {
             const listaVisual = document.getElementById('lista-biblioteca-visual');
             if (!listaVisual) return;
+            
+            // Ativa o visual de grade em vez de lista reta
+            listaVisual.className = 'cocktail-grid';
             listaVisual.innerHTML = '';
 
             window.bibliotecaGlobal.forEach(drink => {
+                // Se o cliente não colocou foto, exibe um placeholder bonitinho
+                const foto = drink.image_url || 'https://via.placeholder.com/240x180?text=Sem+Foto';
+                
+                // Pega o nome do drink garantindo compatibilidade com o banco
+                const nomeDrink = drink.drink_nome || drink.name || 'Sem Nome';
+
                 listaVisual.innerHTML += `
-                    <div class="catalog-item" onclick="carregarDrinkParaEdicao('${drink.id}')" style="cursor:pointer; padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            ${drink.image_url ? `<img src="${drink.image_url}" style="width:30px; height:30px; border-radius:4px; object-fit:cover;">` : ''}
-                            <b>${drink.drink_nome}</b>
+                    <div class="cocktail-card">
+                        <img src="${foto}" class="cocktail-img" alt="${nomeDrink}">
+                        
+                        <div class="cocktail-info">
+                            <h4 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.05em;">${nomeDrink}</h4>
+                            <span style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px;">
+                                ${drink.category || 'Cocktail'}
+                            </span>
                         </div>
-                        <button onclick="excluirDrink('${drink.id}', event)" class="btn-trash" style="border:none; background:none; cursor:pointer;" title="Excluir">🗑️</button>
-                    </div>`;
+                        
+                        <div class="cocktail-actions">
+                            <button onclick="carregarDrinkParaEdicao('${drink.id}')" title="Editar">✏️</button>
+                            <button onclick="clonarReceita('${drink.id}')" title="Clonar Ficha">🐑</button>
+                            <button onclick="excluirDrink('${drink.id}', event)" title="Excluir">🗑️</button>
+                        </div>
+                    </div>
+                `;
             });
-        }
+        };
+
+        window.clonarReceita = async (cocktailId) => {
+            // 1. Pergunta o nome da nova ficha
+            const novoNome = prompt("Como você quer chamar a nova cópia deste drink?", "Cópia Prata");
+            if (!novoNome) return; // Se cancelar ou deixar vazio, aborta
+
+            const dados = {
+                account_id: localStorage.getItem('account_id'),
+                novo_nome: novoNome
+            };
+
+            try {
+                // 2. Avisa que está pensando
+                document.body.style.cursor = 'wait';
+
+                // 3. Bate lá no seu servidor FastAPI (no Render)
+                const resposta = await fetch(`${API_BASE}/recipes/${cocktailId}/clone`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Erro ao clonar a ficha.");
+                }
+
+                alert(`✅ Ficha clonada com sucesso! O drink "${novoNome}" já está na sua biblioteca.`);
+                
+                // 4. Se você tiver uma função que busca as fichas do banco novamente, chame ela aqui!
+                // Exemplo: window.carregarBibliotecaDoBanco(); 
+                
+            } catch (e) {
+                alert("❌ " + e.message);
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        };
 
         // ==========================================
         // 4.2 CARREGAR PARA EDIÇÃO (LIMPO E SEM O BUG DO DROPDOWN)
@@ -6778,6 +6898,39 @@
             // 📍 A MÁGICA DA SEGURANÇA: Apaga o token e a agência do navegador!
             localStorage.clear(); 
             window.location.replace('login.html');
+        };
+
+
+        // ==========================================
+        // CLONAR RECEITA
+        // ==========================================
+        window.clonarReceita = async (cocktailId) => {
+            // Pergunta o nome da nova ficha, ou usa um padrão
+            const novoNome = prompt("Qual será o nome da nova Ficha Técnica?", "Caipirinha Prata");
+            if (!novoNome) return; // Se ele cancelar, não faz nada
+
+            const dados = {
+                account_id: localStorage.getItem('account_id'),
+                novo_nome: novoNome
+            };
+
+            try {
+                const resposta = await fetch(`${API_BASE}/recipes/${cocktailId}/clone`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail);
+                }
+
+                alert("✅ Ficha Técnica clonada com sucesso! Você já pode editar os ingredientes dela.");
+                // window.renderizarFichas(); // Recarrega a tela de receitas
+            } catch (e) {
+                alert("Erro ao clonar: " + e.message);
+            }
         };
 
     </script>
