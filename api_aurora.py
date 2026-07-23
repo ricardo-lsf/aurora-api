@@ -187,6 +187,10 @@ class ItemRetorno(BaseModel):
 class PayloadRetorno(BaseModel):
     itens: List[ItemRetorno]
 
+class CloneCocktail(BaseModel):
+    account_id: str
+    novo_nome: Optional[str] = None # Opcional: permite que o frontend já mande o nome desejado
+
 # ==========================================
 # ROTAS DO FRONTEND (Telas HTML)
 # ==========================================
@@ -2770,3 +2774,71 @@ def listar_estoque_evento(event_id: str):
             conn.close()
         print("Erro ao listar estoque do evento:", str(e))
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# ROTA DE CLONAGEM DE RECEITA
+# ==========================================
+@app.post("/recipes/{cocktail_id}/clone")
+def clonar_receita(cocktail_id: str, payload: CloneCocktail):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # 1. Busca a ficha técnica original
+        cur.execute("""
+            SELECT * FROM cocktails
+            WHERE id = %s::uuid AND account_id = %s::uuid
+        """, (cocktail_id, payload.account_id))
+        
+        original = cur.fetchone()
+        if not original:
+            raise HTTPException(status_code=404, detail="Ficha técnica original não encontrada.")
+
+        # 2. Define o nome do clone para evitar bloqueio do banco de dados (UNIQUE)
+        # Se o frontend não enviar um nome, colocamos " (Cópia)" automaticamente
+        nome_clone = payload.novo_nome if payload.novo_nome else f"{original['name']} (Cópia)"
+
+        # 3. Insere o Drink Clonado (Gera o novo ID)
+        cur.execute("""
+            INSERT INTO cocktails (
+                account_id, name, category, drink_type, technique, 
+                preparation_steps, description, sale_price, image_url, min_package_level
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id;
+        """, (
+            payload.account_id, nome_clone, original['category'], original['drink_type'],
+            original['technique'], original['preparation_steps'], original['description'],
+            original['sale_price'], original['image_url'], original['min_package_level']
+        ))
+        
+        novo_cocktail_id = cur.fetchone()['id']
+
+        # 4. Copia os Ingredientes (O "Pulo do Gato" da tabela relacional)
+        # Esse comando SELECT insere todas as linhas de ingredientes do drink velho no drink novo de uma vez só!
+        cur.execute("""
+            INSERT INTO cocktail_ingredients (cocktail_id, ingredient_id, quantity)
+            SELECT %s::uuid, ingredient_id, quantity
+            FROM cocktail_ingredients
+            WHERE cocktail_id = %s::uuid;
+        """, (novo_cocktail_id, cocktail_id))
+
+        # 5. Salva tudo!
+        conn.commit()
+        return {
+            "status": "sucesso", 
+            "mensagem": "Ficha clonada com sucesso!", 
+            "novo_cocktail_id": novo_cocktail_id,
+            "nome_clone": nome_clone
+        }
+
+    except Exception as e:
+        if conn: conn.rollback()
+        # Tratamento visual amigável se ele tentar clonar a cópia e o nome ficar duplicado
+        if 'unique_drink_name_per_account' in str(e):
+            raise HTTPException(status_code=400, detail=f"Você já possui uma receita chamada '{nome_clone}'. Renomeie a cópia anterior antes de clonar novamente.")
+        print(f"ERRO CLONE: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
