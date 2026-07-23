@@ -3431,10 +3431,18 @@
             });
         };
 
+        // ==========================================
+        // CLONAR RECEITA
+        // ==========================================
+
         window.clonarReceita = async (cocktailId) => {
-            // 1. Pergunta o nome da nova ficha
-            const novoNome = prompt("Como você quer chamar a nova cópia deste drink?", "Cópia Prata");
-            if (!novoNome) return; // Se cancelar ou deixar vazio, aborta
+            // 1. Procura o drink original na nossa memória (para pegar o nome exato)
+            const drinkOriginal = window.bibliotecaGlobal.find(d => d.id === cocktailId);
+            const nomeAtual = drinkOriginal ? (drinkOriginal.drink_nome || drinkOriginal.name) : 'Drink';
+            
+            // 2. Pergunta o nome já sugerindo "- Cópia" no final
+            const novoNome = prompt("Como você quer chamar a nova cópia deste drink?", `${nomeAtual} - Cópia`);
+            if (!novoNome) return; // Se cancelar, aborta
 
             const dados = {
                 account_id: localStorage.getItem('account_id'),
@@ -3442,10 +3450,9 @@
             };
 
             try {
-                // 2. Avisa que está pensando
                 document.body.style.cursor = 'wait';
 
-                // 3. Bate lá no seu servidor FastAPI (no Render)
+                // 3. Bate no servidor para clonar no Banco de Dados
                 const resposta = await fetch(`${API_BASE}/recipes/${cocktailId}/clone`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3457,13 +3464,29 @@
                     throw new Error(erro.detail || "Erro ao clonar a ficha.");
                 }
 
+                // Captura a resposta do Python (que traz o novo ID gerado)
+                const retorno = await resposta.json(); 
+
+                // === 4. A MÁGICA DA TELA INSTANTÂNEA ===
+                if (drinkOriginal) {
+                    // Copia todos os dados do drink original (foto, categoria, etc)
+                    const drinkClonado = { ...drinkOriginal };
+                    
+                    // Atualiza apenas o ID e o Nome para os dados da cópia
+                    drinkClonado.id = retorno.novo_cocktail_id;
+                    if (drinkClonado.drink_nome) drinkClonado.drink_nome = novoNome;
+                    if (drinkClonado.name) drinkClonado.name = novoNome;
+                    
+                    // Empurra a cópia para a nossa lista na memória e manda desenhar a tela
+                    window.bibliotecaGlobal.push(drinkClonado);
+                    window.renderizarListaVisual();
+                }
+                // =======================================
+
                 alert(`✅ Ficha clonada com sucesso! O drink "${novoNome}" já está na sua biblioteca.`);
                 
-                // 4. Se você tiver uma função que busca as fichas do banco novamente, chame ela aqui!
-                // Exemplo: window.carregarBibliotecaDoBanco(); 
-                
             } catch (e) {
-                alert("❌ " + e.message);
+                alert("❌ Erro: " + e.message);
             } finally {
                 document.body.style.cursor = 'default';
             }
@@ -6915,39 +6938,6 @@
             // 📍 A MÁGICA DA SEGURANÇA: Apaga o token e a agência do navegador!
             localStorage.clear(); 
             window.location.replace('login.html');
-        };
-
-
-        // ==========================================
-        // CLONAR RECEITA
-        // ==========================================
-        window.clonarReceita = async (cocktailId) => {
-            // Pergunta o nome da nova ficha, ou usa um padrão
-            const novoNome = prompt("Qual será o nome da nova Ficha Técnica?", "Caipirinha Prata");
-            if (!novoNome) return; // Se ele cancelar, não faz nada
-
-            const dados = {
-                account_id: localStorage.getItem('account_id'),
-                novo_nome: novoNome
-            };
-
-            try {
-                const resposta = await fetch(`${API_BASE}/recipes/${cocktailId}/clone`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dados)
-                });
-
-                if (!resposta.ok) {
-                    const erro = await resposta.json();
-                    throw new Error(erro.detail);
-                }
-
-                alert("✅ Ficha Técnica clonada com sucesso! Você já pode editar os ingredientes dela.");
-                // window.renderizarFichas(); // Recarrega a tela de receitas
-            } catch (e) {
-                alert("Erro ao clonar: " + e.message);
-            }
         };
 
     </script>
