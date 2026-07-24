@@ -3166,7 +3166,10 @@
                     body: JSON.stringify(payloadEvento)
                 });
 
-                if (!respostaEvento.ok) throw new Error("Falha ao criar o evento no banco de dados.");
+                if (!respostaEvento.ok) {
+                    const erroDB = await respostaEvento.json();
+                    throw new Error("\nDetalhe do Banco: " + (erroDB.detail || "Falha desconhecida."));
+                }
 
                 // 5. Atualiza o status do Orçamento para "Aprovado"
                 await fetch(`${API_BASE}/orcamentos/${orcId}/status`, {
