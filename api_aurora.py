@@ -2974,3 +2974,81 @@ def importar_pacote_premium(payload: ImportPackPayload):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
+
+# ==========================================
+# MODELOS DE DADOS (PYDANTIC)
+# ==========================================
+class EventoPayload(BaseModel):
+    account_id: str
+    nome_contratante: str
+    data_evento: str
+    local_evento: str
+    convidados: int
+    duracao_horas: int
+    duracao_minutos: int
+    valor_contrato: float
+    orcamento_origem_id: str
+    status: str
+
+class StatusOrcamentoPayload(BaseModel):
+    status: str
+
+# ==========================================
+# ROTA 1: CRIAR EVENTO (Vindo do Orçamento)
+# ==========================================
+@app.post("/events")
+def criar_evento_via_orcamento(payload: EventoPayload):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        # ⚠️ ATENÇÃO: Verifique se os nomes das colunas abaixo batem exatamente 
+        # com os nomes que você criou na sua tabela 'events' no Supabase!
+        cur.execute("""
+            INSERT INTO events (
+                account_id, contratante, data_evento, local, 
+                convidados, duracao_horas, duracao_minutos, valor_contrato, 
+                orcamento_origem_id, status
+            ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s)
+            RETURNING id;
+        """, (
+            payload.account_id, payload.nome_contratante, payload.data_evento, 
+            payload.local_evento, payload.convidados, payload.duracao_horas, 
+            payload.duracao_minutos, payload.valor_contrato, 
+            payload.orcamento_origem_id, payload.status
+        ))
+        
+        novo_id = cur.fetchone()['id']
+        conn.commit()
+        return {"status": "sucesso", "evento_id": novo_id}
+
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
+
+# ==========================================
+# ROTA 2: ATUALIZAR STATUS DO ORÇAMENTO
+# ==========================================
+@app.patch("/orcamentos/{orcamento_id}/status")
+def atualizar_status_orcamento(orcamento_id: str, payload: StatusOrcamentoPayload):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        
+        # ⚠️ Ajuste o nome da tabela 'budgets' ou 'orcamentos' conforme o seu banco
+        cur.execute("""
+            UPDATE budgets 
+            SET status = %s 
+            WHERE id = %s::uuid
+        """, (payload.status, orcamento_id))
+        
+        conn.commit()
+        return {"status": "sucesso"}
+
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
