@@ -2999,37 +2999,35 @@ def criar_evento_via_orcamento(payload: EventoPayload):
     try:
         cur = conn.cursor()
         
-        # Colunas e variáveis estritamente alinhadas com a tabela events
+        # 1. CRIA O EVENTO
         cur.execute("""
             INSERT INTO events (
-                account_id, 
-                name, 
-                contratante, 
-                event_date, 
-                location, 
-                duration_h, 
-                duration_m, 
-                contract_value, 
-                orcamento_origem_id, 
-                status
+                account_id, name, contratante, event_date, location, 
+                duration_h, duration_m, contract_value, orcamento_origem_id, status
             ) VALUES (
                 %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s
             )
             RETURNING id;
         """, (
-            payload.account_id, 
-            payload.nome_contratante, # name é Not Null no DB, usamos o contratante
-            payload.nome_contratante, # contratante
-            payload.data_evento,      # event_date
-            payload.local_evento,     # location
-            payload.duracao_horas,    # duration_h
-            payload.duracao_minutos,  # duration_m
-            payload.valor_contrato,   # contract_value
-            payload.orcamento_origem_id, 
-            payload.status            
+            payload.account_id, payload.nome_contratante, payload.nome_contratante, 
+            payload.data_evento, payload.local_evento, payload.duracao_horas, 
+            payload.duracao_minutos, payload.valor_contrato, 
+            payload.orcamento_origem_id, payload.status
         ))
         
+        # Pega o ID do evento recém-criado
         novo_id = cur.fetchone()[0]
+        
+        # 2. COPIA OS DRINKS DO ORÇAMENTO PARA A TABELA event_menus
+        # ⚠️ IMPORTANTE: Ajuste o nome da tabela do orçamento na linha FROM e a coluna na linha WHERE
+        cur.execute("""
+            INSERT INTO event_menus (event_id, cocktail_id)
+            SELECT %s::uuid, cocktail_id 
+            FROM budgets 
+            WHERE id = %s::uuid       -- <<< SUBSTITUA PELO NOME DA COLUNA DO ID
+        """, (novo_id, payload.orcamento_origem_id))
+
+        # Confirma as duas transações no banco de uma vez só
         conn.commit()
         return {"status": "sucesso", "evento_id": novo_id}
 
