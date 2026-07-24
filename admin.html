@@ -1427,14 +1427,17 @@
                             </div>
                         </div> -->
 
-                        <div style="display:flex; gap:10px; margin-top:15px;">
+                        <div style="display:flex; gap:10px; margin-top:15px; flex-wrap: wrap;">
                             <button onclick="salvarOrcamento()" class="btn-success" style="flex:1;">💾 SALVAR</button>
                             <button onclick="gerarPDFOrcamento()" class="btn-primary" style="flex:1;">📄 PDF</button>
-                            <button type="button" onclick="window.duplicarOrcamento()" class="btn btn-warning" style="margin-right: 10px;">📋 Duplicar Orçamento
-                        </button>
+                            <button type="button" onclick="window.duplicarOrcamento()" class="btn-warning" style="flex:1;">📋 DUPLICAR</button>
+                            
+                            <!-- 📍 NOVO BOTÃO DE APROVAÇÃO -->
+                            <button type="button" onclick="window.aprovarGerarEvento()" class="btn-live" id="btnAprovarOrcamento" style="flex:100%; margin-top: 5px; background: #27ae60; color: white; padding: 12px; font-size: 1.1em; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                                ✅ APROVAR E GERAR EVENTO
+                            </button>
                         </div>
-                        <button onclick="limparOrcamento()" class="btn-info" style="margin-top:10px; width:100%;">Limpar
-                            / Novo</button>
+                        <button onclick="limparOrcamento()" class="btn-info" style="margin-top:10px; width:100%;">Limpar / Novo</button>
                     </div>
                 </div>
 
@@ -3106,6 +3109,95 @@
         };
 
         // ==========================================
+        // TRANSFORMAR ORÇAMENTO EM EVENTO
+        // ==========================================
+        window.aprovarGerarEvento = async () => {
+            const orcId = document.getElementById('orcIdHidden').value;
+            
+            // 1. Validação
+            if (!orcId) {
+                alert("⚠️ Você precisa salvar este orçamento primeiro antes de gerar um evento.");
+                return;
+            }
+
+            const cliente = document.getElementById('orcCliente').value;
+            const dataEvento = document.getElementById('orcData').value;
+            
+            if (!cliente || !dataEvento) {
+                alert("⚠️ Nome do cliente e data são obrigatórios para gerar o evento.");
+                return;
+            }
+
+            const confirmacao = confirm(`Deseja aprovar a proposta de ${cliente} e gerar o Evento Oficial na agenda?`);
+            if (!confirmacao) return;
+
+            const btn = document.getElementById('btnAprovarOrcamento');
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = "⏳ Gerando Evento...";
+            btn.disabled = true;
+
+            try {
+                // 2. Coleta os dados da tela de Orçamentos
+                const local = document.getElementById('orcLocal').value;
+                const convidados = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
+                const horas = parseInt(document.getElementById('orcHoras').value) || 4;
+                const valorFechado = parseFloat(document.getElementById('orcValorNegociado').value) || 0;
+
+                // 3. Monta o Payload no formato da tabela de Eventos
+                const payloadEvento = {
+                    account_id: localStorage.getItem('account_id'),
+                    nome_contratante: cliente,
+                    data_evento: dataEvento,
+                    local_evento: local,
+                    convidados: convidados,
+                    duracao_horas: horas,
+                    duracao_minutos: 0,
+                    valor_contrato: valorFechado,
+                    orcamento_origem_id: orcId, // Link para saber de onde veio
+                    status: 'Pendente' // Status inicial do evento na produção
+                    // Nota: Se você já tem a lista de drinks salva no orçamento, 
+                    // o backend deve copiar os itens de 'orcamento_drinks' para 'evento_drinks'.
+                };
+
+                // 4. Dispara a criação do Evento (Ajuste a rota conforme o seu backend atual)
+                const respostaEvento = await fetch(`${API_BASE}/eventos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadEvento)
+                });
+
+                if (!respostaEvento.ok) throw new Error("Falha ao criar o evento no banco de dados.");
+
+                // 5. Atualiza o status do Orçamento para "Aprovado"
+                await fetch(`${API_BASE}/orcamentos/${orcId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: "Aprovado" })
+                });
+
+                alert("🎉 SUCESSO! Evento criado e inserido na agenda de produção.");
+                
+                // 6. Transição Fluida: Leva o usuário direto para a tela de Eventos
+                document.getElementById('view-orcamentos').style.display = 'none';
+                document.getElementById('view-eventos').style.display = 'block';
+                
+                // Simula o clique no menu lateral para deixar visualmente correto
+                const menus = document.querySelectorAll('.menu-item');
+                menus.forEach(m => m.classList.remove('active'));
+                menus[0].classList.add('active'); // Assumindo que Eventos é o primeiro menu
+
+                // Recarrega a lista de eventos para o novo já aparecer
+                if(typeof carregarEventos === "function") carregarEventos();
+
+            } catch (e) {
+                alert("❌ Erro ao converter orçamento: " + e.message);
+            } finally {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        };
+
+        // ==========================================
         //  3. GESTÃO DE ORÇAMENTOS (V62) - ATUALIZADO FORMATO DINHEIRO
         // ==========================================
 
@@ -3240,6 +3332,8 @@
                 window.renderLibOrcamento();
             }
         };
+
+
 
         // ==========================================
         // FUNÇÃO: CARREGAR (POPULAR) ORÇAMENTO SALVO NA TELA
