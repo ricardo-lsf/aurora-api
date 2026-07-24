@@ -2996,7 +2996,7 @@ class StatusOrcamentoPayload(BaseModel):
 # ==========================================
 # ROTA 1: CRIAR EVENTO (Vindo do Orçamento)
 # ==========================================
-@app.post("/events")
+@app.post("/eventos")
 def criar_evento_via_orcamento(payload: EventoPayload):
     conn = get_db_connection()
     try:
