@@ -2990,6 +2990,8 @@ def importar_pacote_premium(payload: ImportPackPayload):
         if conn: conn.close()
 
 
+import json # Garanta que a biblioteca json esteja importada no topo do arquivo
+
 # ==========================================
 # ROTA 1: CRIAR EVENTO (Vindo do Orçamento)
 # ==========================================
@@ -2999,7 +3001,7 @@ def criar_evento_via_orcamento(payload: EventoPayload):
     try:
         cur = conn.cursor()
         
-        # 1. CRIA O EVENTO
+        # 1. CRIA O EVENTO NA TABELA events
         cur.execute("""
             INSERT INTO events (
                 account_id, name, contratante, event_date, location, 
@@ -3018,16 +3020,37 @@ def criar_evento_via_orcamento(payload: EventoPayload):
         # Pega o ID do evento recém-criado
         novo_id = cur.fetchone()[0]
         
-        # 2. COPIA OS DRINKS DO ORÇAMENTO PARA A TABELA event_menus
-        # ⚠️ IMPORTANTE: Ajuste o nome da tabela do orçamento na linha FROM e a coluna na linha WHERE
+        # 2. PUXA O JSON DOS DRINKS LÁ DO ORÇAMENTO
         cur.execute("""
-            INSERT INTO event_menus (event_id, cocktail_id)
-            SELECT %s::uuid, cocktail_id 
+            SELECT drinks_selecionados 
             FROM budgets 
-            WHERE id = %s::uuid       -- <<< SUBSTITUA PELO NOME DA COLUNA DO ID
-        """, (novo_id, payload.orcamento_origem_id))
+            WHERE id = %s::uuid
+        """, (payload.orcamento_origem_id,))
+        
+        resultado_orc = cur.fetchone()
+        
+        # 3. EXTRAI OS DRINKS E COPIA PARA O EVENTO
+        if resultado_orc and resultado_orc[0]:
+            drinks_json = resultado_orc[0]
+            
+            # Se o banco retornou como string, converte para lista do Python
+            if isinstance(drinks_json, str):
+                drinks_json = json.loads(drinks_json)
+            
+            # Loop inteligente para inserir cada drink na tabela event_menus
+            for drink in drinks_json:
+                # Trata as duas possibilidades: se o JSON for uma lista de textos ou uma lista de objetos
+                cocktail_id = drink if isinstance(drink, str) else drink.get('id') or drink.get('cocktail_id')
+                
+                if cocktail_id:
+                    # Usamos ON CONFLICT DO NOTHING para respeitar a sua trava 'unique_event_cocktail'
+                    cur.execute("""
+                        INSERT INTO event_menus (event_id, cocktail_id)
+                        VALUES (%s::uuid, %s::uuid)
+                        ON CONFLICT (event_id, cocktail_id) DO NOTHING
+                    """, (novo_id, cocktail_id))
 
-        # Confirma as duas transações no banco de uma vez só
+        # Confirma tudo no banco
         conn.commit()
         return {"status": "sucesso", "evento_id": novo_id}
 
