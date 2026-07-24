@@ -192,6 +192,20 @@ class CloneCocktail(BaseModel):
     novo_nome: Optional[str] = None # Opcional: permite que o frontend já mande o nome desejado
 
 # ==========================================
+# MODELOS DE DADOS (PYDANTIC)
+# ==========================================
+class EventoPayload(BaseModel):
+    account_id: str
+    nome_contratante: str
+    data_evento: str
+    local_evento: str
+    duracao_horas: int
+    duracao_minutos: int
+    valor_contrato: float
+    orcamento_origem_id: str
+    status: str
+
+# ==========================================
 # ROTAS DO FRONTEND (Telas HTML)
 # ==========================================
 @app.get("/login.html")
@@ -2975,23 +2989,6 @@ def importar_pacote_premium(payload: ImportPackPayload):
     finally:
         if conn: conn.close()
 
-# ==========================================
-# MODELOS DE DADOS (PYDANTIC)
-# ==========================================
-class EventoPayload(BaseModel):
-    account_id: str
-    nome_contratante: str
-    data_evento: str
-    local_evento: str
-    convidados: int
-    duracao_horas: int
-    duracao_minutos: int
-    valor_contrato: float
-    orcamento_origem_id: str
-    status: str
-
-class StatusOrcamentoPayload(BaseModel):
-    status: str
 
 # ==========================================
 # ROTA 1: CRIAR EVENTO (Vindo do Orçamento)
@@ -3002,20 +2999,34 @@ def criar_evento_via_orcamento(payload: EventoPayload):
     try:
         cur = conn.cursor()
         
-        # ⚠️ ATENÇÃO: Verifique se os nomes das colunas abaixo batem exatamente 
-        # com os nomes que você criou na sua tabela 'events' no Supabase!
+        # Colunas e variáveis estritamente alinhadas com a tabela events
         cur.execute("""
             INSERT INTO events (
-                account_id, contratante, data_evento, local, 
-                convidados, duracao_horas, duracao_minutos, valor_contrato, 
-                orcamento_origem_id, status
-            ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s)
+                account_id, 
+                name, 
+                contratante, 
+                event_date, 
+                location, 
+                duration_h, 
+                duration_m, 
+                contract_value, 
+                orcamento_origem_id, 
+                status
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s
+            )
             RETURNING id;
         """, (
-            payload.account_id, payload.nome_contratante, payload.data_evento, 
-            payload.local_evento, payload.convidados, payload.duracao_horas, 
-            payload.duracao_minutos, payload.valor_contrato, 
-            payload.orcamento_origem_id, payload.status
+            payload.account_id, 
+            payload.nome_contratante, # name é Not Null no DB, usamos o contratante
+            payload.nome_contratante, # contratante
+            payload.data_evento,      # event_date
+            payload.local_evento,     # location
+            payload.duracao_horas,    # duration_h
+            payload.duracao_minutos,  # duration_m
+            payload.valor_contrato,   # contract_value
+            payload.orcamento_origem_id, 
+            payload.status            
         ))
         
         novo_id = cur.fetchone()['id']

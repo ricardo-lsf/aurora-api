@@ -3149,14 +3149,12 @@
                     nome_contratante: cliente,
                     data_evento: dataEvento,
                     local_evento: local,
-                    convidados: convidados,
+                    // Linha 'convidados' apagada
                     duracao_horas: horas,
                     duracao_minutos: 0,
                     valor_contrato: valorFechado,
-                    orcamento_origem_id: orcId, // Link para saber de onde veio
-                    status: 'Pendente' // Status inicial do evento na produção
-                    // Nota: Se você já tem a lista de drinks salva no orçamento, 
-                    // o backend deve copiar os itens de 'orcamento_drinks' para 'evento_drinks'.
+                    orcamento_origem_id: orcId, 
+                    status: 'aberto' // Mudado de 'Pendente' para 'aberto' conforme seu padrão de DB
                 };
 
                 // 4. Dispara a criação do Evento (Ajuste a rota conforme o seu backend atual)
