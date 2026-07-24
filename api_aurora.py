@@ -3029,7 +3029,7 @@ def criar_evento_via_orcamento(payload: EventoPayload):
             payload.status            
         ))
         
-        novo_id = cur.fetchone()['id']
+        novo_id = cur.fetchone()[0]
         conn.commit()
         return {"status": "sucesso", "evento_id": novo_id}
 
