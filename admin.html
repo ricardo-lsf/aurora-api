@@ -19,6 +19,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
 
@@ -1488,6 +1489,7 @@
                         <h3 style="margin:0; color:#34495e;">1. Editor de Drinks</h3>
                         <button onclick="limparFormDrink()" class="btn-info"
                             style="padding:5px 10px; height:30px; font-size:0.8em;">Limpar / Novo</button>
+                        <button type="button" onclick="exportarFichaPDF()" class="btn-primary" style="background:#8e44ad; margin-left: 10px;">📄 Gerar PDF (WhatsApp)</button>
                     </div>
 
                     <input type="hidden" id="drinkId">
@@ -7090,6 +7092,77 @@
             }
         };
 
+        // ==========================================
+        // EXPORTAR FICHA TÉCNICA (PDF)
+        // ==========================================
+        window.exportarFichaPDF = () => {
+            const nomeDrink = document.getElementById('globalName').value || "Drink_Sem_Nome";
+            const tecnica = document.getElementById('globalTecnica').value;
+            const classificacao = document.getElementById('globalClassificacao').value;
+            const modoPreparo = document.getElementById('globalPreparo').value.replace(/\n/g, '<br>');
+            const precoVenda = document.getElementById('globalPrice').value;
+            const custoTotal = document.getElementById('globalCusto').value;
+            const cmv = document.getElementById('cmv-display').innerText;
+
+            // Pega as linhas dos ingredientes que estão na tela no momento
+            const containerIngredientes = document.getElementById('lista-ingredientes');
+            let linhasInsumosHTML = '';
+            
+            // Verifica se existem itens na lista antes de tentar varrer
+            if(containerIngredientes && containerIngredientes.children.length > 0) {
+                Array.from(containerIngredientes.children).forEach(linha => {
+                    const texto = linha.innerText.replace('❌', '').trim();
+                    linhasInsumosHTML += `<tr><td style="padding:8px; border-bottom:1px solid #ddd;">${texto}</td></tr>`;
+                });
+            } else {
+                linhasInsumosHTML = '<tr><td style="padding:8px; border-bottom:1px solid #ddd; text-align:center;">Nenhum ingrediente adicionado.</td></tr>';
+            }
+
+            // Monta o layout HTML invisível
+            const elementoHTML = document.createElement('div');
+            elementoHTML.innerHTML = `
+                <div style="font-family: Arial, sans-serif; padding: 40px; color: #2c3e50;">
+                    <div style="background: #1e3c72; color: #fff; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px;">
+                        <h1 style="margin: 0; color: #f1c40f;">${nomeDrink}</h1>
+                        <p style="margin: 5px 0 0 0;">${classificacao} | Técnica: ${tecnica}</p>
+                    </div>
+                    
+                    <h2 style="border-bottom: 2px solid #eee; padding-bottom: 5px; color: #1e3c72;">Composição</h2>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tbody>
+                            ${linhasInsumosHTML}
+                        </tbody>
+                    </table>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; text-align: right; margin-bottom: 20px;">
+                        <span style="color: #7f8c8d;">Custo Estimado:</span> <strong style="color: #e74c3c;">R$ ${custoTotal}</strong><br>
+                        <span style="color: #7f8c8d;">Preço Sugerido:</span> <strong style="color: #27ae60;">R$ ${precoVenda}</strong><br>
+                        <span style="display:inline-block; background:#f1c40f; color:#000; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:bold; margin-top:5px;">${cmv}</span>
+                    </div>
+
+                    <h2 style="border-bottom: 2px solid #eee; padding-bottom: 5px; color: #1e3c72;">Modo de Preparo</h2>
+                    <div style="background: #fff; border-left: 4px solid #f39c12; padding: 15px; font-size: 14px; line-height: 1.6;">
+                        ${modoPreparo || "Modo de preparo não informado."}
+                    </div>
+                    
+                    <div style="margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+                        Gerado por Aurora Bartenders - Ficha Técnica Oficial
+                    </div>
+                </div>
+            `;
+
+            // Configuração do PDF
+            const opt = {
+                margin:       0,
+                filename:     `Ficha_Tecnica_${nomeDrink.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Transforma o HTML em PDF e faz o download
+            html2pdf().set(opt).from(elementoHTML).save();
+        };
 
     </script>
 
