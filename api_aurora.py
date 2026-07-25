@@ -206,6 +206,14 @@ class EventoPayload(BaseModel):
     status: str
 
 # ==========================================
+# ROTA PARA EXIBIR A LOGO
+# ==========================================
+@app.get("/logo-simbolo.png")
+def get_logo():
+    # Retorna o arquivo da imagem que está na mesma pasta
+    return FileResponse("logo-simbolo.png")
+
+# ==========================================
 # ROTAS DO FRONTEND (Telas HTML)
 # ==========================================
 @app.get("/login.html")
