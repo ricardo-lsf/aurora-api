@@ -16,7 +16,9 @@ app = FastAPI(title="Aurora Bartenders API")
 # ==========================================
 # CLASSES
 # ==========================================
-
+class StatusOrcamentoPayload(BaseModel):
+    status: str
+    
 class EventoUpdate(BaseModel):
     responsavel: Optional[str] = ""
     telefone: Optional[str] = ""
@@ -2563,7 +2565,7 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
 
 
 # ==========================================
-# ROTA: SALVAR NOVO OU ATUALIZAR ORÇAMENTO
+# ROTA: SALVAR NOVO OU ATUALIZAR ORÇAMENTO (CORRIGIDA)
 # ==========================================
 @app.post("/orcamentos")
 def salvar_orcamento(orc: NovoOrcamentoInput):
@@ -2582,15 +2584,19 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                     cliente = %s, data_evento = %s, local = %s, 
                     qtd_pessoas = %s, pacote_escolhido = %s, valor_pessoa = %s, 
                     extras = %s, total = %s, drinks_selecionados = %s, 
-                    custo_estimado = %s, valor_sugerido = %s
+                    custo_estimado = %s, valor_sugerido = %s,
+                    cnpj_cpf = %s, responsible_name = %s, phone = %s, 
+                    start_time = %s, duration_h = %s, event_type = %s, sinal_negocio = %s
                 WHERE id = %s AND account_id = %s
                 RETURNING numero;
             """
             cur.execute(query_update, (
-                orc.cliente, orc.data_evento if orc.data_evento else None,
-                orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
-                orc.valor_pessoa, orc.extras, orc.total, 
-                drinks_jsonb, orc.custo_estimado, orc.valor_sugerido,
+                orc.cliente, orc.data_evento if orc.data_evento else None, orc.local, 
+                orc.qtd_pessoas, orc.pacote_escolhido, orc.valor_pessoa, 
+                orc.extras, orc.total, drinks_jsonb, 
+                orc.custo_estimado, orc.valor_sugerido,
+                orc.cnpj_cpf, orc.responsible_name, orc.phone, 
+                orc.start_time, orc.duration_h, orc.event_type, orc.sinal_negocio,
                 orc.id, orc.account_id
             ))
             
@@ -2608,23 +2614,23 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             total_existente = cur.fetchone()[0]
             numero_final = f"ORC-{str(total_existente + 1).zfill(4)}"
             
+            # Comando INSERT 100% alinhado com as variáveis
             query_insert = """
                 INSERT INTO budgets (
-                        account_id, cliente, data_evento, local, qtd_pessoas, valor_pessoa, 
-                        extras, total, pacote_escolhido, drinks_selecionados, custo_estimado, valor_sugerido,
-                        cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
-                    ) VALUES (
-                        %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s
-                    )
-                RETURNING id;
+                    account_id, numero, cliente, data_evento, local, qtd_pessoas, valor_pessoa, 
+                    extras, total, pacote_escolhido, drinks_selecionados, status, custo_estimado, valor_sugerido,
+                    cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
+                ) VALUES (
+                    %s::uuid, %s, %s, %s, %s, %s, %s, 
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s
+                ) RETURNING id;
             """
             cur.execute(query_insert, (
-                orc.account_id, numero_final, orc.cliente, 
-                orc.data_evento if orc.data_evento else None,
-                orc.local, orc.qtd_pessoas, orc.pacote_escolhido, 
-                orc.valor_pessoa, orc.extras, orc.total, 
-                drinks_jsonb, "Pendente", orc.custo_estimado, orc.valor_sugerido
+                orc.account_id, numero_final, orc.cliente, orc.data_evento if orc.data_evento else None,
+                orc.local, orc.qtd_pessoas, orc.valor_pessoa, 
+                orc.extras, orc.total, orc.pacote_escolhido, drinks_jsonb, "Pendente", orc.custo_estimado, orc.valor_sugerido,
+                orc.cnpj_cpf, orc.responsible_name, orc.phone, orc.start_time, orc.duration_h, orc.event_type, orc.sinal_negocio
             ))
             
             id_final = cur.fetchone()[0]
@@ -3019,7 +3025,7 @@ def importar_pacote_premium(payload: ImportPackPayload):
 import json # Garanta que a biblioteca json esteja importada no topo do arquivo
 
 # ==========================================
-# ROTA 1: CRIAR EVENTO (Vindo do Orçamento)
+# ROTA 1: CRIAR EVENTO VIA ORÇAMENTO (PONTE FINALIZADA)
 # ==========================================
 @app.post("/eventos")
 def criar_evento_via_orcamento(payload: EventoPayload):
@@ -3027,20 +3033,24 @@ def criar_evento_via_orcamento(payload: EventoPayload):
     try:
         cur = conn.cursor()
         
-        # 1. CRIA O EVENTO NA TABELA events
+        # 1. CRIA O EVENTO RECEBENDO TODOS OS DADOS NOVOS DA PROPOSTA
         cur.execute("""
             INSERT INTO events (
                 account_id, name, contratante, event_date, location, 
-                duration_h, duration_m, contract_value, orcamento_origem_id, status
+                duration_h, duration_m, contract_value, orcamento_origem_id, status,
+                qtd_pessoas, cnpj_cpf, responsible_name, phone, start_time, event_type
             ) VALUES (
-                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s,
+                %s, %s, %s, %s, %s, %s
             )
             RETURNING id;
         """, (
             payload.account_id, payload.nome_contratante, payload.nome_contratante, 
             payload.data_evento, payload.local_evento, payload.duracao_horas, 
             payload.duracao_minutos, payload.valor_contrato, 
-            payload.orcamento_origem_id, payload.status
+            payload.orcamento_origem_id, payload.status,
+            payload.qtd_pessoas, payload.cnpj_cpf, payload.responsible_name, 
+            payload.phone, payload.start_time, payload.event_type
         ))
         
         # Pega o ID do evento recém-criado
@@ -3059,17 +3069,13 @@ def criar_evento_via_orcamento(payload: EventoPayload):
         if resultado_orc and resultado_orc[0]:
             drinks_json = resultado_orc[0]
             
-            # Se o banco retornou como string, converte para lista do Python
             if isinstance(drinks_json, str):
                 drinks_json = json.loads(drinks_json)
             
-            # Loop inteligente para inserir cada drink na tabela event_menus
             for drink in drinks_json:
-                # Trata as duas possibilidades: se o JSON for uma lista de textos ou uma lista de objetos
                 cocktail_id = drink if isinstance(drink, str) else drink.get('id') or drink.get('cocktail_id')
                 
                 if cocktail_id:
-                    # Usamos ON CONFLICT DO NOTHING para respeitar a sua trava 'unique_event_cocktail'
                     cur.execute("""
                         INSERT INTO event_menus (event_id, cocktail_id)
                         VALUES (%s::uuid, %s::uuid)
