@@ -3233,6 +3233,7 @@
                 const telefone = document.getElementById('orcTelefone').value || "";
                 const horaInicio = document.getElementById('orcHoraInicio').value || null;
                 const tipoEvento = document.getElementById('orcTipoEvento').value || "";
+                const sinalPerc = parseFloat(document.getElementById('orcSinalPerc')?.value) || 30.0;
 
                 // 3. Monta o Payload no formato da tabela de Eventos
                 const payloadEvento = {
@@ -3245,13 +3246,13 @@
                     valor_contrato: valorFechado,
                     orcamento_origem_id: orcId, 
                     status: 'aberto',
-                    // Novos campos inseridos no payload:
                     qtd_pessoas: convidados,
                     cnpj_cpf: cnpjCpf,
                     responsible_name: responsavel,
                     phone: telefone,
                     start_time: horaInicio,
-                    event_type: tipoEvento
+                    event_type: tipoEvento,
+                    upfront_perc: sinalPerc
                 };
 
                 // 4. Dispara a criação do Evento (Ajuste a rota conforme o seu backend atual)

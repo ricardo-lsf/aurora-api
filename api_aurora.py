@@ -221,6 +221,7 @@ class EventoPayload(BaseModel):
     phone: Optional[str] = None
     start_time: Optional[str] = None
     event_type: Optional[str] = None
+    upfront_perc: Optional[float] = 0.0
 
 # ==========================================
 # ROTA PARA EXIBIR A LOGO
@@ -3046,15 +3047,17 @@ def criar_evento_via_orcamento(payload: EventoPayload):
     try:
         cur = conn.cursor()
         
-        # 1. CRIA O EVENTO RECEBENDO TODOS OS DADOS NOVOS DA PROPOSTA
+        # 1. CRIA O EVENTO RECEBENDO TODOS OS DADOS NOVOS + O SINAL DE NEGÓCIO
         cur.execute("""
             INSERT INTO events (
                 account_id, name, contratante, event_date, location, 
                 duration_h, duration_m, contract_value, orcamento_origem_id, status,
-                qtd_pessoas, cnpj_cpf, responsible_name, phone, start_time, event_type
+                qtd_pessoas, cnpj_cpf, responsible_name, phone, start_time, event_type,
+                upfront_perc
             ) VALUES (
                 %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s::uuid, %s,
-                %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s,
+                %s
             )
             RETURNING id;
         """, (
@@ -3063,10 +3066,10 @@ def criar_evento_via_orcamento(payload: EventoPayload):
             payload.duracao_minutos, payload.valor_contrato, 
             payload.orcamento_origem_id, payload.status,
             payload.qtd_pessoas, payload.cnpj_cpf, payload.responsible_name, 
-            payload.phone, payload.start_time, payload.event_type
+            payload.phone, payload.start_time, payload.event_type,
+            payload.upfront_perc
         ))
         
-        # Pega o ID do evento recém-criado
         novo_id = cur.fetchone()[0]
         
         # 2. PUXA O JSON DOS DRINKS LÁ DO ORÇAMENTO
