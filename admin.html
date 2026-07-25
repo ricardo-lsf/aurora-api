@@ -1370,22 +1370,72 @@
             <h2>📑 Gerador de Propostas</h2>
             <div class="grid-3">
                 <div class="card">
-                    <h3>1. Dados do Cliente</h3>
+                    <h3>1. Dados do Cliente e Evento</h3>
                     <div style="display:grid; gap:10px;">
                         <input type="hidden" id="orcIdHidden">
-                        <div style="display:flex; justify-content:space-between;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 5px;">
                             <label>Nº Orçamento</label>
                             <span id="orcNumeroDisplay" style="color:#3498db; font-weight:bold;">Novo</span>
                         </div>
                         
-                        <div><label>Nome do Cliente / Empresa</label><input type="text" id="orcCliente"></div>
-                        <div><label>Data do Evento</label><input type="date" id="orcData"></div>
-                        <div><label>Local / Cidade</label><input type="text" id="orcLocal"></div>
-                        <hr style="width:100%; border:0; border-top:1px dashed #ccc;">
+                        <!-- 👤 BLOCO: DADOS DO CLIENTE -->
+                        <div>
+                            <label>Contratante (Nome / Empresa)</label>
+                            <input type="text" id="orcCliente" style="width: 100%;">
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label>CNPJ / CPF</label>
+                                <input type="text" id="orcCnpjCpf" placeholder="000.000.000-00" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label>Responsável</label>
+                                <input type="text" id="orcResponsavel" placeholder="Nome do contato" style="width: 100%;">
+                            </div>
+                        </div>
 
+                        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px;">
+                            <div>
+                                <label>Telefone</label>
+                                <input type="text" id="orcTelefone" placeholder="(00) 00000-0000" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label>Local / Cidade</label>
+                                <input type="text" id="orcLocal" style="width: 100%;">
+                            </div>
+                        </div>
+
+                        <hr style="width:100%; border:0; border-top:1px dashed rgba(255,255,255,0.1); margin: 10px 0;">
+
+                        <!-- 📅 BLOCO: DADOS DO EVENTO -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 10px;">
+                            <div>
+                                <label>Data</label>
+                                <input type="date" id="orcData" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label>Hora Início</label>
+                                <input type="time" id="orcHoraInicio" style="width: 100%;">
+                            </div>
+                            <div>
+                                <label>Tipo de Evento</label>
+                                <select id="orcTipoEvento" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #1e1e2d; color: #fff;">
+                                    <option value="">Selecione...</option>
+                                    <option value="Confraternização">Confraternização</option>
+                                    <option value="Casamento">Casamento</option>
+                                    <option value="Debutante">15 Anos / Debutante</option>
+                                    <option value="Bodas">Bodas</option>
+                                    <option value="Temático">Temáticos</option>
+                                    <option value="Outros">Outros</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- ⚖️ BLOCO: DIMENSIONAMENTO DO BAR -->
                         <div style="display: flex; gap: 15px; margin-top: 15px; background: #2d2d44; padding: 15px; border-radius: 8px; border: 1px solid #4b5563;">
                             <div style="flex: 1;">
-                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Convidados (Ex: 50)</label>
+                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Convidados</label>
                                 <input type="number" id="orcQtdPessoas" class="form-control" style="width: 100%; background: #1e1e2d; color: #fff; border: 1px solid #333; padding: 8px; border-radius: 4px;" value="50" onchange="window.calcularPreviaOrcamento()">
                             </div>
                             
@@ -1395,7 +1445,7 @@
                             </div>
 
                             <div style="flex: 2;">
-                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Pacote / Nível da Carta</label>
+                                <label style="color: #aaa; font-size: 12px; display: block; margin-bottom: 5px;">Nível da Carta</label>
                                 <select id="orcPacote" class="form-control" onchange="window.renderLibOrcamento(); window.calcularPreviaOrcamento();">
                                     <option value="bronze">🥉 Bronze</option>
                                     <option value="prata">🥈 Prata</option>
@@ -1405,10 +1455,11 @@
                             </div>
                         </div>
 
+                        <!-- 💰 BLOCO: PRECIFICAÇÃO E SINAL -->
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; background: #1e1e2d; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
-    
+                            
                             <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 6px;">
-                                <span style="color: #aaa; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Custo Base (Insumos + Equipe)</span>
+                                <span style="color: #aaa; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px;">Custo Base (Insumos+Eqp)</span>
                                 <span id="orcCustoDisplay" style="color: #e11d48; font-size: 18px; font-weight: bold;">R$ 0,00</span>
                             </div>
 
@@ -1421,38 +1472,29 @@
                                 <span style="color: #10b981; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;">Valor Final Fechado</span>
                                 <div style="display: flex; align-items: center; margin-top: 4px;">
                                     <span style="color: #10b981; font-size: 20px; font-weight: bold; margin-right: 5px;">R$</span>
-                                    <input type="number" step="0.01" id="orcValorNegociado" onkeyup="window.recalcularValorPorPessoa()" onchange="window.recalcularValorPorPessoa()" style="background: transparent; border: none; border-bottom: 1px dashed #10b981; color: #10b981; font-size: 20px; font-weight: bold; width: 100%; outline: none; box-shadow: none;" placeholder="0.00">
+                                    <input type="number" step="0.01" id="orcValorNegociado" onkeyup="window.recalcularValorPorPessoa(); window.calcularSinal();" onchange="window.recalcularValorPorPessoa(); window.calcularSinal();" style="background: transparent; border: none; border-bottom: 1px dashed #10b981; color: #10b981; font-size: 20px; font-weight: bold; width: 100%; outline: none; box-shadow: none;" placeholder="0.00">
                                 </div>
                                 <small id="orcPrecoPessoaDisplay" style="display: block; color: #10b981; font-size: 12px; margin-top: 6px;">(R$ 0,00 por pessoa)</small>
-                                
                                 <span id="orcTotalDisplay" style="display: none;">R$ 0,00</span>
+                                
+                                <!-- NOVO: CÁLCULO DE SINAL -->
+                                <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.3);">
+                                    <span style="color: #f59e0b; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;">Sinal de Negócio (Min 30%)</span>
+                                    <div style="display: flex; align-items: center; margin-top: 4px; gap: 8px;">
+                                        <input type="number" id="orcSinalPerc" value="30" onkeyup="window.calcularSinal()" onchange="window.calcularSinal()" style="background: rgba(0,0,0,0.2); border: 1px solid #f59e0b; color: #f59e0b; font-size: 14px; font-weight: bold; width: 60px; padding: 4px; border-radius: 4px; text-align: center; outline: none;">
+                                        <span style="color: #f59e0b; font-weight: bold;">% = </span>
+                                        <span style="color: #f59e0b; font-size: 16px; font-weight: bold;">R$</span>
+                                        <span id="orcSinalValorDisplay" style="color: #f59e0b; font-size: 16px; font-weight: bold;">0,00</span>
+                                    </div>
+                                </div>
                             </div>
-                            
                         </div>
-
-                        <!-- <h4 style="margin:5px 0;">💰 Precificação</h4>
-                        <div class="grid-2">
-                            <div><label style="white-space: nowrap;">Nº Convidados</label><input type="number"
-                                    id="orcQtdPessoas" placeholder="0" oninput="calcOrcamento()"></div>
-                            <div><label style="white-space: nowrap;">Valor por Pessoa (R$)</label><input type="number"
-                                    id="orcValorPessoa" placeholder="0.00" oninput="calcOrcamento()"></div>
-                        </div>
-                        <div><label>Taxa Deslocamento / Extra (R$)</label><input type="number" id="orcExtras"
-                                placeholder="0.00" oninput="calcOrcamento()"></div>
-
-                        <div
-                            style="background:#e8f5e9; padding:15px; border-radius:6px; margin-top:10px; border:1px solid #a5d6a7;">
-                            <label style="color:#2e7d32;">VALOR TOTAL ESTIMADO:</label>
-                            <div id="orcTotalDisplay" style="font-size:1.8em; font-weight:bold; color:#1b5e20;">R$ 0,00
-                            </div>
-                        </div> -->
 
                         <div style="display:flex; gap:10px; margin-top:15px; flex-wrap: wrap;">
                             <button onclick="salvarOrcamento()" class="btn-success" style="flex:1;">💾 SALVAR</button>
                             <button onclick="gerarPDFOrcamento()" class="btn-primary" style="flex:1;">📄 PDF</button>
                             <button type="button" onclick="window.duplicarOrcamento()" class="btn-warning" style="flex:1;">📋 DUPLICAR</button>
                             
-                            <!-- 📍 BOTÃO DE APROVAÇÃO (CORRIGIDO) -->
                             <button type="button" onclick="window.aprovarGerarEvento()" id="btnAprovarOrcamento" style="width: 100%; margin-top: 10px; background: #27ae60; color: white; padding: 15px 10px; font-size: 1em; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.2); white-space: normal; line-height: 1.4; box-sizing: border-box; text-align: center;">
                                 ✅ APROVAR E GERAR EVENTO
                             </button>
@@ -3121,11 +3163,34 @@
             document.getElementById('orcValorNegociado').value = valorVendaTotal.toFixed(2);
             window.recalcularValorPorPessoa();
             
+            // Já dispara o cálculo de sinal para atualizar a interface junto
+            if(typeof window.calcularSinal === 'function') window.calcularSinal();
+            
             const txtPessoa = document.getElementById('orcPrecoPessoaDisplay');
             if(txtPessoa) txtPessoa.innerText = `(${formata(valorPorPessoaFinal)} por pessoa)`;
 
             // Garante que a lista aplique os cadeados bloqueando o que não pertence ao pacote
             window.renderLibOrcamento();
+        };
+
+        // ==========================================
+        // CÁLCULO DE SINAL DE NEGÓCIO (NOVO)
+        // ==========================================
+        window.calcularSinal = () => {
+            const valorFechado = parseFloat(document.getElementById('orcValorNegociado').value) || 0;
+            let porcentagem = parseFloat(document.getElementById('orcSinalPerc').value) || 0;
+            
+            // Força o mínimo de 30% na interface
+            if (porcentagem < 30) {
+                porcentagem = 30;
+                document.getElementById('orcSinalPerc').value = 30;
+            }
+            
+            const valorSinal = (valorFechado * porcentagem) / 100;
+            const displaySinal = document.getElementById('orcSinalValorDisplay');
+            if(displaySinal) {
+                displaySinal.innerText = valorSinal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
         };
 
         // ==========================================
@@ -3157,11 +3222,17 @@
             btn.disabled = true;
 
             try {
-                // 2. Coleta os dados da tela de Orçamentos
+                // 2. Coleta TODOS os dados novos da tela de Orçamentos
                 const local = document.getElementById('orcLocal').value;
                 const convidados = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
                 const horas = parseInt(document.getElementById('orcHoras').value) || 4;
                 const valorFechado = parseFloat(document.getElementById('orcValorNegociado').value) || 0;
+                
+                const cnpjCpf = document.getElementById('orcCnpjCpf').value || "";
+                const responsavel = document.getElementById('orcResponsavel').value || "";
+                const telefone = document.getElementById('orcTelefone').value || "";
+                const horaInicio = document.getElementById('orcHoraInicio').value || null;
+                const tipoEvento = document.getElementById('orcTipoEvento').value || "";
 
                 // 3. Monta o Payload no formato da tabela de Eventos
                 const payloadEvento = {
@@ -3169,12 +3240,18 @@
                     nome_contratante: cliente,
                     data_evento: dataEvento,
                     local_evento: local,
-                    // Linha 'convidados' apagada
                     duracao_horas: horas,
                     duracao_minutos: 0,
                     valor_contrato: valorFechado,
                     orcamento_origem_id: orcId, 
-                    status: 'aberto' // Mudado de 'Pendente' para 'aberto' conforme seu padrão de DB
+                    status: 'aberto',
+                    // Novos campos inseridos no payload:
+                    qtd_pessoas: convidados,
+                    cnpj_cpf: cnpjCpf,
+                    responsible_name: responsavel,
+                    phone: telefone,
+                    start_time: horaInicio,
+                    event_type: tipoEvento
                 };
 
                 // 4. Dispara a criação do Evento (Ajuste a rota conforme o seu backend atual)
