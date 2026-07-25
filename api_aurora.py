@@ -2528,7 +2528,7 @@ def atualizar_status_pedido(order_id: str, payload: dict):
 # ROTA: LISTAR ORÇAMENTOS SALVOS DA CONTA (GET)
 # ==========================================
 @app.get("/orcamentos")
-def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâmetro
+def listar_orcamentos(account_id: str): 
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -2536,12 +2536,13 @@ def listar_orcamentos(account_id: str): # Recebe o ID da conta ativo como parâm
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         
-        # AJUSTES: Adicionado filtro por account_id
+        # 👇 AGORA A COBERTA TÁ GRANDE! Colocamos todos os campos novos no SELECT
         query = """
             SELECT 
                 id, numero, cliente, data_evento, local, 
                 qtd_pessoas, pacote_escolhido, valor_pessoa, 
-                extras, total, drinks_selecionados, status, custo_estimado, valor_sugerido  -- <--- ADICIONE AQUI
+                extras, total, drinks_selecionados, status, custo_estimado, valor_sugerido,
+                cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
             FROM budgets 
             WHERE account_id = %s
             ORDER BY numero DESC 
