@@ -3335,7 +3335,16 @@
                     total: d.total,
                     custoEstimado: d.custo_estimado, 
                     valorSugerido: d.valor_sugerido,
-                    drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || [])
+                    drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || []),
+                    
+                    // 👇 OS 7 CAMPOS NOVOS AGORA SÃO SALVOS NO CACHE DO NAVEGADOR
+                    cnpj_cpf: d.cnpj_cpf,
+                    responsible_name: d.responsible_name,
+                    phone: d.phone,
+                    start_time: d.start_time,
+                    duration_h: d.duration_h,
+                    event_type: d.event_type,
+                    sinal_negocio: d.sinal_negocio
                 }));
 
                 l.innerHTML = '';
@@ -3452,13 +3461,21 @@
             if (el('orcQtdPessoas')) el('orcQtdPessoas').value = d.qtdPessoas || '';
             if (el('orcExtras')) el('orcExtras').value = d.extras || 0;
 
+            // 👇 OS 7 CAMPOS NOVOS ENTRANDO AQUI!
+            if (el('orcCnpjCpf')) el('orcCnpjCpf').value = d.cnpj_cpf || '';
+            if (el('orcResponsavel')) el('orcResponsavel').value = d.responsible_name || '';
+            if (el('orcTelefone')) el('orcTelefone').value = d.phone || '';
+            if (el('orcHoraInicio')) el('orcHoraInicio').value = d.start_time || '';
+            if (el('orcHoras')) el('orcHoras').value = d.duration_h || 4; 
+            if (el('orcTipoEvento')) el('orcTipoEvento').value = d.event_type || '';
+            if (el('orcSinalPerc')) el('orcSinalPerc').value = d.sinal_negocio || 30;
+
             // Carrega o pacote se existir no banco (para exibir os cadeados corretos)
             if (el('orcPacote') && d.pacote_escolhido) {
                 el('orcPacote').value = d.pacote_escolhido;
             }
 
-            
-            /// 2. Formata os valores de exibição com a máscara de dinheiro
+            // 2. Formata os valores de exibição com a máscara de dinheiro
             const formataDinheiro = (v) => typeof formatCurrency === 'function' ? formatCurrency(parseFloat(v||0)) : `R$ ${parseFloat(v||0).toFixed(2)}`;
             
             if (el('orcTotalDisplay')) {
@@ -3476,6 +3493,9 @@
             if (el('orcValorNegociado')) {
                 el('orcValorNegociado').value = parseFloat(d.total || 0).toFixed(2);
                 window.recalcularValorPorPessoa(); // Força o recálculo do "por pessoa" ao carregar
+                
+                // Força o cálculo visual do sinal de negócio na tela
+                if (typeof window.calcularSinal === 'function') window.calcularSinal();
             }
 
             // 3. Atualiza a tela para aplicar os cadeados antes de marcar os drinks
@@ -3500,6 +3520,7 @@
             }
         };
 
+        
         // ==========================================
         // SALVAR OU ATUALIZAR ORÇAMENTO (ATUALIZADO)
         // ==========================================
