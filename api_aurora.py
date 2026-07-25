@@ -166,7 +166,7 @@ class EstoqueDrink(BaseModel):
 
 # 1. MODELO DE ENTRADA CORRIGIDO CONFORME A TABELA BUDGET
 class NovoOrcamentoInput(BaseModel):
-    id: Optional[str] = None  # <--- NOVA LINHA AQUI
+    id: Optional[str] = None
     account_id: str
     cliente: str
     data_evento: Optional[str] = None
@@ -175,10 +175,18 @@ class NovoOrcamentoInput(BaseModel):
     valor_pessoa: float
     extras: float
     total: float
-    pacote_escolhido: str  # 100% alinhado com a coluna 8
-    drinks: List[dict]     # Recebe a lista de objetos do JS diretamente
+    pacote_escolhido: str
+    drinks: List[dict]
     custo_estimado: float
     valor_sugerido: float
+    # 👇 NOVOS CAMPOS ADICIONADOS PARA A NOVA TELA
+    cnpj_cpf: Optional[str] = None
+    responsible_name: Optional[str] = None
+    phone: Optional[str] = None
+    start_time: Optional[str] = None
+    duration_h: Optional[int] = None
+    event_type: Optional[str] = None
+    sinal_negocio: Optional[float] = None
 
 class ItemRetorno(BaseModel):
     ingredient_id: str
@@ -192,7 +200,7 @@ class CloneCocktail(BaseModel):
     novo_nome: Optional[str] = None # Opcional: permite que o frontend já mande o nome desejado
 
 # ==========================================
-# MODELOS DE DADOS (PYDANTIC)
+# MODELOS DE DADOS (PYDANTIC) PARA EVENTOS
 # ==========================================
 class EventoPayload(BaseModel):
     account_id: str
@@ -204,6 +212,13 @@ class EventoPayload(BaseModel):
     valor_contrato: float
     orcamento_origem_id: str
     status: str
+    # 👇 NOVOS CAMPOS ADICIONADOS PARA A INTEGRAÇÃO COM ORÇAMENTO
+    qtd_pessoas: int
+    cnpj_cpf: Optional[str] = None
+    responsible_name: Optional[str] = None
+    phone: Optional[str] = None
+    start_time: Optional[str] = None
+    event_type: Optional[str] = None
 
 # ==========================================
 # ROTA PARA EXIBIR A LOGO
@@ -2595,10 +2610,13 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             
             query_insert = """
                 INSERT INTO budgets (
-                    account_id, numero, cliente, data_evento, local, 
-                    qtd_pessoas, pacote_escolhido, valor_pessoa, extras, total, 
-                    drinks_selecionados, status, custo_estimado, valor_sugerido
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        account_id, cliente, data_evento, local, qtd_pessoas, valor_pessoa, 
+                        extras, total, pacote_escolhido, drinks_selecionados, custo_estimado, valor_sugerido,
+                        cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
+                    ) VALUES (
+                        %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s
+                    )
                 RETURNING id;
             """
             cur.execute(query_insert, (
