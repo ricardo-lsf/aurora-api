@@ -18,7 +18,7 @@ app = FastAPI(title="Aurora Bartenders API")
 # ==========================================
 class StatusOrcamentoPayload(BaseModel):
     status: str
-    
+
 class EventoUpdate(BaseModel):
     responsavel: Optional[str] = ""
     telefone: Optional[str] = ""
@@ -2608,11 +2608,24 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             mensagem_final = f"Orçamento {numero_final} atualizado com sucesso!"
             id_final = orc.id
 
-        # FLUXO 2: CRIAR NOVO ORÇAMENTO
+       # FLUXO 2: CRIAR NOVO ORÇAMENTO
         else:
-            cur.execute("SELECT COUNT(*) FROM budgets WHERE account_id = %s;", (orc.account_id,))
-            total_existente = cur.fetchone()[0]
-            numero_final = f"ORC-{str(total_existente + 1).zfill(4)}"
+            # 1. Busca todos os números de orçamentos para achar o maior absoluto (À prova de exclusões)
+            cur.execute("SELECT numero FROM budgets WHERE numero LIKE 'ORC-%%';")
+            todos_numeros = cur.fetchall()
+            
+            maior_numero = 0
+            for num in todos_numeros:
+                try:
+                    # Tira a palavra 'ORC-' e converte para número puro. Ex: ORC-0015 vira 15
+                    valor = int(num[0].replace("ORC-", ""))
+                    if valor > maior_numero:
+                        maior_numero = valor
+                except:
+                    pass
+            
+            # 2. Cria o próximo número sequencial garantido
+            numero_final = f"ORC-{str(maior_numero + 1).zfill(4)}"
             
             # Comando INSERT 100% alinhado com as variáveis
             query_insert = """
