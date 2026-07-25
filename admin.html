@@ -3499,105 +3499,100 @@
             }
         };
 
-        // SALVAR COM NUMERAÇÃO AUTOMÁTICA
-        // SALVAR ORÇAMENTO DEFINITIVO (ALINHADO COM A TABELA BUDGET)
+        // ==========================================
+        // SALVAR OU ATUALIZAR ORÇAMENTO (ATUALIZADO)
+        // ==========================================
         window.salvarOrcamento = async () => {
-            const clienteInput = document.getElementById('orcCliente');
-            if (!clienteInput || !clienteInput.value) return alert("Preencha o nome do cliente!");
-
-            // 1. Coleta os drinks selecionados
-            const selecionados = [];
-            document.querySelectorAll('.chk-drink-orc:checked').forEach(chk => {
-                const drink = window.bibliotecaGlobal.find(d => d.id == chk.value);
-                if (drink) {
-                    selecionados.push({ 
-                        id: drink.id, 
-                        nome: drink.nome, 
-                        tipo: drink.tipo, 
-                        tecnica: drink.tecnica 
-                    });
-                }
-            });
-
-            if (selecionados.length === 0) {
-                return alert("Selecione pelo menos um drink para o orçamento!");
+            const idOrcamento = document.getElementById('orcIdHidden').value;
+            const cliente = document.getElementById('orcCliente').value;
+            
+            if (!cliente) {
+                alert("⚠️ O nome do Contratante é obrigatório para salvar a proposta.");
+                return;
             }
 
-            // Formatações numéricas para o banco de dados (Removendo máscaras de R$)
-            const textoTotalRaw = document.getElementById('orcTotalDisplay')?.innerText || '0';
-            const totalNumerico = parseFloat(textoTotalRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
-
-            const textoPessoaRaw = document.getElementById('orcPrecoPessoaDisplay')?.innerText || '0';
-            const valorPessoaNumerico = parseFloat(textoPessoaRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
-
-            // NOVA LINHA: Lendo o Custo Estimado da tela
-            const textoCustoRaw = document.getElementById('orcCustoDisplay')?.innerText || '0';
-            const custoNumerico = parseFloat(textoCustoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
-
-            // Procure onde capturamos os valores da tela e adicione esta linha:
-            const textoSugeridoRaw = document.getElementById('orcSugeridoDisplay')?.innerText || '0';
-            const sugeridoNumerico = parseFloat(textoSugeridoRaw.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0;
-
-            // Captura o ID oculto (Se for novo, ele pega vazio e manda null pro Python)
-            const idHidden = document.getElementById('orcIdHidden')?.value || null;
-
-            // 3. Monta o payload exato esperado pelo Pydantic
-            const dados = {
-                id: idHidden, // <--- A MÁGICA ACONTECE AQUI
-                account_id: ACCOUNT_ID,
-                cliente: clienteInput.value.trim(),
-                data_evento: document.getElementById('orcData')?.value || null,
-                local: document.getElementById('orcLocal')?.value || '',
-                qtd_pessoas: parseInt(document.getElementById('orcQtdPessoas')?.value) || 0,
-                valor_pessoa: valorPessoaNumerico,
-                extras: parseFloat(document.getElementById('orcExtras')?.value) || 0,
-                total: totalNumerico,
-                pacote_escolhido: document.getElementById('orcPacote')?.value || 'bronze',
-                drinks: selecionados,
-                custo_estimado: custoNumerico,
-                valor_sugerido: sugeridoNumerico
-            };
+            // Pega o botão para dar um feedback visual
+            const btn = document.querySelector('button[onclick="salvarOrcamento()"]');
+            const txtOriginal = btn.innerHTML;
+            btn.innerHTML = "⏳ Salvando...";
+            btn.disabled = true;
 
             try {
-                const btnSalvar = document.getElementById('btnSalvarOrcamento');
-                if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.innerText = "Salvando..."; }
+                // 1. Levanta os drinks selecionados e converte para o formato de dicionário que o Python exige
+                const chks = document.querySelectorAll('.chk-drink-orc:checked');
+                const drinksSelecionados = Array.from(chks).map(chk => ({ id: chk.value }));
 
-                // 4. Envio direto para o banco PostgreSQL
-                const resposta = await fetch(`${API_BASE}/orcamentos`, {
+                // 2. Coleta os valores numéricos de forma segura
+                const qtd = parseInt(document.getElementById('orcQtdPessoas').value) || 0;
+                const totalNegociadoStr = document.getElementById('orcValorNegociado').value;
+                const totalNegociado = parseFloat(totalNegociadoStr) || 0;
+                const valorPessoa = qtd > 0 ? (totalNegociado / qtd) : 0;
+                
+                // O HTML não tem mais o campo de extras, então mandamos 0
+                const extrasValue = 0; 
+                
+                // Tratamento de conversão para pegar os números dos textos "R$ 1.500,00"
+                const limparMoeda = (str) => parseFloat(str.replace(/[^\d,-]/g, '').replace(',', '.')) || 0;
+                const custoEstimado = limparMoeda(document.getElementById('orcCustoDisplay').innerText);
+                const valorSugerido = limparMoeda(document.getElementById('orcSugeridoDisplay').innerText);
+
+                // 3. O Payload Completo (Novo Molde)
+                const payload = {
+                    id: idOrcamento || null,
+                    account_id: localStorage.getItem('account_id'),
+                    cliente: cliente,
+                    data_evento: document.getElementById('orcData').value || null,
+                    local: document.getElementById('orcLocal').value || "",
+                    qtd_pessoas: qtd,
+                    valor_pessoa: valorPessoa,
+                    extras: extrasValue,
+                    total: totalNegociado,
+                    pacote_escolhido: document.getElementById('orcPacote').value,
+                    drinks: drinksSelecionados,
+                    custo_estimado: custoEstimado,
+                    valor_sugerido: valorSugerido,
+                    
+                    // 🚨 OS NOVOS CAMPOS MIGRANDO PARA O PYTHON
+                    cnpj_cpf: document.getElementById('orcCnpjCpf').value || "",
+                    responsible_name: document.getElementById('orcResponsavel').value || "",
+                    phone: document.getElementById('orcTelefone').value || "",
+                    start_time: document.getElementById('orcHoraInicio').value || null,
+                    duration_h: parseInt(document.getElementById('orcHoras').value) || 4,
+                    event_type: document.getElementById('orcTipoEvento').value || "",
+                    sinal_negocio: parseFloat(document.getElementById('orcSinalPerc').value) || 30.0
+                };
+
+                // 4. Dispara para a API
+                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/orcamentos', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dados)
+                    body: JSON.stringify(payload)
                 });
 
-                const resultado = await resposta.json();
-
-                if (resultado.status === "sucesso") {
-                    alert(`🎉 ${resultado.mensagem}`);
-                    
-                    // 1. Atualiza o número visual (ex: ORC-0005)
-                    const displayNumero = document.getElementById('orcNumeroDisplay');
-                    if (displayNumero) displayNumero.innerText = resultado.numero_gerado;
-                    
-                    // 📍 A CORREÇÃO ENTRA AQUI: Guarda o ID que o Python acabou de criar
-                    const idHidden = document.getElementById('orcIdHidden');
-                    if (idHidden && resultado.budget_id) {
-                        idHidden.value = resultado.budget_id; // <--- O carimbo que faltava!
-                    }
-                    
-                    // 2. Recarrega a lista lateral para o orçamento aparecer lá
-                    if (window.carregarOrcamentosSalvos) window.carregarOrcamentosSalvos();
-                    
-                } else {
-                    alert(`❌ Erro: ${resultado.mensagem}`);
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(JSON.stringify(erro.detail) || "Falha na comunicação com o banco de dados.");
                 }
 
-                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = "💾 SALVAR ORÇAMENTO"; }
+                const dados = await resposta.json();
+                alert(dados.mensagem);
+                
+                // 5. Preenche os campos ocultos e de display para manter o orçamento ativo na tela
+                document.getElementById('orcIdHidden').value = dados.budget_id;
+                document.getElementById('orcNumeroDisplay').innerText = dados.numero_gerado;
+                
+                // Atualiza a lista lateral de orçamentos se a função existir
+                if (typeof window.carregarListaOrcamentos === 'function') {
+                    window.carregarListaOrcamentos();
+                }
 
             } catch (erro) {
-                console.error("Erro na requisição de salvamento:", erro);
-                alert("Falha ao conectar com o servidor da Aurora.");
-                const btnSalvar = document.getElementById('btnSalvarOrcamento');
-                if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.innerText = "💾 SALVAR ORÇAMENTO"; }
+                console.error("Erro no Salvar Orçamento:", erro);
+                alert("❌ Erro: " + (erro.message || "Verifique o console para mais detalhes."));
+            } finally {
+                // Devolve o botão ao normal
+                btn.innerHTML = txtOriginal;
+                btn.disabled = false;
             }
         };
         
