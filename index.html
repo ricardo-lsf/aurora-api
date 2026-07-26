@@ -450,48 +450,80 @@
         setInterval(window.atualizarFilaKDS, 5000);
 
 
-        // ==========================================
-        // 4. BUSCA EVENTOS ATIVOS DO DIA (NO POSTGRESQL)
-        // ==========================================
         async function buscarEventosAtivos() {
-            // Pega o account_id da agência no tablet
             const accountId = localStorage.getItem('account_id');
-            const container = document.getElementById('lista-eventos-pdv');
             
-            if (!container) return; 
-            if (!accountId) return; 
+            // 🚨 ERRO 1 CORRIGIDO: Nome correto da div do HTML
+            const container = document.getElementById('lista-eventos-ativos');
+            const overlayEventos = document.getElementById('event-selection-overlay');
+            const loading = document.getElementById('loading');
 
-            container.innerHTML = '<div style="color: #fff; padding: 20px;">Procurando eventos de hoje...</div>';
-            
+            if (!container || !accountId) return;
+
+            // 🚨 ERRO 2 CORRIGIDO: Força a tela de "Conectando..." sumir e mostra os eventos!
+            if (loading) loading.style.display = 'none';
+            if (overlayEventos) overlayEventos.style.display = 'flex';
+
+            container.innerHTML = '<p style="color: #fff; text-align: center;">Procurando festas de hoje...</p>';
+
             try {
-                // A MÁGICA AQUI: Envia o account_id na URL
                 const resposta = await fetch(`${API_BASE}/events/active?account_id=${accountId}`);
-                
-                if (!resposta.ok) {
-                    throw new Error("Erro ao conectar com o servidor.");
-                }
-                
-                const json = await resposta.json();
-                
-                if (json.status !== "sucesso") {
-                    throw new Error("Resposta inválida do servidor.");
-                }
+                if (!resposta.ok) throw new Error("Erro ao conectar com o servidor.");
 
-                // CORREÇÃO: O Python envia a lista dentro de "dados" e os campos se chamam "event_name"
-                const eventosBanco = json.dados; 
-                
-                eventosMock = eventosBanco.map(e => ({
+                const json = await resposta.json();
+                if (json.status !== "sucesso") throw new Error("Resposta inválida do servidor.");
+
+                const eventosBanco = json.dados;
+
+                const eventosMock = eventosBanco.map(e => ({
                     id: e.id,
-                    titulo: e.event_name, 
-                    hora: "Hoje"          
+                    titulo: e.event_name,
+                    hora: "Ativo"
                 }));
-                
+
+                // Chama a função que cria os botões
                 renderizarEventos(eventosMock);
-                
+
             } catch (erro) {
                 console.error("Erro ao puxar eventos:", erro);
-                container.innerHTML = `<div style="color: #e74c3c; padding: 20px;">Falha ao carregar eventos: ${erro.message}</div>`;
+                container.innerHTML = `<p style="color: #e74c3c; text-align:center;">Falha ao carregar eventos: ${erro.message}</p>`;
             }
+        }
+
+        // ==========================================
+        // 5. DESENHA OS BOTÕES DOS EVENTOS NA TELA
+        // ==========================================
+        // 🚨 ERRO 3 CORRIGIDO: Essa função não existia no código!
+        function renderizarEventos(lista) {
+            const container = document.getElementById('lista-eventos-ativos');
+            container.innerHTML = '';
+
+            if (!lista || lista.length === 0) {
+                container.innerHTML = '<p style="color: #f39c12; text-align: center; font-weight: bold;">Nenhum evento aberto no momento.</p>';
+                return;
+            }
+
+            lista.forEach(evento => {
+                const btn = document.createElement('button');
+                btn.style.width = '100%';
+                btn.style.padding = '15px';
+                btn.style.background = '#2ecc71';
+                btn.style.color = '#000';
+                btn.style.border = 'none';
+                btn.style.borderRadius = '8px';
+                btn.style.fontSize = '1.1rem';
+                btn.style.fontWeight = 'bold';
+                btn.style.cursor = 'pointer';
+                btn.style.marginBottom = '10px';
+                btn.style.boxShadow = '0 4px 10px rgba(46, 204, 113, 0.3)';
+
+                btn.innerText = `🎟️ ${evento.titulo}`;
+
+                // Quando clicar, chama a função de entrar na festa!
+                btn.onclick = () => entrarNaFesta(evento.id, evento.titulo);
+
+                container.appendChild(btn);
+            });
         }
 
         // --- MOTOR DE ENTRADA: CONFIGURAR O APP PARA A FESTA ESCOLHIDA ---
