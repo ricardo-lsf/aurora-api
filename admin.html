@@ -1439,9 +1439,10 @@
                         <div>
                             <label style="display:block; margin-bottom: 5px;">CNPJ / CPF</label>
                             <input type="text" id="orcCnpjCpf" placeholder="000.000.000-00" style="width: 100%;" class="form-control"
-                                oninput="this.value = window.mascaraCpfCnpj(this.value);" 
+                                oninput="window.mascaraCpfCnpj(this);" 
                                 onblur="window.checarCpfCnpj(this);">
                         </div>
+
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Responsável</label>
                             <input type="text" id="orcResponsavel" placeholder="Nome do contato" style="width: 100%;" class="form-control">
@@ -1451,7 +1452,7 @@
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Telefone</label>
                             <input type="text" id="orcTelefone" placeholder="(00) 00000-0000" style="width: 100%;" class="form-control"
-                                oninput="this.value = window.mascaraTelefone(this.value);"
+                                oninput="window.mascaraTelefone(this);"
                                 maxlength="15">
                         </div>
 
@@ -2370,11 +2371,12 @@
         // MÁSCARAS E VALIDADORES (CPF, CNPJ, TELEFONE)
         // ==========================================
 
-        // 1. MÁSCARA INTELIGENTE CPF / CNPJ (BLINDADA)
-        window.mascaraCpfCnpj = (valor) => {
-            if (!valor) return ""; // Se vier undefined ou null, retorna vazio na hora
+        // 1. MÁSCARA INTELIGENTE CPF / CNPJ (VERSÃO DEFINITIVA)
+        window.mascaraCpfCnpj = (input) => {
+            let valor = input.value;
+            if (!valor) return; 
             
-            valor = String(valor).replace(/\D/g, ""); // Garante que é texto e tira letras
+            valor = valor.replace(/\D/g, ""); // Tira letras
             valor = valor.substring(0, 14);
 
             if (valor.length <= 11) {
@@ -2387,14 +2389,15 @@
                 valor = valor.replace(/\.(\d{3})(\d)/, ".$1/$2");
                 valor = valor.replace(/(\d{4})(\d)/, "$1-$2");
             }
-            return valor;
+            input.value = valor; // Devolve formatado
         };
 
-        // 2. MÁSCARA DE TELEFONE Fixo e Celular (BLINDADA)
-        window.mascaraTelefone = (valor) => {
-            if (!valor) return ""; // Se vier undefined ou null, retorna vazio na hora
+        // 2. MÁSCARA DE TELEFONE (VERSÃO DEFINITIVA)
+        window.mascaraTelefone = (input) => {
+            let valor = input.value;
+            if (!valor) return;
             
-            valor = String(valor).replace(/\D/g, ""); // Garante que é texto e tira letras
+            valor = valor.replace(/\D/g, ""); // Tira letras
             valor = valor.substring(0, 11);
             
             if (valor.length > 10) {
@@ -2404,7 +2407,7 @@
             } else if (valor.length > 2) {
                 valor = valor.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
             }
-            return valor;
+            input.value = valor; // Devolve formatado
         };
 
         // 3. MATEMÁTICA DE VALIDAÇÃO OFICIAL
