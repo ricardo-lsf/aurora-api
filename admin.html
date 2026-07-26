@@ -1454,7 +1454,7 @@
                                 oninput="this.value = window.mascaraTelefone(this.value);"
                                 maxlength="15">
                         </div>
-                        
+
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Local / Cidade</label>
                             <input type="text" id="orcLocal" style="width: 100%;" class="form-control">
@@ -2370,18 +2370,18 @@
         // MÁSCARAS E VALIDADORES (CPF, CNPJ, TELEFONE)
         // ==========================================
 
-        // 1. MÁSCARA INTELIGENTE CPF / CNPJ
+        // 1. MÁSCARA INTELIGENTE CPF / CNPJ (BLINDADA)
         window.mascaraCpfCnpj = (valor) => {
-            valor = valor.replace(/\D/g, ""); // Remove tudo o que não for número
-            valor = valor.substring(0, 14);   // Trava no máximo em 14 números (tamanho do CNPJ)
+            if (!valor) return ""; // Se vier undefined ou null, retorna vazio na hora
+            
+            valor = String(valor).replace(/\D/g, ""); // Garante que é texto e tira letras
+            valor = valor.substring(0, 14);
 
             if (valor.length <= 11) {
-                // Máscara de CPF: 000.000.000-00
                 valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
                 valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
                 valor = valor.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
             } else {
-                // Máscara de CNPJ: 00.000.000/0000-00
                 valor = valor.replace(/^(\d{2})(\d)/, "$1.$2");
                 valor = valor.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
                 valor = valor.replace(/\.(\d{3})(\d)/, ".$1/$2");
@@ -2390,16 +2390,16 @@
             return valor;
         };
 
-        // 2. MÁSCARA DE TELEFONE (Fixo e Celular)
+        // 2. MÁSCARA DE TELEFONE Fixo e Celular (BLINDADA)
         window.mascaraTelefone = (valor) => {
-            valor = valor.replace(/\D/g, "");
-            valor = valor.substring(0, 11); // Trava em 11 números
+            if (!valor) return ""; // Se vier undefined ou null, retorna vazio na hora
+            
+            valor = String(valor).replace(/\D/g, ""); // Garante que é texto e tira letras
+            valor = valor.substring(0, 11);
             
             if (valor.length > 10) {
-                // Celular: (00) 90000-0000
                 valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
             } else if (valor.length > 5) {
-                // Fixo: (00) 0000-0000
                 valor = valor.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
             } else if (valor.length > 2) {
                 valor = valor.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
