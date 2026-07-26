@@ -33,6 +33,20 @@
     --baros-text-muted: #8892b0;   /* Texto secundário (cinza azulado) */
 }
 
+        /* No celular/tablet ele empilha (1 coluna). Em telas maiores que 992px (PC), ele FORÇA 2 colunas lado a lado! */
+        .container-orcamento-split {
+            display: grid;
+            grid-template-columns: 1fr; /* Padrão: 1 coluna */
+            gap: 24px;
+            align-items: start;
+        }
+
+        @media (min-width: 992px) {
+            .container-orcamento-split {
+                grid-template-columns: 1fr 1fr; /* PC: Divide exatamente ao meio, lado a lado! */
+            }
+        }
+
         /* Container Pai dos Orçamentos: Garante espaço e quebra de linha suave */
         .orcamento-split-container {
             display: flex;
