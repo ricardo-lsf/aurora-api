@@ -1435,18 +1435,26 @@
                             <input type="text" id="orcCliente" style="width: 100%;" class="form-control">
                         </div>
 
+                        <!-- Campo CNPJ / CPF -->
                         <div>
                             <label style="display:block; margin-bottom: 5px;">CNPJ / CPF</label>
-                            <input type="text" id="orcCnpjCpf" placeholder="000.000.000-00" style="width: 100%;" class="form-control">
+                            <input type="text" id="orcCnpjCpf" placeholder="000.000.000-00" style="width: 100%;" class="form-control"
+                                oninput="this.value = window.mascaraCpfCnpj(this.value);" 
+                                onblur="window.checarCpfCnpj(this);">
                         </div>
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Responsável</label>
                             <input type="text" id="orcResponsavel" placeholder="Nome do contato" style="width: 100%;" class="form-control">
                         </div>
+
+                        <!-- Campo Telefone -->
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Telefone</label>
-                            <input type="text" id="orcTelefone" placeholder="(00) 00000-0000" style="width: 100%;" class="form-control">
+                            <input type="text" id="orcTelefone" placeholder="(00) 00000-0000" style="width: 100%;" class="form-control"
+                                oninput="this.value = window.mascaraTelefone(this.value);"
+                                maxlength="15">
                         </div>
+                        
                         <div>
                             <label style="display:block; margin-bottom: 5px;">Local / Cidade</label>
                             <input type="text" id="orcLocal" style="width: 100%;" class="form-control">
@@ -2358,7 +2366,115 @@
         const API_BASE = "https://aurora-api-zj8e.onrender.com";
         // 🔥 Todo o código do Firebase (firebaseConfig, getFirestore, etc) foi removido daqui!
 
+        // ==========================================
+        // MÁSCARAS E VALIDADORES (CPF, CNPJ, TELEFONE)
+        // ==========================================
 
+        // 1. MÁSCARA INTELIGENTE CPF / CNPJ
+        window.mascaraCpfCnpj = (valor) => {
+            valor = valor.replace(/\D/g, ""); // Remove tudo o que não for número
+            valor = valor.substring(0, 14);   // Trava no máximo em 14 números (tamanho do CNPJ)
+
+            if (valor.length <= 11) {
+                // Máscara de CPF: 000.000.000-00
+                valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
+                valor = valor.replace(/(\d{3})(\d)/, "$1.$2");
+                valor = valor.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+            } else {
+                // Máscara de CNPJ: 00.000.000/0000-00
+                valor = valor.replace(/^(\d{2})(\d)/, "$1.$2");
+                valor = valor.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
+                valor = valor.replace(/\.(\d{3})(\d)/, ".$1/$2");
+                valor = valor.replace(/(\d{4})(\d)/, "$1-$2");
+            }
+            return valor;
+        };
+
+        // 2. MÁSCARA DE TELEFONE (Fixo e Celular)
+        window.mascaraTelefone = (valor) => {
+            valor = valor.replace(/\D/g, "");
+            valor = valor.substring(0, 11); // Trava em 11 números
+            
+            if (valor.length > 10) {
+                // Celular: (00) 90000-0000
+                valor = valor.replace(/^(\d{2})(\d{5})(\d{4}).*/, "($1) $2-$3");
+            } else if (valor.length > 5) {
+                // Fixo: (00) 0000-0000
+                valor = valor.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, "($1) $2-$3");
+            } else if (valor.length > 2) {
+                valor = valor.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+            }
+            return valor;
+        };
+
+        // 3. MATEMÁTICA DE VALIDAÇÃO OFICIAL
+        window.validarDocumento = (documento) => {
+            const limpo = documento.replace(/\D/g, "");
+            if (!limpo) return true; // Se estiver vazio, passa (pois não é obrigatório ter CNPJ no orçamento)
+
+            if (limpo.length === 11) {
+                // VALIDA CPF
+                if (/^(.)\1+$/.test(limpo)) return false; // Bloqueia 111.111.111-11
+                let add = 0;
+                for (let i=0; i < 9; i ++) add += parseInt(limpo.charAt(i)) * (10 - i);
+                let rev = 11 - (add % 11);
+                if (rev === 10 || rev === 11) rev = 0;
+                if (rev !== parseInt(limpo.charAt(9))) return false;
+                
+                add = 0;
+                for (let i = 0; i < 10; i ++) add += parseInt(limpo.charAt(i)) * (11 - i);
+                rev = 11 - (add % 11);
+                if (rev === 10 || rev === 11) rev = 0;
+                if (rev !== parseInt(limpo.charAt(10))) return false;
+                
+                return true;
+            } else if (limpo.length === 14) {
+                // VALIDA CNPJ
+                if (/^(.)\1+$/.test(limpo)) return false;
+                let tamanho = limpo.length - 2
+                let numeros = limpo.substring(0,tamanho);
+                let digitos = limpo.substring(tamanho);
+                let soma = 0;
+                let pos = tamanho - 7;
+                for (let i = tamanho; i >= 1; i--) {
+                    soma += numeros.charAt(tamanho - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+                let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+                if (resultado !== parseInt(digitos.charAt(0))) return false;
+                
+                tamanho = tamanho + 1;
+                numeros = limpo.substring(0,tamanho);
+                soma = 0;
+                pos = tamanho - 7;
+                for (let i = tamanho; i >= 1; i--) {
+                    soma += numeros.charAt(tamanho - i) * pos--;
+                    if (pos < 2) pos = 9;
+                }
+                resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+                if (resultado !== parseInt(digitos.charAt(1))) return false;
+                
+                return true;
+            }
+            
+            return false; // Se não tem nem 11 nem 14 números, tá quebrado
+        };
+
+        // 4. FUNÇÃO DE ALERTA NA TELA
+        window.checarCpfCnpj = (input) => {
+            if (!input.value) {
+                input.style.borderColor = "";
+                return;
+            }
+            const valido = window.validarDocumento(input.value);
+            if (!valido) {
+                input.style.borderColor = "#e11d48"; // Fica vermelho
+                alert("⚠️ CPF ou CNPJ inválido. Verifique os números digitados.");
+                // Opcional: input.value = ""; se quiser apagar quando errar
+            } else {
+                input.style.borderColor = "#10b981"; // Fica verde
+            }
+        };
 
         // --- UTILS ---
         window.toggleMenu = () => { document.getElementById('mainSidebar').classList.toggle('active'); document.querySelector('.sidebar-overlay').style.display = document.getElementById('mainSidebar').classList.contains('active') ? 'block' : 'none'; };
