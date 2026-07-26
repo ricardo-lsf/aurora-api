@@ -1829,10 +1829,14 @@ def login_staff(phone: str, account_id: str):
     conn = get_db_connection()
     try:
         cur = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # 👇 A MÁGICA AQUI: O banco limpa os símbolos do telefone na hora de comparar!
         cur.execute("""
             SELECT id, name, role 
             FROM staff 
-            WHERE phone = %s AND account_id = %s AND status = 'ativo';
+            WHERE regexp_replace(phone, '[^0-9]', '', 'g') = %s 
+              AND account_id = %s 
+              AND status = 'ativo';
         """, (phone, account_id))
         
         user = cur.fetchone()
