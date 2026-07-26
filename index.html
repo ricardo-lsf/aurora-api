@@ -445,40 +445,47 @@
         setInterval(window.atualizarFilaKDS, 5000);
 
 
-        // --- MOTOR DE RECEPÇÃO: BUSCAR FESTAS ABERTAS ---
+        // ==========================================
+        // 4. BUSCA EVENTOS ATIVOS DO DIA (NO POSTGRESQL)
+        // ==========================================
         async function buscarEventosAtivos() {
-            document.getElementById('loading').style.display = 'flex';
+            // Pega o account_id da agência no tablet
+            const accountId = localStorage.getItem('account_id');
+            const container = document.getElementById('lista-eventos-pdv');
+            
+            if (!container) return; // Se a tela não carregou, ignora
+            if (!accountId) return; // Se não tem agência, nem tenta buscar
+
+            container.innerHTML = '<div style="color: #fff; padding: 20px;">Procurando eventos de hoje...</div>';
             
             try {
-                const resposta = await fetch('https://aurora-api-zj8e.onrender.com/events/active');
-                const dadosApi = await resposta.json();
+                // 🚨 AQUI ESTAVA O PROBLEMA: Agora envia o account_id na URL
+                const resposta = await fetch(`${API_BASE}/events/active?account_id=${accountId}`);
                 
-                document.getElementById('loading').style.display = 'none';
-                
-                if (dadosApi.status === "sucesso" && dadosApi.dados.length > 0) {
-                    const lista = document.getElementById('lista-eventos-ativos');
-                    lista.innerHTML = ''; 
-                    
-                    dadosApi.dados.forEach(evento => {
-                        const btn = document.createElement('button');
-                        btn.className = 'login-btn'; 
-                        btn.style.fontSize = '1rem';
-                        btn.innerText = evento.event_name; 
-                        
-                        btn.onclick = () => entrarNaFesta(evento.id, evento.event_name);
-                        
-                        lista.appendChild(btn);
-                    });
-                    
-                    document.getElementById('event-selection-overlay').style.display = 'flex';
-                } else {
-                    document.getElementById('lista-eventos-ativos').innerHTML = '<p style="color:#e74c3c; font-weight:bold;">Nenhum evento aberto no momento.</p>';
-                    document.getElementById('event-selection-overlay').style.display = 'flex';
+                if (!resposta.ok) {
+                    throw new Error("Erro ao conectar com o servidor.");
                 }
-            } catch (e) {
-                console.error("Erro ao buscar eventos:", e);
-                document.getElementById('loading').style.display = 'none';
-                alert("Erro de conexão com o servidor de festas.");
+                
+                const json = await resposta.json();
+                
+                if (json.status !== "sucesso") {
+                    throw new Error("Resposta inválida do servidor.");
+                }
+
+                const eventosBanco = json.eventos;
+                
+                // Mapeia para o padrão que o front-end já usa
+                eventosMock = eventosBanco.map(e => ({
+                    id: e.id,
+                    titulo: `${e.event_type} - ${e.client_name}`,
+                    hora: e.start_time || "N/A"
+                }));
+                
+                renderizarEventos(eventosMock);
+                
+            } catch (erro) {
+                console.error("Erro ao puxar eventos:", erro);
+                container.innerHTML = `<div style="color: #e74c3c; padding: 20px;">Falha ao carregar eventos: ${erro.message}</div>`;
             }
         }
 
