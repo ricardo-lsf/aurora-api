@@ -265,9 +265,18 @@
             // A CORREÇÃO: Usando o ID correto do HTML (loginPhone)
             const telInput = document.getElementById("loginPhone"); 
             const tel = telInput.value.replace(/\D/g, ''); 
+
+            // Pega o account_id salvo no tablet/computador do PDV
+            const accountId = localStorage.getItem('account_id');
             
             if (tel.length < 10) {
                 alert("Por favor, digite um telefone válido com DDD.");
+                return;
+            }
+
+            // 🛡️ Segurança: Garante que o PDV sabe de qual agência ele é
+            if (!accountId) {
+                alert("⚠️ Terminal não configurado! A agência (account_id) não foi encontrada neste dispositivo.");
                 return;
             }
 
@@ -278,7 +287,8 @@
 
             try {
                 // Bate na porta da nossa API em Python!
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/login/${tel}`);
+                // 🚨 AQUI ESTAVA O ERRO: Agora usando a variável certa "tel" e enviando o accountId
+                const resposta = await fetch(`${API_BASE}/login/${tel}?account_id=${accountId}`);
                 
                 if (!resposta.ok) {
                     throw new Error("Telefone não autorizado ou inativo.");
@@ -299,7 +309,9 @@
                     document.getElementById('login-overlay').style.display = 'none'; // <-- NOME CORRIGIDO!
                     
                     // Puxa o calendário (Recepção VIP)!
-                    buscarEventosAtivos();
+                    if (typeof buscarEventosAtivos === 'function') {
+                        buscarEventosAtivos();
+                    }
                 }
             } catch (erro) {
                 console.error("Erro no login:", erro);
