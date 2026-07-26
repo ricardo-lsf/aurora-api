@@ -453,13 +453,13 @@
             const accountId = localStorage.getItem('account_id');
             const container = document.getElementById('lista-eventos-pdv');
             
-            if (!container) return; // Se a tela não carregou, ignora
-            if (!accountId) return; // Se não tem agência, nem tenta buscar
+            if (!container) return; 
+            if (!accountId) return; 
 
             container.innerHTML = '<div style="color: #fff; padding: 20px;">Procurando eventos de hoje...</div>';
             
             try {
-                // 🚨 AQUI ESTAVA O PROBLEMA: Agora envia o account_id na URL
+                // A MÁGICA AQUI: Envia o account_id na URL
                 const resposta = await fetch(`${API_BASE}/events/active?account_id=${accountId}`);
                 
                 if (!resposta.ok) {
@@ -472,13 +472,13 @@
                     throw new Error("Resposta inválida do servidor.");
                 }
 
-                const eventosBanco = json.eventos;
+                // CORREÇÃO: O Python envia a lista dentro de "dados" e os campos se chamam "event_name"
+                const eventosBanco = json.dados; 
                 
-                // Mapeia para o padrão que o front-end já usa
                 eventosMock = eventosBanco.map(e => ({
                     id: e.id,
-                    titulo: `${e.event_type} - ${e.client_name}`,
-                    hora: e.start_time || "N/A"
+                    titulo: e.event_name, 
+                    hora: "Hoje"          
                 }));
                 
                 renderizarEventos(eventosMock);
