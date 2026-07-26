@@ -33,6 +33,27 @@
     --baros-text-muted: #8892b0;   /* Texto secundário (cinza azulado) */
 }
 
+        /* Container que divide os 2 blocos grandes (Esquerda: Dados / Direita: Drinks) */
+        .container-orcamento-split {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        /* Força os blocos a terem no mínimo 400px antes de quebrar a linha */
+        .bloco-orcamento-metade {
+            flex: 1 1 400px; 
+            min-width: 300px;
+        }
+
+        /* O Segredo: Uma grade inteligente pros inputs do Formulário 1 */
+        .grid-inputs-orcamento {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
         /* ===============================
         LOJA AURORA (MARKETPLACE)
         ================================== */
@@ -1481,7 +1502,10 @@
                                 <div style="margin-top: 15px; padding-top: 12px; border-top: 1px dashed rgba(16, 185, 129, 0.3);">
                                     <span style="color: #f59e0b; font-size: 11px; display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold;">Sinal de Negócio (Min 30%)</span>
                                     <div style="display: flex; align-items: center; margin-top: 4px; gap: 8px;">
-                                        <input type="number" id="orcSinalPerc" value="30" onkeyup="window.calcularSinal()" onchange="window.calcularSinal()" style="background: rgba(0,0,0,0.2); border: 1px solid #f59e0b; color: #f59e0b; font-size: 14px; font-weight: bold; width: 60px; padding: 4px; border-radius: 4px; text-align: center; outline: none;">
+                                        <input type="number" id="orcSinalPerc" value="30" min="0" max="100" 
+                                                onblur="if(this.value === '' || this.value < 0) { this.value = 30; } window.calcularSinal();"
+                                                oninput="window.calcularSinal();" 
+                                                class="form-control" /> <!-- Use a sua classe CSS aqui -->
                                         <span style="color: #f59e0b; font-weight: bold;">% = </span>
                                         <span style="color: #f59e0b; font-size: 16px; font-weight: bold;">R$</span>
                                         <span id="orcSinalValorDisplay" style="color: #f59e0b; font-size: 16px; font-weight: bold;">0,00</span>
@@ -3400,20 +3424,28 @@
             const orcNumeroDisplay = document.getElementById('orcNumeroDisplay');
             if (orcNumeroDisplay) orcNumeroDisplay.innerText = 'Novo';
 
-            // Dentro da sua função de limpeza, garanta que essa linha exista:
             const sugeridoDisplay = document.getElementById('orcSugeridoDisplay');
             if (sugeridoDisplay) sugeridoDisplay.innerText = 'R$ 0,00';
 
-            // 2. Limpa os campos de digitação de forma segura (ignorando os que não existem)
-            const camposParaLimpar = ['orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcExtras'];
+            // 2. Limpa os campos de digitação de forma segura (INCLUINDO OS 5 NOVOS DE TEXTO)
+            const camposParaLimpar = [
+                'orcCliente', 'orcData', 'orcLocal', 'orcQtdPessoas', 'orcExtras',
+                'orcCnpjCpf', 'orcResponsavel', 'orcTelefone', 'orcHoraInicio', 'orcTipoEvento'
+            ];
             camposParaLimpar.forEach(id => {
                 const elemento = document.getElementById(id);
                 if (elemento) elemento.value = '';
             });
 
-            // 3. Reseta o pacote para o padrão (opcional, mas recomendado para evitar confusão no próximo orçamento)
+            // 3. Reseta os campos com valores padrão (Pacote, Horas e Sinal)
             const pacoteSelect = document.getElementById('orcPacote');
-            if (pacoteSelect) pacoteSelect.value = 'bronze';
+            if (pacoteSelect) pacoteSelect.value = 'bronze'; // Ou o valor padrão que preferir
+
+            const orcHoras = document.getElementById('orcHoras');
+            if (orcHoras) orcHoras.value = '4';
+
+            const orcSinalPerc = document.getElementById('orcSinalPerc');
+            if (orcSinalPerc) orcSinalPerc.value = '30';
 
             // 4. Zera os displays de cálculo (innerText)
             const totalDisplay = document.getElementById('orcTotalDisplay');
@@ -3433,6 +3465,11 @@
             
             if (typeof window.countOrcDrinks === 'function') {
                 window.countOrcDrinks();
+            }
+
+            // Recalcula o sinal financeiro para a tela ficar coerente
+            if (typeof window.calcularSinal === 'function') {
+                window.calcularSinal();
             }
 
             // 6. Atualiza a lista de drinks na tela para aplicar os cadeados do pacote padrão novamente
@@ -3520,7 +3557,7 @@
             }
         };
 
-        
+
         // ==========================================
         // SALVAR OU ATUALIZAR ORÇAMENTO (ATUALIZADO)
         // ==========================================
