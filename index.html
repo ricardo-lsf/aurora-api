@@ -260,64 +260,69 @@
             buscarEventosAtivos(); 
         }
 
-        // --- MOTOR DE LOGIN: VERIFICA NO POSTGRESQL ---
-        window.fazerLogin = async () => {
-            // A CORREÇÃO: Usando o ID correto do HTML (loginPhone)
+        // --- MOTOR DE LOGIN: MODO RASTREADOR ---
+        window.fazerLogin = async (event) => {
+            // Se o botão estiver dentro de um <form>, isso impede a página de recarregar sozinha
+            if (event) event.preventDefault(); 
+            
+            console.log("1. Botão clicado, iniciando login...");
+            
             const telInput = document.getElementById("loginPhone"); 
             const tel = telInput.value.replace(/\D/g, ''); 
-
-            // Pega o account_id salvo no tablet/computador do PDV
             const accountId = localStorage.getItem('account_id');
             
+            console.log("2. Telefone limpo:", tel, "| Account ID:", accountId);
+
             if (tel.length < 10) {
                 alert("Por favor, digite um telefone válido com DDD.");
                 return;
             }
 
-            // 🛡️ Segurança: Garante que o PDV sabe de qual agência ele é
             if (!accountId) {
                 alert("⚠️ Terminal não configurado! A agência (account_id) não foi encontrada neste dispositivo.");
                 return;
             }
 
-            // Mostra pro usuário que está pensando...
             const btn = document.querySelector(".login-btn");
             const textoOriginal = btn.innerText;
-            btn.innerText = "Verificando...";
+            btn.innerText = "Conectando...";
 
             try {
-                // Bate na porta da nossa API em Python!
-                // 🚨 AQUI ESTAVA O ERRO: Agora usando a variável certa "tel" e enviando o accountId
-                const resposta = await fetch(`${API_BASE}/login/${tel}?account_id=${accountId}`);
+                const url = `${API_BASE}/login/${tel}?account_id=${accountId}`;
+                console.log("3. Chamando a API no endereço:", url);
+                
+                const resposta = await fetch(url);
+                console.log("4. Resposta recebida! Status:", resposta.status);
                 
                 if (!resposta.ok) {
                     throw new Error("Telefone não autorizado ou inativo.");
                 }
 
                 const dados = await resposta.json();
+                console.log("5. Dados validados:", dados);
                 
                 if (dados.status === "sucesso") {
                     const usuario = dados.usuario;
                     
-                    // Salva o nome (ex: Ricardo) na variável mestra e na memória do celular
                     usuarioAtual = usuario.name;
                     localStorage.setItem('usuarioLogado', usuarioAtual);
-                    localStorage.setItem('usuarioRole', usuario.role); // Guardamos o cargo pro futuro (painel admin!)
+                    localStorage.setItem('usuarioRole', usuario.role); 
                     
-                    // Atualiza a interface
                     document.getElementById('user-display').innerText = "👤 " + usuarioAtual;
-                    document.getElementById('login-overlay').style.display = 'none'; // <-- NOME CORRIGIDO!
+                    document.getElementById('login-overlay').style.display = 'none'; 
                     
-                    // Puxa o calendário (Recepção VIP)!
+                    console.log("6. Login concluído. Puxando eventos ativos...");
                     if (typeof buscarEventosAtivos === 'function') {
                         buscarEventosAtivos();
+                    } else {
+                        console.error("ERRO: Função buscarEventosAtivos não existe ou o nome está errado!");
                     }
                 }
             } catch (erro) {
-                console.error("Erro no login:", erro);
+                console.error("7. 🔴 Erro fatal capturado:", erro);
                 alert("Acesso negado: " + erro.message);
             } finally {
-                // Volta o botão ao normal
+                console.log("8. Processo finalizado. Restaurando botão.");
                 btn.innerText = textoOriginal;
             }
         };
