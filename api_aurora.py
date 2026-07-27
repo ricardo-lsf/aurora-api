@@ -2730,7 +2730,7 @@ def relatorio_vendas(event_id: str = 'ALL'):
 
 
 # ==========================================
-# FECHAMENTO DE ESTOQUE (LOGÍSTICA REVERSA)
+# FECHAMENTO DE ESTOQUE (LOGÍSTICA REVERSA + AUDITORIA)
 # ==========================================
 @app.post("/events/{event_id}/retorno-estoque")
 def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
@@ -2740,6 +2740,13 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
     
     try:
         cur = conn.cursor()
+        
+        # PASSO ZERO: Descobrir de qual agência é esse evento para o Log
+        cur.execute("SELECT account_id FROM events WHERE id = %s", (event_id,))
+        row_event = cur.fetchone()
+        if not row_event:
+            raise HTTPException(status_code=404, detail="Evento não encontrado")
+        account_id = row_event[0]
         
         for item in payload.itens:
             # 1. Lê a situação atual daquele insumo no evento
@@ -2757,27 +2764,35 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
             old_returned = float(row[1] or 0)
             new_returned = float(item.returned_quantity)
             
-            # 2. A Mágica Matemática (Calcula apenas o Delta do que já estava no estoque central)
+            # 2. Calcula apenas o Delta (a quantidade nova que está voltando agora)
             delta_return = new_returned - old_returned 
             
-            # 3. Atualiza o histórico do evento (APENAS o retorno, preserva o quantity_used!)
-            cur.execute("""
-                UPDATE event_stocks 
-                SET quantity_returned = %s 
-                WHERE event_id = %s AND ingredient_id = %s
-            """, (new_returned, event_id, item.ingredient_id))
-            
-            # 4. Atualiza o estoque central físico
-            cur.execute("""
-                UPDATE ingredients 
-                SET current_stock = current_stock + %s 
-                WHERE id = %s
-            """, (delta_return, item.ingredient_id))
+            if delta_return > 0:
+                # 3. ATUALIZA EVENTO: Registra que o item voltou (zerando o saldo matemático do evento)
+                cur.execute("""
+                    UPDATE event_stocks 
+                    SET quantity_returned = %s 
+                    WHERE event_id = %s AND ingredient_id = %s
+                """, (new_returned, event_id, item.ingredient_id))
+                
+                # 4. ATUALIZA CENTRAL: Soma no estoque físico da agência
+                cur.execute("""
+                    UPDATE ingredients 
+                    SET current_stock = current_stock + %s 
+                    WHERE id = %s
+                """, (delta_return, item.ingredient_id))
+                
+                # 5. GERA O FATO (BI): Grava na tabela de auditoria
+                cur.execute("""
+                    INSERT INTO event_inventory_returns 
+                    (account_id, event_id, ingredient_id, quantity_returned, returned_at)
+                    VALUES (%s, %s, %s, %s, NOW())
+                """, (account_id, event_id, item.ingredient_id, delta_return))
         
         conn.commit()
         cur.close()
         conn.close()
-        return {"status": "sucesso", "mensagem": "Estoque conciliado com sucesso!"}
+        return {"status": "sucesso", "mensagem": "Estoque conciliado e auditado com sucesso!"}
         
     except Exception as e:
         if conn:
