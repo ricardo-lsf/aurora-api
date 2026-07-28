@@ -4654,7 +4654,16 @@
                     // ============================================================
                     let isNoAr = (ev.is_active === true && ev.status === 'aberto');
                     
-                    // 🛡️ NOVA TRAVA: Verifica se já foi devolvido para mudar o botão
+                    // 🛡️ TRAVA DA CARGA (Inicial vs Extra)
+                    let btnCarga = ev.is_loaded
+                        ? `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #3498db; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                📦 CARGA EXTRA
+                           </button>`
+                        : `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                📤 CARGA INICIAL
+                           </button>`;
+
+                    // 🛡️ TRAVA DA DEVOLUÇÃO (Pendente vs Concluída)
                     let btnDevolucao = ev.is_returned 
                         ? `<button disabled style="flex: 1; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: not-allowed; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0.8;">
                                 ✅ DEVOLVIDO
@@ -4663,17 +4672,15 @@
                                 📥 DEVOLUÇÃO
                            </button>`;
                     
-                    // Substituímos o botão único por um contêiner com 2 botões
+                    // Junta os dois botões no contêiner
                     let botaoCargaHTML = isNoAr 
                         ? `<div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
-                            <button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                📤 CARGA
-                            </button>
+                            ${btnCarga}
                             ${btnDevolucao}
                            </div>`
                         : ''; 
-                    // Obs: o event.stopPropagation() em ambos impede que o clique abra os detalhes do evento por baixo.
 
+                    // Desenha o Card na tela
                     if (listaDiv) {
                         listaDiv.innerHTML += `
                             <div class="event-card-item" style="border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; border-left: 5px solid ${corStatus}; background: #fff;" onclick="window.carregarEvento('${ev.id}')">
@@ -7253,6 +7260,14 @@
                 if (response.ok) {
                     alert("🚚 SUCESSO! Caminhão carregado e PDV liberado.");
                     window.fecharModalLogistica();
+
+                // Atualiza o cache local para a tela piscar azul instantaneamente
+                if (window.listaEventosCache) {
+                    const evEncontrado = window.listaEventosCache.find(e => e.id === payload.event_id); // ou a variável que guarda o ID
+                    if (evEncontrado) evEncontrado.is_loaded = true;
+                }
+                if (typeof window.renderizarListaEventos === 'function') window.renderizarListaEventos();
+
                 } else {
                     if (Array.isArray(result.detail)) {
                         let htmlErro = `

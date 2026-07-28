@@ -816,7 +816,7 @@ def ver_cardapio_publico(url_slug: str):
 # CARREGAR ESTOQUE DO CAMINHÃO (BLINDADO)
 # ==========================================
 @app.post("/inventory/load-event")
-def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): # 🛑 Usa o molde explícito aqui
+def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): 
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -869,6 +869,11 @@ def carregar_estoque_evento(payload: CargaEventoBody = Body(...)): # 🛑 Usa o 
             """
             cur.execute(query_upsert, (payload.event_id, item.ingredient_id, item.quantity))
         
+        # ==========================================
+        # 3. MARCA QUE O CAMINHÃO JÁ FOI CARREGADO
+        # ==========================================
+        cur.execute("UPDATE events SET is_loaded = TRUE WHERE id = %s", (payload.event_id,))
+
         conn.commit() 
         return {"status": "sucesso", "detalhes": f"{len(payload.itens)} insumos carregados."}
         
