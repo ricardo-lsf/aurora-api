@@ -4635,19 +4635,25 @@
 
                     // ============================================================
                     // AJUSTE 3: BOTÕES DE LOGÍSTICA CONDICIONAIS (CARGA E DEVOLUÇÃO)
-                    // Só aparecem se o evento estiver "No Ar" (Ativo e Aberto)
                     // ============================================================
                     let isNoAr = (ev.is_active === true && ev.status === 'aberto');
                     
-                    // Substituímos o botão único por um contêiner com 2 botões dividindo o espaço (flex: 1)
+                    // 🛡️ NOVA TRAVA: Verifica se já foi devolvido para mudar o botão
+                    let btnDevolucao = ev.is_returned 
+                        ? `<button disabled style="flex: 1; background: #27ae60; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: not-allowed; display: flex; align-items: center; justify-content: center; gap: 6px; opacity: 0.8;">
+                                ✅ DEVOLVIDO
+                           </button>`
+                        : `<button onclick="event.stopPropagation(); abrirModalDevolucao('${ev.id}', '${ev.name}')" style="flex: 1; background: #8e44ad; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                📥 DEVOLUÇÃO
+                           </button>`;
+                    
+                    // Substituímos o botão único por um contêiner com 2 botões
                     let botaoCargaHTML = isNoAr 
                         ? `<div style="display: flex; gap: 8px; margin-top: 10px; width: 100%;">
                             <button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 📤 CARGA
                             </button>
-                            <button onclick="event.stopPropagation(); abrirModalDevolucao('${ev.id}', '${ev.name}')" style="flex: 1; background: #8e44ad; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                📥 DEVOLUÇÃO
-                            </button>
+                            ${btnDevolucao}
                            </div>`
                         : ''; 
                     // Obs: o event.stopPropagation() em ambos impede que o clique abra os detalhes do evento por baixo.
@@ -7354,6 +7360,38 @@
             const btnToggle = document.getElementById('btn-toggle-estoque');
             const titulo = document.getElementById('titulo-modal-estoque');
             const desc = document.getElementById('desc-modal-estoque');
+            
+            // Adicionei a captura do botão de devolução (ajuste o ID se no seu HTML estiver diferente)
+            const btnDevolver = document.getElementById('btn-confirmar-devolucao'); 
+
+            // 1. Resgata o evento da memória para verificar o status
+            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === idDaFesta) : null;
+
+            // ==========================================
+            // 2. A TRAVA DE SEGURANÇA VISUAL (DEVOLUÇÃO OK)
+            // ==========================================
+            if (eventoAtual && eventoAtual.is_returned) {
+                titulo.innerHTML = '✅ Devolução OK';
+                titulo.style.color = '#27ae60'; // Verde sucesso
+                desc.innerHTML = 'O estoque que sobrou neste evento já foi contabilizado e devolvido à base.';
+                if (containerLista) containerLista.innerHTML = '<p style="text-align:center; font-weight:bold; padding:30px; color:#7f8c8d;">Nenhuma pendência de logística reversa.</p>';
+                boxModal.style.borderColor = "#27ae60";
+
+                // Esconde os botões para blindar cliques duplicados
+                if (btnToggle) btnToggle.style.display = 'none';
+                if (btnDevolver) btnDevolver.style.display = 'none';
+
+                modal.style.display = 'flex';
+                return; // Aborta aqui! Não faz fetch nem executa o resto do código.
+            }
+
+            // ==========================================
+            // 3. FLUXO NORMAL (PENDENTE DE DEVOLUÇÃO)
+            // ==========================================
+            
+            // Garante que os botões voltem a aparecer (caso o usuário tenha aberto um evento fechado antes)
+            if (btnToggle) btnToggle.style.display = 'inline-block';
+            if (btnDevolver) btnDevolver.style.display = 'inline-block';
 
             if (containerLista) containerLista.innerHTML = '<p style="text-align:center; padding: 20px;">Puxando dados do bar... ⏳</p>';
             modal.style.display = 'flex';

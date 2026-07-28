@@ -2814,6 +2814,9 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
                     (account_id, event_id, ingredient_id, quantity_returned, returned_at)
                     VALUES (%s, %s, %s, %s, NOW())
                 """, (account_id, event_id, item.ingredient_id, delta_return))
+
+                # 6. A MÁGICA DA SINALIZAÇÃO: Marca o evento como "Devolução OK"
+                cur.execute("UPDATE events SET is_returned = TRUE WHERE id = %s", (event_id,))
         
         conn.commit()
         cur.close()
