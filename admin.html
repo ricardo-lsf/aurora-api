@@ -7118,10 +7118,12 @@
             window.eventoSendoCarregado = eventId;
             
             // ==========================================
-            // 🧠 INTELIGÊNCIA: DESCOBRE SE É CARGA EXTRA
+            // 🧠 INTELIGÊNCIA CORRIGIDA (Forçando formato de Texto)
             // ==========================================
-            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === eventId) : null;
+            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => String(e.id) === String(eventId)) : null;
             const isCargaExtra = eventoAtual ? eventoAtual.is_loaded : false;
+            
+            console.log("Status de Carga Extra detectado:", isCargaExtra); // Deixei esse log para você conferir no F12!
 
             // 1. ATUALIZA O TÍTULO DO MODAL (Com alerta visual)
             const tituloModal = document.getElementById('titulo-modal-logistica');
@@ -7156,7 +7158,9 @@
             }
 
             // 5. ATIVA A FUNÇÃO DE ARRASTAR
-            window.tornarArrastavel('caixa-branca-logistica', 'cabecalho-modal-logistica');
+            if (typeof window.tornarArrastavel === 'function') {
+                window.tornarArrastavel('caixa-branca-logistica', 'cabecalho-modal-logistica');
+            }
 
             const corpoTabela = document.getElementById('listaCargaCorpo');
             if (!corpoTabela) return console.error("Erro: Elemento listaCargaCorpo não encontrado!");
