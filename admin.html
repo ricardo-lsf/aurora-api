@@ -4483,18 +4483,24 @@
 
         // 1. Abre o Modal e busca o que foi enviado para a festa
         window.abrirModalDevolucao = async (id, nome) => {
+            // 🛡️ BLINDA ANTES DE ABRIR: Confirma se o evento já foi devolvido na memória/cache
+            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === id) : null;
+            if (eventoAtual && eventoAtual.is_returned) {
+                alert(`⚠️ O evento "${nome}" já teve sua devolução de estoque realizada e conciliada!`);
+                return; // Interrompe para não abrir a tela de edição
+            }
+
             document.getElementById('modal-devolucao-evento-id').value = id;
             document.getElementById('modal-devolucao-titulo').innerText = `📥 Devolução: ${nome}`;
             
             const corpoTabela = document.getElementById('tabela-devolucao-corpo');
-            corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#7f8c8d;">🔎 Buscando insumos enviados...</td></tr>`;
+            corpoTabela.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#7f8c8d;">🔎 Buscando insumos enviados...</td></tr>`;
             
             // Exibe o modal na tela usando Flexbox
             document.getElementById('modal-devolucao').style.display = 'flex';
 
             try {
                 // Rota que busca a lista de ingredientes vinculados a esse evento na tabela event_stocks
-                // (Certifique-se de que sua API possui uma rota GET para listar o estoque atual do evento)
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${id}/stocks`);
                 if (!resposta.ok) throw new Error("Falha ao carregar estoque enviado.");
 
@@ -4502,13 +4508,12 @@
                 corpoTabela.innerHTML = ""; // Limpa o carregando
 
                 if (itens.length === 0) {
-                    corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b; font-weight:bold;">⚠️ Nenhum insumo foi carregado neste caminhão ainda!</td></tr>`;
+                    corpoTabela.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#c0392b; font-weight:bold;">⚠️ Nenhum insumo foi carregado neste caminhão ainda!</td></tr>`;
                     return;
                 }
 
                 // Monta as linhas da tabela dinamicamente
                 itens.forEach(item => {
-                    // 📍 A MÁGICA ACONTECE AQUI:
                     let sobraTeorica = item.quantity_sent - item.quantity_used;
                     if (sobraTeorica < 0) sobraTeorica = 0; // Garante que não fique negativo
                     
@@ -4537,7 +4542,7 @@
 
             } catch (erro) {
                 console.error("Erro ao abrir devolução:", erro);
-                corpoTabela.innerHTML = `<tr><td colspan="3" style="text-align:center; padding:20px; color:#c0392b;">❌ Erro ao carregar os dados.</td></tr>`;
+                corpoTabela.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#c0392b;">❌ Erro ao carregar os dados.</td></tr>`;
             }
         };
 
@@ -4581,7 +4586,18 @@
                 alert("✅ Estoque conciliado e devolvido à base central com sucesso!");
                 fecharModalDevolucao();
                 
-                // Se você tiver uma função que atualiza a listagem de estoques na tela, chame-a aqui
+                // 🔄 ATUALIZAÇÃO AUTOMÁTICA DA TELA SEM DAR F5
+                // Atualiza o cache local do evento para is_returned = true imediatamente
+                if (window.listaEventosCache) {
+                    const evEncontrado = window.listaEventosCache.find(e => e.id === eid);
+                    if (evEncontrado) evEncontrado.is_returned = true;
+                }
+
+                // Redesenha a lista de eventos para o botão roxo virar verde na hora
+                if (typeof window.renderizarListaEventos === 'function') {
+                    window.renderizarListaEventos();
+                }
+
                 if (window.carregarEstoqueGeral) window.carregarEstoqueGeral();
 
             } catch (e) {
@@ -7361,9 +7377,6 @@
             const titulo = document.getElementById('titulo-modal-estoque');
             const desc = document.getElementById('desc-modal-estoque');
             
-            // Adicionei a captura do botão de devolução (ajuste o ID se no seu HTML estiver diferente)
-            const btnDevolver = document.getElementById('btn-confirmar-devolucao'); 
-
             // 1. Resgata o evento da memória para verificar o status
             const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === idDaFesta) : null;
 
@@ -7377,9 +7390,8 @@
                 if (containerLista) containerLista.innerHTML = '<p style="text-align:center; font-weight:bold; padding:30px; color:#7f8c8d;">Nenhuma pendência de logística reversa.</p>';
                 boxModal.style.borderColor = "#27ae60";
 
-                // Esconde os botões para blindar cliques duplicados
+                // Esconde apenas a chavinha de toggle, já que não tem o que filtrar
                 if (btnToggle) btnToggle.style.display = 'none';
-                if (btnDevolver) btnDevolver.style.display = 'none';
 
                 modal.style.display = 'flex';
                 return; // Aborta aqui! Não faz fetch nem executa o resto do código.
@@ -7389,9 +7401,8 @@
             // 3. FLUXO NORMAL (PENDENTE DE DEVOLUÇÃO)
             // ==========================================
             
-            // Garante que os botões voltem a aparecer (caso o usuário tenha aberto um evento fechado antes)
+            // Garante que o botão de toggle volte a aparecer (caso o usuário tenha aberto um evento fechado antes)
             if (btnToggle) btnToggle.style.display = 'inline-block';
-            if (btnDevolver) btnDevolver.style.display = 'inline-block';
 
             if (containerLista) containerLista.innerHTML = '<p style="text-align:center; padding: 20px;">Puxando dados do bar... ⏳</p>';
             modal.style.display = 'flex';
