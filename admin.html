@@ -4656,10 +4656,10 @@
                     
                     // 🛡️ TRAVA DA CARGA (Inicial vs Extra)
                     let btnCarga = ev.is_loaded
-                        ? `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #3498db; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        ? `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}', true)" style="flex: 1; background: #3498db; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 📦 CARGA EXTRA
                            </button>`
-                        : `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}')" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        : `<button onclick="event.stopPropagation(); abrirModalLogistica('${ev.id}', '${ev.name}', false)" style="flex: 1; background: #f39c12; color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                 📤 CARGA INICIAL
                            </button>`;
 
@@ -7113,17 +7113,10 @@
         // --- FUNÇÕES DE LOGÍSTICA (AURORA V3) ---
         window.eventoSendoCarregado = null;
 
-        window.abrirModalLogistica = async function(eventId, nomeEvento) {
-            console.log("🚚 Tentando abrir logística para o evento:", eventId);
+        // Note que agora ele recebe o isCargaExtra direto do botão!
+        window.abrirModalLogistica = async function(eventId, nomeEvento, isCargaExtra = false) {
+            console.log("🚚 Tentando abrir logística para o evento:", eventId, "| Extra:", isCargaExtra);
             window.eventoSendoCarregado = eventId;
-            
-            // ==========================================
-            // 🧠 INTELIGÊNCIA CORRIGIDA (Forçando formato de Texto)
-            // ==========================================
-            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => String(e.id) === String(eventId)) : null;
-            const isCargaExtra = eventoAtual ? eventoAtual.is_loaded : false;
-            
-            console.log("Status de Carga Extra detectado:", isCargaExtra); // Deixei esse log para você conferir no F12!
 
             // 1. ATUALIZA O TÍTULO DO MODAL (Com alerta visual)
             const tituloModal = document.getElementById('titulo-modal-logistica');
@@ -7146,18 +7139,13 @@
                 btnConfirmar.disabled = false;
                 btnConfirmar.innerText = "CONFIRMAR SAÍDA DO GALPÃO";
                 btnConfirmar.style.backgroundColor = "#27ae60"; 
-                // Removemos qualquer marcação de erro anterior
                 btnConfirmar.removeAttribute('data-erro');
                 btnConfirmar.onclick = function() { window.confirmarCargaEvento(this); };
             }
 
-            // 4. RESET DA POSIÇÃO: Garante que o modal abra no centro, caso tenha sido arrastado antes
+            // 4. RESET DA POSIÇÃO E ARRASTAR
             const caixaBranca = document.getElementById('caixa-branca-logistica');
-            if (caixaBranca) {
-                caixaBranca.style.transform = 'translate(0px, 0px)';
-            }
-
-            // 5. ATIVA A FUNÇÃO DE ARRASTAR
+            if (caixaBranca) caixaBranca.style.transform = 'translate(0px, 0px)';
             if (typeof window.tornarArrastavel === 'function') {
                 window.tornarArrastavel('caixa-branca-logistica', 'cabecalho-modal-logistica');
             }
@@ -7183,7 +7171,7 @@
                     const tr = document.createElement('tr');
                     const sugerido = parseFloat(item.sugerido || 0);
                     
-                    // 🧠 INTELIGÊNCIA: Se for carga extra, força o campo a nascer com ZEROS.
+                    // 🧠 INTELIGÊNCIA DIRETA: Se for carga extra, valor é ZERO.
                     const valorExibicao = isCargaExtra ? 0 : sugerido;
                     
                     tr.innerHTML = `
