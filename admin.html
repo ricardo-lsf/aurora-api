@@ -7117,10 +7117,20 @@
             console.log("🚚 Tentando abrir logística para o evento:", eventId);
             window.eventoSendoCarregado = eventId;
             
-            // 1. ATUALIZA O TÍTULO DO MODAL
+            // ==========================================
+            // 🧠 INTELIGÊNCIA: DESCOBRE SE É CARGA EXTRA
+            // ==========================================
+            const eventoAtual = window.listaEventosCache ? window.listaEventosCache.find(e => e.id === eventId) : null;
+            const isCargaExtra = eventoAtual ? eventoAtual.is_loaded : false;
+
+            // 1. ATUALIZA O TÍTULO DO MODAL (Com alerta visual)
             const tituloModal = document.getElementById('titulo-modal-logistica');
             if (tituloModal) {
-                tituloModal.innerHTML = `Carregamento de Estoque - <b>${nomeEvento}</b>`;
+                if (isCargaExtra) {
+                    tituloModal.innerHTML = `📦 Carga Extra - <b>${nomeEvento}</b><br><small style="color:#e74c3c; font-size:13px; font-weight:normal;">⚠️ A carga principal já zarpou. Digite apenas o reforço. Itens zerados não serão enviados.</small>`;
+                } else {
+                    tituloModal.innerHTML = `📤 Carregamento Inicial - <b>${nomeEvento}</b><br><small style="color:#7f8c8d; font-size:13px; font-weight:normal;">Revise as quantidades sugeridas e confirme a saída.</small>`;
+                }
             }
 
             // 2. CORREÇÃO DO FANTASMA: Limpa erros antigos ao abrir
@@ -7169,6 +7179,9 @@
                     const tr = document.createElement('tr');
                     const sugerido = parseFloat(item.sugerido || 0);
                     
+                    // 🧠 INTELIGÊNCIA: Se for carga extra, força o campo a nascer com ZEROS.
+                    const valorExibicao = isCargaExtra ? 0 : sugerido;
+                    
                     tr.innerHTML = `
                         <td style="padding:12px; border-bottom:1px solid #eee;">
                             <b>${item.nome}</b><br><small style="color:#888;">${item.unidade}</small>
@@ -7177,7 +7190,7 @@
                             ${sugerido}
                         </td>
                         <td style="padding:12px; border-bottom:1px solid #eee; text-align:center;">
-                            <input type="number" class="input-carga-insumo" data-id="${item.id}" value="${sugerido}" 
+                            <input type="number" class="input-carga-insumo" data-id="${item.id}" value="${valorExibicao}" min="0" 
                                 style="width:85px; padding:8px; border:1px solid #ddd; border-radius:6px; text-align:center;">
                         </td>
                     `;
@@ -7219,6 +7232,7 @@
 
             inputs.forEach(input => {
                 const qtd = parseFloat(input.value);
+                // 🛡️ O SEU CÓDIGO JÁ ESTAVA PERFEITO AQUI: Só manda se for > 0
                 if (qtd > 0) {
                     itensParaCarga.push({
                         ingredient_id: input.dataset.id,
@@ -7227,12 +7241,13 @@
                 }
             });
 
+            // 🛡️ EVITA O CLIQUE ACIDENTAL VAZIO
             if (itensParaCarga.length === 0) {
-                alert("Informe as quantidades para carregar!");
+                alert("Nenhum item com quantidade válida para envio. Digite a quantidade de pelo menos um insumo.");
                 if (botaoElement) { 
                     botaoElement.disabled = false; 
                     botaoElement.innerText = "CONFIRMAR SAÍDA DO GALPÃO"; 
-                    botaoElement.style.backgroundColor = ""; // Reseta a cor se tiver
+                    botaoElement.style.backgroundColor = ""; 
                 }
                 return;
             }
@@ -7250,7 +7265,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        event_id: idFestaParaCarga, // Usa a variável blindada que criamos no início
+                        event_id: idFestaParaCarga, 
                         itens: itensParaCarga 
                     })
                 });
@@ -7261,12 +7276,14 @@
                     alert("🚚 SUCESSO! Caminhão carregado e PDV liberado.");
                     window.fecharModalLogistica();
 
-                // Atualiza o cache local para a tela piscar azul instantaneamente
-                if (window.listaEventosCache) {
-                    const evEncontrado = window.listaEventosCache.find(e => e.id === payload.event_id); // ou a variável que guarda o ID
-                    if (evEncontrado) evEncontrado.is_loaded = true;
-                }
-                if (typeof window.renderizarListaEventos === 'function') window.renderizarListaEventos();
+                    // ==========================================
+                    // 🔄 ATUALIZAÇÃO AUTOMÁTICA DA TELA SEM F5
+                    // ==========================================
+                    if (window.listaEventosCache) {
+                        const evEncontrado = window.listaEventosCache.find(e => e.id === idFestaParaCarga); // 🛠️ Corrigido o nome da variável
+                        if (evEncontrado) evEncontrado.is_loaded = true;
+                    }
+                    if (typeof window.renderizarListaEventos === 'function') window.renderizarListaEventos();
 
                 } else {
                     if (Array.isArray(result.detail)) {
