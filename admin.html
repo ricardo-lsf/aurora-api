@@ -1406,6 +1406,9 @@
                         <button onclick="excluirEventoAtual()" class="btn-delete-event">🗑️ EXCLUIR EVENTO
                             PERMANENTEMENTE</button>
                     </div>
+
+                    <button onclick="arquivarEventoAtual()" style="background: #f39c12; color: white;">📁 Arquivar Evento</button>
+                
                 </div>
             </div>
         </div>
@@ -5286,7 +5289,39 @@
         }
     };
 
-        window.marcarTodos = (m) => document.querySelectorAll('.chk-drink:not([disabled])').forEach(c => c.checked = m);
+    // ==========================================
+    // 4.1 ARQUIVAR EVENTO (Soft Delete para Auditoria/B.I.)
+    // ==========================================
+    window.arquivarEventoAtual = async () => {
+        if (!eventoID) return;
+        
+        const nomeDoEvento = document.getElementById('titulo-evento').innerText;
+
+        const confirmacao = confirm(`Deseja arquivar o evento "${nomeDoEvento}"?\n\nEle sairá do tablet dos garçons, mas todo o histórico financeiro e de sobras continuará salvo no B.I.`);
+        
+        if (!confirmacao) return;
+
+        try {
+            const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}/archive`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!resposta.ok) {
+                const erro = await resposta.json();
+                throw new Error(erro.detail || "Erro ao tentar arquivar o evento.");
+            }
+
+            alert(`📁 Evento "${nomeDoEvento}" encerrado e arquivado com sucesso!`);
+            document.getElementById('painel-detalhes').style.display = 'none'; // Esconde o painel
+            eventoID = null;
+            window.renderizarListaEventos(); // Recarrega a lista da esquerda
+        } catch(e) {
+            alert("Erro: " + e.message);
+        }
+    };
+
+    window.marcarTodos = (m) => document.querySelectorAll('.chk-drink:not([disabled])').forEach(c => c.checked = m);
 
     // ============================================================
     // MÓDULO: MONTAR CARDÁPIO (POSTGRESQL)

@@ -2118,7 +2118,33 @@ def deletar_evento(event_id: str):
     except Exception as e:
         if conn: conn.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    
+
+# ==========================================
+# ROTA PARA ARQUIVAR EVENTO (SOFT DELETE PARA B.I.)
+# ==========================================
+@app.patch("/events/{event_id}/archive")
+def arquivar_evento(event_id: str):
+    conn = get_db_connection()
+    if not conn: 
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+    try:
+        cur = conn.cursor()
+        
+        # Apenas muda o status e inativa, preservando as vendas, estoques e devoluções!
+        cur.execute("""
+            UPDATE events 
+            SET is_active = FALSE, status = 'cancelado' 
+            WHERE id = %s
+        """, (event_id,))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        return {"status": "sucesso", "mensagem": "Evento arquivado com segurança. Dados preservados!"}
+    except Exception as e:
+        if conn: conn.rollback()
+        print(f"Erro ao arquivar evento {event_id}:", str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ROTA PARA ATUALIZAR A QUANTIDADE DE UM DRINK NO EVENTO
 @app.patch("/events/{event_id}/menu/{cocktail_id}/quantity")
