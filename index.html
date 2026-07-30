@@ -391,9 +391,13 @@
                     const drink = drinks.find(d => d.id === venda.cocktail_id);
                     const nomeDoDrink = drink ? drink.nome : "Drink Desconhecido";
 
-                    // Reconstrói o histórico visual (lista de logs) - Passando os IDs para o estorno funcionar!
+                    // 🕒 SOLUÇÃO DO PROBLEMA 3: Busca a hora que veio do banco!
+                    // Tenta capturar o campo de hora (adapte caso sua API use outro nome)
+                    const horaDoBanco = venda.created_at || venda.sale_time || venda.data_venda || null;
+
+                    // Reconstrói o histórico visual passando a HORA DO BANCO
                     if (typeof adicionarLog === 'function') {
-                        adicionarLog(nomeDoDrink, 1, venda.id, venda.cocktail_id);
+                        adicionarLog(nomeDoDrink, 1, venda.id, venda.cocktail_id, horaDoBanco);
                     }
                 });
 
@@ -570,19 +574,21 @@
             ID_FESTA_POSTGRES = null;
             eventoID = null;
             
-            // ==========================================
-            // 🛑 ESCUDO ANTI-F5: Apaga a memória pra ele não voltar pra cá no F5
-            // ==========================================
+            // 🛑 ESCUDO ANTI-F5: Apaga a memória
             localStorage.removeItem('eventoID');
-            localStorage.removeItem('nomeEventoSalvo'); // <-- ADICIONADO AQUI!
+            localStorage.removeItem('nomeEventoSalvo'); 
             
-            // 2. Limpa a tela de fundo
+            // 2. Limpa a tela de fundo (AGORA LIMPANDO O LOG TAMBÉM)
             document.getElementById('nome-evento').innerText = "Aguardando...";
             document.getElementById('grid').innerHTML = '';
             document.getElementById('total-count').innerText = "0";
             document.getElementById('total-valor').innerText = "R$ 0.00";
             
-            // 3. Puxa a Recepção VIP de volta para a tela!
+            // 👻 SOLUÇÃO DO FANTASMA 1: Limpa o histórico visual para a próxima festa nascer zerada!
+            const listaLogs = document.getElementById('lista-logs');
+            if (listaLogs) listaLogs.innerHTML = '';
+            
+            // 3. Puxa a Recepção VIP de volta
             buscarEventosAtivos();
         };
 
@@ -899,11 +905,11 @@
             });
         }
 
-        function adicionarLog(nome, qtd, vendaId = null, drinkId = null) {
+        // 🕒 AGORA RECEBE A 'horaBanco' COMO QUINTO PARÂMETRO
+        function adicionarLog(nome, qtd, vendaId = null, drinkId = null, horaBanco = null) {
             const lista = document.getElementById('lista-logs');
             if (!lista) return;
 
-            // Se for apenas um informativo de estorno (qtd < 0)
             if (qtd < 0) {
                 const liEstorno = document.createElement('li');
                 liEstorno.style.color = "#e74c3c";
@@ -916,10 +922,24 @@
             }
 
             const li = document.createElement('li');
-            // Guardamos o ID único da venda na linha do HTML
             if (vendaId) li.setAttribute('data-sale-id', vendaId);
 
-            const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            // 🕒 SOLUÇÃO DO PROBLEMA 3: Inteligência de tempo
+            let horaExibicao = "";
+            if (horaBanco) {
+                // Se veio do banco, formata a data/hora recebida
+                try {
+                    const dataObj = new Date(horaBanco);
+                    horaExibicao = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    // Se der erro ou a data for inválida, cai no fallback abaixo
+                    if (horaExibicao === "Invalid Date") throw new Error(); 
+                } catch(e) {
+                    horaExibicao = "🕒"; // Fallback se a formatação falhar
+                }
+            } else {
+                // Se é uma venda feita AGORA pelo clique do bartender, pega a hora do PC/Celular
+                horaExibicao = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            }
 
             li.style.display = "grid";
             li.style.gridTemplateColumns = "50px 1fr 40px"; 
@@ -927,9 +947,8 @@
             li.style.padding = "8px 0";
             li.style.borderBottom = "1px solid #2a2a2a";
 
-            // Criamos o HTML com o botão de "X" passando o ID da VENDA e o ID do DRINK
             li.innerHTML = `
-                <span style="color:#666; font-size:0.8em;">${agora}</span> 
+                <span style="color:#666; font-size:0.8em;">${horaExibicao}</span> 
                 <span style="color:#fff; font-size:0.9rem;">${nome}</span>
                 <button onclick="estornarPeloLog('${vendaId}', '${drinkId}')" 
                         style="background:none; border:none; color:#e74c3c; font-weight:bold; cursor:pointer; font-size:1.3rem; display:flex; align-items:center; justify-content:center;">
@@ -945,11 +964,17 @@
         }
 
         window.estornarPeloLog = async (saleId, drinkId) => {
-            // 1. Busca infalível pelo ID na memória
+            // ==========================================
+            // 🛑 SOLUÇÃO DO PROBLEMA 2: TRAVA DE CAIXA FECHADO
+            // ==========================================
+            if (eventoStatus === 'fechado') {
+                alert("🔒 BLOQUEADO: Este evento já teve o estoque devolvido. Você não pode estornar vendas de um caixa encerrado.");
+                return; // ✂️ Corta a função aqui!
+            }
+
             const drink = drinks.find(d => d.id === drinkId);
             const nomeParaAlerta = drink ? drink.nome : "este drink";
 
-            // Pedir confirmação para evitar cliques acidentais
             if (!confirm(`Deseja estornar a venda de: ${nomeParaAlerta}?`)) return;
 
             try {
@@ -967,25 +992,19 @@
                     throw new Error(erro.detail || "Falha ao comunicar com o servidor.");
                 }
 
-                // 2. Remove a linha do histórico visualmente
                 const itemLog = document.querySelector(`li[data-sale-id="${saleId}"]`);
                 if (itemLog) itemLog.remove();
 
-                // 3. ATUALIZA A TELA (Caixinha, Foto e Gráfico)
                 if (drink) {
-                    // A MÁGICA AQUI: Força a soma para voltar o estoque pra caixinha e acender a foto!
                     drink.estoque = parseInt(drink.estoque, 10) + 1;
-
                     if (counts[drink.id] > 0) {
                         counts[drink.id]--;
                     }
                     localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
-                    renderizar(); // Re-desenha a tela para atualizar totais e estoque visual
+                    renderizar(); 
                 }
 
-                // 4. Opcional: Adiciona um log avisando do estorno
                 adicionarLog(nomeParaAlerta, -1);
-
                 console.log(`Venda ${saleId} estornada com sucesso.`);
 
             } catch (e) {
