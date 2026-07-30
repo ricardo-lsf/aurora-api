@@ -1363,13 +1363,12 @@ def listar_vendas_evento(event_id: str):
     try:
         cur = conn.cursor()
         
-        # Busca as vendas do evento ordenadas das mais antigas para as mais novas
-        # Assim o frontend reconstrói a tela exatamente na ordem que as coisas aconteceram
+        # 🕒 CORREÇÃO 1: Adicionado o "created_at" no SELECT e na ORDENAÇÃO
         query = """
-            SELECT id, cocktail_id, price, user_name
+            SELECT id, cocktail_id, price, user_name, created_at
             FROM sales 
             WHERE event_id = %s
-            ORDER BY id ASC
+            ORDER BY created_at ASC
         """
         cur.execute(query, (event_id,))
         vendas = cur.fetchall()
@@ -1380,7 +1379,9 @@ def listar_vendas_evento(event_id: str):
                 "id": str(v[0]),
                 "cocktail_id": str(v[1]),
                 "price": float(v[2]) if v[2] else 0.0,
-                "user_name": str(v[3]) if v[3] else "Desconhecido"
+                "user_name": str(v[3]) if v[3] else "Desconhecido",
+                # 🕒 CORREÇÃO 2: Pega o 5º item (índice 4) e transforma em texto para o JSON não quebrar
+                "created_at": str(v[4]) if v[4] else None
             })
             
         cur.close()
