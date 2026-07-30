@@ -306,6 +306,9 @@
         window.addEventListener('DOMContentLoaded', async () => {
             const usuarioSalvo = localStorage.getItem('usuarioLogado');
             const eventoSalvo = localStorage.getItem('eventoID');
+            
+            // 👻 SOLUÇÃO DO FANTASMA 2: Puxa o nome da festa da memória
+            const nomeSalvo = localStorage.getItem('nomeEventoSalvo'); 
 
             if (usuarioSalvo) {
                 console.log("🔄 Sessão recuperada para:", usuarioSalvo);
@@ -319,11 +322,17 @@
 
                 if (eventoSalvo) {
                     eventoID = eventoSalvo;
-                    ID_FESTA_POSTGRES = eventoSalvo; // Garante que a variável mestra também seja preenchida
+                    ID_FESTA_POSTGRES = eventoSalvo;
                     console.log("🔄 Retornando ao evento:", eventoID);
                     
+                    // 👻 SOLUÇÃO DO FANTASMA 2: Reescreve o nome da festa no topo!
+                    if (nomeSalvo) {
+                        const tituloEvento = document.getElementById('nome-evento');
+                        if (tituloEvento) tituloEvento.innerText = nomeSalvo;
+                    }
+                    
                     // ============================================================
-                    // 🛑 O DESTRAVAMENTO VISUAL: Tira o loading e as sobreposições da frente!
+                    // 🛑 O DESTRAVAMENTO VISUAL: Tira o loading e as sobreposições!
                     // ============================================================
                     const eventSelection = document.getElementById('event-selection-overlay');
                     if (eventSelection) eventSelection.style.display = 'none';
@@ -530,6 +539,9 @@
             // 1. Esconde a tela de recepção
             document.getElementById('event-selection-overlay').style.display = 'none';
             
+            // 👻 SOLUÇÃO DO FANTASMA 1: Reseta o status sempre que entra numa festa nova!
+            eventoStatus = "aberto"; 
+            
             // 2. Alimenta a Variável Mestra Nova e a Antiga
             ID_FESTA_POSTGRES = idPostgres;
             eventoID = idPostgres; 
@@ -538,7 +550,7 @@
             // 🛑 ESCUDO ANTI-F5: Salva no navegador que ele entrou nessa festa!
             // ==========================================
             localStorage.setItem('eventoID', eventoID);
-            localStorage.setItem('nomeEventoSalvo', nomeEvento); // <-- ADICIONADO AQUI!
+            localStorage.setItem('nomeEventoSalvo', nomeEvento); 
             
             // 3. Coloca o nome da festa lá no topo
             document.getElementById('nome-evento').innerText = nomeEvento;
