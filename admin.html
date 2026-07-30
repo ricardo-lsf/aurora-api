@@ -1291,34 +1291,50 @@
             
             <div class="menu-label">Inteligência</div>
             <a onclick="showView('view-analytics', this)" class="menu-item"><span class="menu-icon">📈</span> Estatísticas</a>
+
+            <a href="#" class="menu-item" onclick="abrirTelaAuditoria()">
+                <span>🕵️</span> Dashboard Auditoria
+            </a>
+            
             <a onclick="showView('view-ferramentas', this)" class="menu-item"><span class="menu-icon">🛠️</span> Ferramentas</a>
 
-            <!-- ESTRUTURA DO DASHBOARD -->
-            <div id="painel-furo-estoque" style="padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
+            <!-- TELA DE AUDITORIA (Inicia escondida) -->
+            <div id="tela-auditoria" style="display: none; padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0; color: #2c3e50;">📊 Auditoria: Furo de Estoque</h3>
-                    <button onclick="gerarAuditoriaFuro(eventoAdminID)" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                        🔄 Atualizar Análise
-                    </button>
+                    
+                    <!-- O SELETOR DE EVENTOS E O BOTÃO -->
+                    <div style="display: flex; gap: 10px;">
+                        <select id="select-evento-auditoria" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                            <option value="">Carregando eventos...</option>
+                        </select>
+                        
+                        <button onclick="gerarAuditoriaFuro()" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            🔄 Analisar Evento
+                        </button>
+                    </div>
                 </div>
-                <p style="font-size: 13px; color: #7f8c8d; margin-top: 5px;">
+                
+                <p style="font-size: 13px; color: #7f8c8d; margin-top: -10px; margin-bottom: 20px;">
                     Cruzamento automático do <b>Estoque Devolvido</b> vs <b>Cliques no PDV</b>.
                 </p>
 
-                <table class="table-furo">
-                    <thead>
+                <!-- TABELA -->
+                <table class="table-furo" style="width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+                    <thead style="background: #2c3e50; color: white; text-align: left; font-size: 13px; text-transform: uppercase;">
                         <tr>
-                            <th>Ingrediente</th>
-                            <th style="text-align: center;">Enviado</th>
-                            <th style="text-align: center;">Devolvido</th>
-                            <th style="text-align: center;">Consumo Físico</th>
-                            <th style="text-align: center;">Consumo PDV</th>
-                            <th style="text-align: center;">Perda (Sumiu)</th>
-                            <th style="text-align: center;">Auditoria</th>
+                            <th style="padding: 12px;">Ingrediente</th>
+                            <th style="padding: 12px; text-align: center;">Enviado</th>
+                            <th style="padding: 12px; text-align: center;">Devolvido</th>
+                            <th style="padding: 12px; text-align: center;">Consumo Físico</th>
+                            <th style="padding: 12px; text-align: center;">Consumo PDV</th>
+                            <th style="padding: 12px; text-align: center;">Perda (Sumiu)</th>
+                            <th style="padding: 12px; text-align: center;">Auditoria</th>
                         </tr>
                     </thead>
                     <tbody id="corpo-tabela-furo">
-                        <tr><td colspan="7" style="text-align:center; padding: 20px;">Clique em "Atualizar Análise" para processar os dados.</td></tr>
+                        <tr><td colspan="7" style="text-align:center; padding: 30px; color:#7f8c8d;">Selecione um evento acima e clique em Analisar.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -7686,15 +7702,52 @@
 
         // ==========================================
         // DASHBOARD AUDITORIA
+        // ABRIR A TELA DE AUDITORIA E CARREGAR SELECT
         // ==========================================
-        window.gerarAuditoriaFuro = async function(eventId) {
-            const tbody = document.getElementById('corpo-tabela-furo');
-            if (!tbody || !eventId) return;
+        window.abrirTelaAuditoria = async function() {
+            // 1. Esconde as outras telas (adicione os IDs das suas outras telas aqui)
+            const telasParaEsconder = ['tela-eventos', 'tela-estatisticas', 'tela-cardapios']; // Adapte para os IDs que você usa
+            telasParaEsconder.forEach(id => {
+                const tela = document.getElementById(id);
+                if (tela) tela.style.display = 'none';
+            });
 
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Processando cruzamento de dados... ⏳</td></tr>';
+            // 2. Mostra a tela de auditoria
+            document.getElementById('tela-auditoria').style.display = 'block';
+
+            // 3. Preenche a caixinha de selecionar os eventos
+            const select = document.getElementById('select-evento-auditoria');
+            
+            try {
+                // Puxa as festas da sua conta
+                const res = await fetch(`https://aurora-api-zj8e.onrender.com/events?account_id=${typeof ACCOUNT_ID !== 'undefined' ? ACCOUNT_ID : 1}`);
+                const data = await res.json();
+                
+                select.innerHTML = '<option value="">-- Escolha um Evento --</option>';
+                data.eventos.forEach(ev => {
+                    select.innerHTML += `<option value="${ev.id}">${ev.name}</option>`;
+                });
+            } catch (err) {
+                select.innerHTML = '<option value="">Erro ao carregar eventos</option>';
+            }
+        };
+
+        // ==========================================
+        // PUXAR OS DADOS DO FURO E PINTAR A TABELA
+        // ==========================================
+        window.gerarAuditoriaFuro = async function() {
+            // 🛑 AGORA ELE PEGA O ID DO SELECT QUE ESTÁ NA TELA!
+            const eventId = document.getElementById('select-evento-auditoria').value;
+            
+            if (!eventId) {
+                alert("Por favor, selecione um evento na lista primeiro.");
+                return;
+            }
+
+            const tbody = document.getElementById('corpo-tabela-furo');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 30px;">Calculando cruzamentos... ⏳</td></tr>';
 
             try {
-                // Acessa a nova rota que contém aquele SQL avançado!
                 const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/reports/leakage/${eventId}`);
                 if (!resposta.ok) throw new Error("Falha ao buscar relatório no servidor.");
                 const dados = await resposta.json();
@@ -7702,12 +7755,11 @@
                 tbody.innerHTML = '';
 
                 if (dados.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Sem dados de logística ou vendas para este evento.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 30px;">Sem dados para este evento. O caminhão já retornou?</td></tr>';
                     return;
                 }
 
                 dados.forEach(item => {
-                    // Formata os números
                     const enviado = parseFloat(item.enviado || 0);
                     const devolvido = parseFloat(item.devolvido || 0);
                     const consumoReal = parseFloat(item.consumo_real || 0);
@@ -7715,47 +7767,45 @@
                     const diferenca = parseFloat(item.diferenca_perda || 0);
                     const percentual = parseFloat(item.percentual_perda || 0);
 
-                    // 🧠 REGRAS DE NEGÓCIO E CORES:
-                    let corBadge = 'badge-verde'; 
+                    // Regras de Cor
+                    let corBadge = 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;'; // Verde
                     let icone = '✅';
 
                     if (percentual > 15) {
-                        // Perda grave, acima de 15% (Roubo, desperdício alto ou ninguém clicou no sistema)
-                        corBadge = 'badge-vermelho'; 
+                        corBadge = 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'; // Vermelho
                         icone = '🚨';
                     } else if (percentual > 5 && percentual <= 15) {
-                        // Alerta, entre 5% e 15% (Desperdício moderado, overpouring)
-                        corBadge = 'badge-amarelo'; 
+                        corBadge = 'background: #fff3cd; color: #856404; border: 1px solid #ffeeba;'; // Amarelo
                         icone = '⚠️';
                     } else if (percentual < 0) {
-                        // Negativo: Serviu mais no PDV do que o físico gastou (Doses fracas ou clique duplo)
-                        corBadge = 'badge-amarelo'; 
+                        corBadge = 'background: #fff3cd; color: #856404; border: 1px solid #ffeeba;'; // Amarelo (Sobra sistêmica)
                         icone = '🧐';
                     }
 
-                    // Pinta o número da perda de vermelho apenas se houver perda real
                     const corDiferenca = diferenca > 0 ? 'color:#e74c3c; font-weight:bold;' : 'color:#333;';
+                    const badgeEstilo = `padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; display: inline-block; ${corBadge}`;
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><b>${item.ingrediente}</b> <br><small style="color:#7f8c8d;">${item.unidade}</small></td>
-                        <td style="text-align: center;">${enviado.toFixed(1)}</td>
-                        <td style="text-align: center;">${devolvido.toFixed(1)}</td>
-                        <td style="text-align: center; font-weight:bold; color:#2980b9;">${consumoReal.toFixed(2)}</td>
-                        <td style="text-align: center; font-weight:bold; color:#8e44ad;">${consumoPdv.toFixed(2)}</td>
-                        <td style="text-align: center; ${corDiferenca}">
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; font-size: 14px;">
+                            <b>${item.ingrediente}</b> <br><small style="color:#7f8c8d;">${item.unidade}</small>
+                        </td>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center;">${enviado.toFixed(1)}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center;">${devolvido.toFixed(1)}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center; font-weight:bold; color:#2980b9;">${consumoReal.toFixed(2)}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center; font-weight:bold; color:#8e44ad;">${consumoPdv.toFixed(2)}</td>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center; ${corDiferenca}">
                             ${diferenca > 0 ? '-' : (diferenca < 0 ? '+' : '')}${Math.abs(diferenca).toFixed(2)}
                         </td>
-                        <td style="text-align: center;">
-                            <span class="badge ${corBadge}">${icone} ${percentual.toFixed(1)}%</span>
+                        <td style="padding: 12px; border-bottom: 1px solid #ecf0f1; text-align: center;">
+                            <span style="${badgeEstilo}">${icone} ${percentual.toFixed(1)}%</span>
                         </td>
                     `;
                     tbody.appendChild(tr);
                 });
 
             } catch (erro) {
-                console.error("Erro na auditoria:", erro);
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding: 20px;">Falha ao carregar auditoria: ${erro.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding: 30px;">Falha ao carregar auditoria.</td></tr>`;
             }
         };
 
