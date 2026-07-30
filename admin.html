@@ -77,6 +77,28 @@
             grid-column: 1 / -1;
         }
 
+        <!-- ESTILOS DO DASHBOARD DE AUDITORIA -->
+        <style>
+            .table-furo { 
+                width: 100%; border-collapse: collapse; margin-top: 15px; 
+                background: #fff; font-family: sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+                border-radius: 8px; overflow: hidden;
+            }
+            .table-furo th { 
+                background: #2c3e50; color: white; padding: 12px; 
+                text-align: left; font-size: 13px; text-transform: uppercase; 
+            }
+            .table-furo td { 
+                padding: 12px; border-bottom: 1px solid #ecf0f1; color: #333; font-size: 14px; 
+            }
+            .table-furo tr:hover { background-color: #f9f9f9; }
+            
+            /* As famosas "Pílulas" de cor */
+            .badge { padding: 5px 10px; border-radius: 12px; font-weight: bold; font-size: 12px; display: inline-block;}
+            .badge-verde { background: #d4edda; color: #155724; border: 1px solid #c3e6cb;}
+            .badge-amarelo { background: #fff3cd; color: #856404; border: 1px solid #ffeeba;}
+            .badge-vermelho { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;}
+
         /* ===============================
         LOJA AURORA (MARKETPLACE)
         ================================== */
@@ -1270,6 +1292,36 @@
             <div class="menu-label">Inteligência</div>
             <a onclick="showView('view-analytics', this)" class="menu-item"><span class="menu-icon">📈</span> Estatísticas</a>
             <a onclick="showView('view-ferramentas', this)" class="menu-item"><span class="menu-icon">🛠️</span> Ferramentas</a>
+
+            <!-- ESTRUTURA DO DASHBOARD -->
+            <div id="painel-furo-estoque" style="padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; color: #2c3e50;">📊 Auditoria: Furo de Estoque</h3>
+                    <button onclick="gerarAuditoriaFuro(eventoAdminID)" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        🔄 Atualizar Análise
+                    </button>
+                </div>
+                <p style="font-size: 13px; color: #7f8c8d; margin-top: 5px;">
+                    Cruzamento automático do <b>Estoque Devolvido</b> vs <b>Cliques no PDV</b>.
+                </p>
+
+                <table class="table-furo">
+                    <thead>
+                        <tr>
+                            <th>Ingrediente</th>
+                            <th style="text-align: center;">Enviado</th>
+                            <th style="text-align: center;">Devolvido</th>
+                            <th style="text-align: center;">Consumo Físico</th>
+                            <th style="text-align: center;">Consumo PDV</th>
+                            <th style="text-align: center;">Perda (Sumiu)</th>
+                            <th style="text-align: center;">Auditoria</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabela-furo">
+                        <tr><td colspan="7" style="text-align:center; padding: 20px;">Clique em "Atualizar Análise" para processar os dados.</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
             <div class="menu-label">Marketplace</div>
             <a onclick="showView('view-loja', this)" class="menu-item"><span class="menu-icon">🛒</span> Loja Aurora</a>
@@ -7631,6 +7683,82 @@
                 btn.disabled = false;
             }
         };
+
+        // ==========================================
+        // DASHBOARD AUDITORIA
+        // ==========================================
+        window.gerarAuditoriaFuro = async function(eventId) {
+            const tbody = document.getElementById('corpo-tabela-furo');
+            if (!tbody || !eventId) return;
+
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Processando cruzamento de dados... ⏳</td></tr>';
+
+            try {
+                // Acessa a nova rota que contém aquele SQL avançado!
+                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/reports/leakage/${eventId}`);
+                if (!resposta.ok) throw new Error("Falha ao buscar relatório no servidor.");
+                const dados = await resposta.json();
+
+                tbody.innerHTML = '';
+
+                if (dados.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 20px;">Sem dados de logística ou vendas para este evento.</td></tr>';
+                    return;
+                }
+
+                dados.forEach(item => {
+                    // Formata os números
+                    const enviado = parseFloat(item.enviado || 0);
+                    const devolvido = parseFloat(item.devolvido || 0);
+                    const consumoReal = parseFloat(item.consumo_real || 0);
+                    const consumoPdv = parseFloat(item.consumo_pdv || 0);
+                    const diferenca = parseFloat(item.diferenca_perda || 0);
+                    const percentual = parseFloat(item.percentual_perda || 0);
+
+                    // 🧠 REGRAS DE NEGÓCIO E CORES:
+                    let corBadge = 'badge-verde'; 
+                    let icone = '✅';
+
+                    if (percentual > 15) {
+                        // Perda grave, acima de 15% (Roubo, desperdício alto ou ninguém clicou no sistema)
+                        corBadge = 'badge-vermelho'; 
+                        icone = '🚨';
+                    } else if (percentual > 5 && percentual <= 15) {
+                        // Alerta, entre 5% e 15% (Desperdício moderado, overpouring)
+                        corBadge = 'badge-amarelo'; 
+                        icone = '⚠️';
+                    } else if (percentual < 0) {
+                        // Negativo: Serviu mais no PDV do que o físico gastou (Doses fracas ou clique duplo)
+                        corBadge = 'badge-amarelo'; 
+                        icone = '🧐';
+                    }
+
+                    // Pinta o número da perda de vermelho apenas se houver perda real
+                    const corDiferenca = diferenca > 0 ? 'color:#e74c3c; font-weight:bold;' : 'color:#333;';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><b>${item.ingrediente}</b> <br><small style="color:#7f8c8d;">${item.unidade}</small></td>
+                        <td style="text-align: center;">${enviado.toFixed(1)}</td>
+                        <td style="text-align: center;">${devolvido.toFixed(1)}</td>
+                        <td style="text-align: center; font-weight:bold; color:#2980b9;">${consumoReal.toFixed(2)}</td>
+                        <td style="text-align: center; font-weight:bold; color:#8e44ad;">${consumoPdv.toFixed(2)}</td>
+                        <td style="text-align: center; ${corDiferenca}">
+                            ${diferenca > 0 ? '-' : (diferenca < 0 ? '+' : '')}${Math.abs(diferenca).toFixed(2)}
+                        </td>
+                        <td style="text-align: center;">
+                            <span class="badge ${corBadge}">${icone} ${percentual.toFixed(1)}%</span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (erro) {
+                console.error("Erro na auditoria:", erro);
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red; padding: 20px;">Falha ao carregar auditoria: ${erro.message}</td></tr>`;
+            }
+        };
+
 
         // ==========================================
         // EXPORTAR FICHA TÉCNICA (PDF)

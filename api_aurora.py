@@ -3194,3 +3194,87 @@ def atualizar_status_orcamento(orcamento_id: str, payload: StatusOrcamentoPayloa
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn: conn.close()
+
+# ==========================================
+# ROTA: AUDITORIA DE FURO DE ESTOQUE (LEAKAGE)
+# ==========================================
+@app.get("/reports/leakage/{event_id}")
+def relatorio_furo_estoque(event_id: str):
+    conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+        
+    try:
+        cur = conn.cursor()
+        
+        # A super query que cruza estoque físico e cliques no PDV
+        query = """
+        WITH ConsumoTeorico AS (
+            -- Passo 1: Multiplica os cliques no PDV pela ficha técnica
+            SELECT 
+                ci.ingredient_id,
+                SUM(ci.quantity) as teorico_qtd
+            FROM sales s
+            JOIN cocktail_ingredients ci ON s.cocktail_id = ci.cocktail_id
+            WHERE s.event_id = %s::uuid
+            GROUP BY ci.ingredient_id
+        ),
+        ConsumoFisico AS (
+            -- Passo 2: Calcula o que efetivamente não voltou pro galpão
+            SELECT 
+                es.ingredient_id,
+                i.name as ingrediente,
+                i.measurement_unit as unidade,
+                es.quantity_sent as enviado,
+                COALESCE(es.quantity_returned, 0) as devolvido,
+                (es.quantity_sent - COALESCE(es.quantity_returned, 0)) as fisico_qtd
+            FROM event_stocks es
+            JOIN ingredients i ON es.ingredient_id = i.id
+            WHERE es.event_id = %s::uuid
+        )
+        -- Passo 3: O Confronto Final
+        SELECT 
+            cf.ingrediente,
+            cf.unidade,
+            cf.enviado,
+            cf.devolvido,
+            cf.fisico_qtd as consumo_real,
+            COALESCE(ct.teorico_qtd, 0) as consumo_pdv,
+            (cf.fisico_qtd - COALESCE(ct.teorico_qtd, 0)) as diferenca_perda,
+            
+            -- Calcula a porcentagem de furo evitando divisão por zero
+            CASE 
+                WHEN cf.fisico_qtd > 0 THEN 
+                    ROUND(((cf.fisico_qtd - COALESCE(ct.teorico_qtd, 0)) / cf.fisico_qtd::numeric) * 100, 2)
+                ELSE 0 
+            END as percentual_perda
+        FROM ConsumoFisico cf
+        LEFT JOIN ConsumoTeorico ct ON cf.ingredient_id = ct.ingredient_id
+        ORDER BY percentual_perda DESC;
+        """
+        
+        # ATENÇÃO: Passamos o event_id DUAS vezes, pois ele aparece em dois lugares no SQL (nos dois WHERE)
+        cur.execute(query, (event_id, event_id))
+        linhas = cur.fetchall()
+        
+        resultado = []
+        for s in linhas:
+            resultado.append({
+                "ingrediente": s[0],
+                "unidade": s[1],
+                "enviado": float(s[2]) if s[2] is not None else 0.0,
+                "devolvido": float(s[3]) if s[3] is not None else 0.0,
+                "consumo_real": float(s[4]) if s[4] is not None else 0.0,
+                "consumo_pdv": float(s[5]) if s[5] is not None else 0.0,
+                "diferenca_perda": float(s[6]) if s[6] is not None else 0.0,
+                "percentual_perda": float(s[7]) if s[7] is not None else 0.0
+            })
+            
+        return resultado
+        
+    except Exception as e:
+        print(f"ERRO RELATÓRIO FURO: {str(e)}") # Aparecerá nos logs do Render
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals(): conn.close()
