@@ -7166,11 +7166,39 @@
                 const response = await fetch(`https://aurora-api-zj8e.onrender.com/inventory/suggest-load/${eventId}`);
                 const itens = await response.json();
 
+                // ==========================================
+                // 🛡️ SINALIZADOR ANTI-ESQUECIMENTO (ZERO DRINKS)
+                // ==========================================
                 corpoTabela.innerHTML = '';
                 
                 if (!itens || itens.length === 0) {
-                    corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Nenhum insumo necessário. Verifique o cardápio.</td></tr>';
+                    corpoTabela.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Nenhum insumo necessário ou cardápio vazio.</td></tr>';
                     return;
+                }
+
+                // Soma tudo o que o Python sugeriu
+                const totalSugeridoMatematica = itens.reduce((soma, item) => soma + (parseFloat(item.sugerido) || 0), 0);
+
+                // SE for Carga Inicial E a soma de tudo for ZERO, pegamos o erro!
+                if (!eCargaExtra && totalSugeridoMatematica === 0) {
+                    corpoTabela.innerHTML = `
+                        <tr>
+                            <td colspan="3" style="text-align:center; padding:30px; background-color: #fff3cd; color: #856404; border-radius: 8px;">
+                                <span style="font-size: 30px; display: block; margin-bottom: 10px;">🚨</span>
+                                <b style="font-size: 16px;">O Cálculo Logístico deu Zero!</b><br><br>
+                                O sistema detectou que você esqueceu de preencher a <b>expectativa de vendas</b> (quantidade planejada) dos drinks no cardápio deste evento.<br><br>
+                                <span style="font-size: 13px; opacity: 0.8;">Vá até o Cardápio da festa, digite quantos drinks espera vender, e tente abrir a logística novamente.</span>
+                            </td>
+                        </tr>`;
+                    
+                    // Desabilita o botão de confirmar para ele não enviar uma carga vazia
+                    const btnConfirmar = document.getElementById('btn-confirmar-carga');
+                    if (btnConfirmar) {
+                        btnConfirmar.disabled = true;
+                        btnConfirmar.style.backgroundColor = '#bdc3c7';
+                    }
+                    
+                    return; // ✂️ Corta a execução aqui. Nem desenha a tabela!
                 }
 
                 itens.forEach(item => {
