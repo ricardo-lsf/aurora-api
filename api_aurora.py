@@ -2820,8 +2820,17 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
                     VALUES (%s, %s, %s, %s, NOW())
                 """, (account_id, event_id, item.ingredient_id, delta_return))
 
-                # 6. A MÁGICA DA SINALIZAÇÃO: Marca o evento como "Devolução OK"
-                cur.execute("UPDATE events SET is_returned = TRUE WHERE id = %s", (event_id,))
+        # ==========================================
+        # 6. A MÁGICA DA SINALIZAÇÃO E TRAVA DO PDV
+        # ==========================================
+        # Fica FORA do loop 'for' para rodar apenas 1 vez por requisição!
+        cur.execute("""
+            UPDATE events 
+            SET is_returned = TRUE, 
+                is_active = FALSE, 
+                status = 'fechado' 
+            WHERE id = %s
+        """, (event_id,))
         
         conn.commit()
         cur.close()
