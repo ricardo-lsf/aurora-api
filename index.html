@@ -499,6 +499,32 @@
             });
         }
 
+        // ============================================================
+        // 🔒 BLINDAGEM DE CAIXA: TRAVA VISUAL DO PDV
+        // ============================================================
+        window.validarStatusDoCaixa = function(evento) {
+            // Se o evento foi devolvido, fechado ou inativado no banco:
+            if (evento.is_returned === true || evento.status === 'fechado' || evento.is_active === false) {
+                eventoStatus = 'fechado'; // Trava a variável global para o botão não funcionar
+                
+                // Substitui os botões de drinks pelo alerta visual gigante
+                const grid = document.getElementById('grid');
+                if (grid) {
+                    grid.innerHTML = `
+                        <div style="background: #e74c3c; color: white; padding: 20px; text-align: center; border-radius: 8px; font-weight: bold; font-size: 18px; margin: 20px auto; width: 90%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            🔒 CAIXA ENCERRADO E DEVOLVIDO<br>
+                            <small style="font-weight: normal; font-size: 14px; margin-top: 5px; display: block;">
+                                O estoque deste evento já retornou ao galpão principal. O PDV está bloqueado para novos lançamentos.
+                            </small>
+                        </div>
+                    `;
+                }
+                return true; // Retorna true dizendo que travou
+            }
+            return false;
+        };
+
+
         // --- MOTOR DE ENTRADA: CONFIGURAR O APP PARA A FESTA ESCOLHIDA ---
         function entrarNaFesta(idPostgres, nomeEvento) {
             // 1. Esconde a tela de recepção
@@ -1010,34 +1036,32 @@ function atualizarStatusConexao() {
 
             console.log("📡 Radar Ativado: Vigiando Status do Evento e Estoque simultaneamente!");
 
-            intervaloMonitoramento = setInterval(async () => {
+            // 🧠 INTELIGÊNCIA: Criamos a função de verificação isolada
+            const executarRadar = async () => {
                 if (!eventoID) return; 
                 
                 try {
                     // -----------------------------------------------------
-                    // MISSÃO 1: VIGIA SE O EVENTO FOI ENCERRADO
+                    // MISSÃO 1: VIGIA SE O EVENTO FOI ENCERRADO OU DEVOLVIDO
                     // -----------------------------------------------------
                     const resStatus = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}`);
                     if (resStatus.ok) {
                         const dataStatus = await resStatus.json();
-                        if (dataStatus.status === 'fechado') {
-                            alert("Atenção: O evento foi encerrado pelo Gerente!");
-                            clearInterval(intervaloMonitoramento); // Desliga o radar
-                            location.reload(); // Expulsa o bartender
-                            return; // Para o código aqui mesmo
+                        
+                        // 🔒 CHAMA A NOSSA TRAVA VISUAL AQUI
+                        if (window.validarStatusDoCaixa(dataStatus)) {
+                            clearInterval(intervaloMonitoramento); // Desliga o radar para economizar internet
+                            return; // ✂️ CORTA A EXECUÇÃO AQUI! Não checa nem desenha mais estoque!
                         }
                     }
 
                     // -----------------------------------------------------
                     // MISSÃO 2: VIGIA O ESTOQUE DOS DRINKS
                     // -----------------------------------------------------
-                    // 🛑 URL CORRIGIDA PARA /menu (Adeus Erro 404!)
                     const resEstoque = await fetch(`https://aurora-api-zj8e.onrender.com/events/${eventoID}/menu`);
                     
                     if (resEstoque.ok) {
                         const dataApi = await resEstoque.json();
-                        
-                        // Lida com o formato correto igual fizemos no carregarDrinks
                         let drinksBanco = [];
                         if (Array.isArray(dataApi)) drinksBanco = dataApi;
                         else if (dataApi && Array.isArray(dataApi.drinks)) drinksBanco = dataApi.drinks;
@@ -1045,31 +1069,30 @@ function atualizarStatusConexao() {
                         let teveMudanca = false;
 
                         drinksBanco.forEach(itemBanco => {
-                            // Procura o drink na memória do celular
                             const drinkTela = drinks.find(d => d.id === itemBanco.id);
-                            
-                            // 🛑 Ajuste: o nome da coluna no banco é planned_quantity
                             const estoqueBanco = itemBanco.planned_quantity !== undefined ? itemBanco.planned_quantity : 999;
                             
-                            // Se o estoque do banco estiver diferente do celular, a gente atualiza
                             if (drinkTela && drinkTela.estoque !== estoqueBanco) {
                                 drinkTela.estoque = estoqueBanco;
                                 teveMudanca = true;
                             }
                         });
 
-                        // Se teve diferença, redesenha a tela toda!
                         if (teveMudanca) {
                             console.log("🔄 Estoque atualizado via Radar!");
                             renderizar(); 
                         }
                     }
-
                 } catch (e) {
-                    // Falha silenciosa. Se a rede do evento oscilar, ele tenta de novo em 8s sem travar a tela.
                     console.error("📡 Oscilação no radar:", e);
                 }
-            }, 8000); // 8000 = 8 segundos. É rápido o suficiente e não sobrecarrega a sua API no Render!
+            };
+
+            // 🚀 RODA IMEDIATAMENTE NA HORA QUE ENTRA NA FESTA OU DÁ F5 (Zera o delay)
+            executarRadar(); 
+
+            // ⏱️ DEPOIS SEGUE RODANDO A CADA 8 SEGUNDOS
+            intervaloMonitoramento = setInterval(executarRadar, 8000); 
         };
 
     </script>
