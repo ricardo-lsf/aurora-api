@@ -2823,12 +2823,10 @@ def processar_retorno_estoque(event_id: str, payload: PayloadRetorno):
         # ==========================================
         # 6. A MÁGICA DA SINALIZAÇÃO E TRAVA DO PDV
         # ==========================================
-        # Fica FORA do loop 'for' para rodar apenas 1 vez por requisição!
+        # Atualiza APENAS a logística reversa, mantendo o evento aberto para o Administrativo
         cur.execute("""
             UPDATE events 
-            SET is_returned = TRUE, 
-                is_active = FALSE, 
-                status = 'fechado' 
+            SET is_returned = TRUE 
             WHERE id = %s
         """, (event_id,))
         
