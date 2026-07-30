@@ -1298,47 +1298,6 @@
             
             <a onclick="showView('view-ferramentas', this)" class="menu-item"><span class="menu-icon">🛠️</span> Ferramentas</a>
 
-            <!-- TELA DE AUDITORIA (Inicia escondida) -->
-            <div id="tela-auditoria" style="display: none; padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
-                
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0; color: #2c3e50;">📊 Auditoria: Furo de Estoque</h3>
-                    
-                    <!-- O SELETOR DE EVENTOS E O BOTÃO -->
-                    <div style="display: flex; gap: 10px;">
-                        <select id="select-evento-auditoria" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
-                            <option value="">Carregando eventos...</option>
-                        </select>
-                        
-                        <button onclick="gerarAuditoriaFuro()" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                            🔄 Analisar Evento
-                        </button>
-                    </div>
-                </div>
-                
-                <p style="font-size: 13px; color: #7f8c8d; margin-top: -10px; margin-bottom: 20px;">
-                    Cruzamento automático do <b>Estoque Devolvido</b> vs <b>Cliques no PDV</b>.
-                </p>
-
-                <!-- TABELA -->
-                <table class="table-furo" style="width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
-                    <thead style="background: #2c3e50; color: white; text-align: left; font-size: 13px; text-transform: uppercase;">
-                        <tr>
-                            <th style="padding: 12px;">Ingrediente</th>
-                            <th style="padding: 12px; text-align: center;">Enviado</th>
-                            <th style="padding: 12px; text-align: center;">Devolvido</th>
-                            <th style="padding: 12px; text-align: center;">Consumo Físico</th>
-                            <th style="padding: 12px; text-align: center;">Consumo PDV</th>
-                            <th style="padding: 12px; text-align: center;">Perda (Sumiu)</th>
-                            <th style="padding: 12px; text-align: center;">Auditoria</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corpo-tabela-furo">
-                        <tr><td colspan="7" style="text-align:center; padding: 30px; color:#7f8c8d;">Selecione um evento acima e clique em Analisar.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
             <div class="menu-label">Marketplace</div>
             <a onclick="showView('view-loja', this)" class="menu-item"><span class="menu-icon">🛒</span> Loja Aurora</a>
 
@@ -2055,6 +2014,47 @@
                 <div class="card" style="height:300px"><canvas id="chartHorario"></canvas></div>
             </div>
         </div>
+
+        <!-- TELA DE AUDITORIA (Inicia escondida) -->
+            <div id="tela-auditoria" style="display: none; padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: #2c3e50;">📊 Auditoria: Furo de Estoque</h3>
+                    
+                    <!-- O SELETOR DE EVENTOS E O BOTÃO -->
+                    <div style="display: flex; gap: 10px;">
+                        <select id="select-evento-auditoria" style="padding: 8px; border-radius: 4px; border: 1px solid #ccc;">
+                            <option value="">Carregando eventos...</option>
+                        </select>
+                        
+                        <button onclick="gerarAuditoriaFuro()" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            🔄 Analisar Evento
+                        </button>
+                    </div>
+                </div>
+                
+                <p style="font-size: 13px; color: #7f8c8d; margin-top: -10px; margin-bottom: 20px;">
+                    Cruzamento automático do <b>Estoque Devolvido</b> vs <b>Cliques no PDV</b>.
+                </p>
+
+                <!-- TABELA -->
+                <table class="table-furo" style="width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">
+                    <thead style="background: #2c3e50; color: white; text-align: left; font-size: 13px; text-transform: uppercase;">
+                        <tr>
+                            <th style="padding: 12px;">Ingrediente</th>
+                            <th style="padding: 12px; text-align: center;">Enviado</th>
+                            <th style="padding: 12px; text-align: center;">Devolvido</th>
+                            <th style="padding: 12px; text-align: center;">Consumo Físico</th>
+                            <th style="padding: 12px; text-align: center;">Consumo PDV</th>
+                            <th style="padding: 12px; text-align: center;">Perda (Sumiu)</th>
+                            <th style="padding: 12px; text-align: center;">Auditoria</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabela-furo">
+                        <tr><td colspan="7" style="text-align:center; padding: 30px; color:#7f8c8d;">Selecione um evento acima e clique em Analisar.</td></tr>
+                    </tbody>
+                </table>
+            </div>
 
         <div id="view-ferramentas" class="view-section" style="display:none">
             <h2 style="color:#2c3e50">🛠️ Central de Ferramentas</h2>
