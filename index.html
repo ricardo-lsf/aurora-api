@@ -387,15 +387,15 @@
                     if (!counts[venda.cocktail_id]) counts[venda.cocktail_id] = 0;
                     counts[venda.cocktail_id]++;
 
-                    // Traduz o ID do drink para o Nome
                     const drink = drinks.find(d => d.id === venda.cocktail_id);
                     const nomeDoDrink = drink ? drink.nome : "Drink Desconhecido";
 
-                    // 🕒 SOLUÇÃO DO PROBLEMA 3: Busca a hora que veio do banco!
-                    // Tenta capturar o campo de hora (adapte caso sua API use outro nome)
-                    const horaDoBanco = venda.created_at || venda.sale_time || venda.data_venda || null;
+                    // 🕵️ DETETIVE: Imprime a venda no F12 para vermos o nome real da coluna da hora!
+                    console.log("Venda vinda do banco:", venda);
 
-                    // Reconstrói o histórico visual passando a HORA DO BANCO
+                    // 🕒 CORREÇÃO 2: A rede universal para capturar a hora do Python
+                    const horaDoBanco = venda.created_at || venda.timestamp || venda.data || venda.sale_time || venda.hora || venda.date || null;
+
                     if (typeof adicionarLog === 'function') {
                         adicionarLog(nomeDoDrink, 1, venda.id, venda.cocktail_id, horaDoBanco);
                     }
@@ -542,31 +542,30 @@
         function entrarNaFesta(idPostgres, nomeEvento) {
             // 1. Esconde a tela de recepção
             document.getElementById('event-selection-overlay').style.display = 'none';
-            
-            // 👻 SOLUÇÃO DO FANTASMA 1: Reseta o status sempre que entra numa festa nova!
             eventoStatus = "aberto"; 
             
-            // 2. Alimenta a Variável Mestra Nova e a Antiga
             ID_FESTA_POSTGRES = idPostgres;
             eventoID = idPostgres; 
 
-            // ==========================================
-            // 🛑 ESCUDO ANTI-F5: Salva no navegador que ele entrou nessa festa!
-            // ==========================================
             localStorage.setItem('eventoID', eventoID);
             localStorage.setItem('nomeEventoSalvo', nomeEvento); 
             
-            // 3. Coloca o nome da festa lá no topo
             document.getElementById('nome-evento').innerText = nomeEvento;
             
-            // 4. Recupera a contagem de cliques do celular
             const c = localStorage.getItem('counts_ev_' + idPostgres); 
             counts = c ? JSON.parse(c) : {};
             
-            // 5. Manda buscar o cardápio no banco
             carregarDrinks(idPostgres); 
             monitorarEvento(idPostgres);
-        }
+
+            // 🚀 CORREÇÃO 1: Avisa o sistema para puxar o histórico na mesma hora!
+            // Esperamos 1 segundo só para dar tempo de desenhar os drinks na tela primeiro
+            setTimeout(() => {
+                if (typeof window.sincronizarDadosDoBanco === 'function') {
+                    window.sincronizarDadosDoBanco();
+                }
+            }, 1000); 
+        };
 
         // --- MOTOR DE SAÍDA: TROCAR DE FESTA ---
         window.sairDoEvento = () => {
