@@ -7174,11 +7174,13 @@
                 }
 
                 itens.forEach(item => {
-                    const tr = document.createElement('tr');
-                    const sugerido = parseFloat(item.sugerido || 0);
+                    // Puxa exatamente o 'sugerido' do seu Python
+                    const sugerido = parseFloat(item.sugerido) || 0;
                     
-                    // 🧠 A MÁGICA ACONTECE AQUI: Usa a nova trava blindada
+                    // A regra de ouro: se for extra, zero. Se for inicial, usa o sugerido.
                     const valorExibicao = eCargaExtra ? 0 : sugerido;
+                    
+                    const tr = document.createElement('tr');
                     
                     tr.innerHTML = `
                         <td style="padding:12px; border-bottom:1px solid #eee;">
@@ -7188,7 +7190,7 @@
                             ${sugerido}
                         </td>
                         <td style="padding:12px; border-bottom:1px solid #eee; text-align:center;">
-                            <input type="number" class="input-carga-insumo" data-id="${item.id}" value="${valorExibicao}" min="0" 
+                            <input type="number" class="input-carga-insumo" data-id="${item.id}" value="${valorExibicao}" min="0" step="any"
                                 style="width:85px; padding:8px; border:1px solid #ddd; border-radius:6px; text-align:center;">
                         </td>
                     `;
