@@ -2016,7 +2016,7 @@
         </div>
 
         <!-- TELA DE AUDITORIA (Inicia escondida) -->
-            <div id="tela-auditoria" style="display: none; padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
+            <div id="view-auditoria" style="display: none; padding: 20px; background: #f4f6f7; border-radius: 8px; margin-top: 20px;">
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0; color: #2c3e50;">📊 Auditoria: Furo de Estoque</h3>
@@ -7706,14 +7706,14 @@
         // ==========================================
         window.abrirTelaAuditoria = async function() {
             // 1. Esconde as outras telas (adicione os IDs das suas outras telas aqui)
-            const telasParaEsconder = ['tela-eventos', 'tela-estatisticas', 'tela-cardapios']; // Adapte para os IDs que você usa
+            const telasParaEsconder = ['view-eventos', 'view-orcamentos', 'view-equipe', 'view-biblioteca', 'view-estoque', 'view-analytics', 'view-ferramentas', 'view-loja']; // Adapte para os IDs que você usa
             telasParaEsconder.forEach(id => {
                 const tela = document.getElementById(id);
                 if (tela) tela.style.display = 'none';
             });
 
             // 2. Mostra a tela de auditoria
-            document.getElementById('tela-auditoria').style.display = 'block';
+            document.getElementById('view-auditoria').style.display = 'block';
 
             // 3. Preenche a caixinha de selecionar os eventos
             const select = document.getElementById('select-evento-auditoria');
