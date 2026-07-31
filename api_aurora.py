@@ -3245,7 +3245,7 @@ def relatorio_furo_estoque(event_id: str):
             -- Calcula a porcentagem de furo evitando divisão por zero
             CASE 
                 WHEN cf.fisico_qtd > 0 THEN 
-                    ROUND(((cf.fisico_qtd - COALESCE(ct.teorico_qtd, 0)) / cf.fisico_qtd::numeric) * 100, 2)
+                    ROUND( (((cf.fisico_qtd - COALESCE(ct.teorico_qtd, 0)) / cf.fisico_qtd) * 100)::numeric, 2 )
                 ELSE 0 
             END as percentual_perda
         FROM ConsumoFisico cf
