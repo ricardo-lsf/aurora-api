@@ -1291,11 +1291,8 @@
             
             <div class="menu-label">Inteligência</div>
             <a onclick="showView('view-analytics', this)" class="menu-item"><span class="menu-icon">📈</span> Estatísticas</a>
-
-            <a href="#" class="menu-item" onclick="abrirTelaAuditoria()">
-                <span>🕵️</span> Dashboard Auditoria
-            </a>
-            
+            <!-- Botão Atualizado da Auditoria -->
+            <a onclick="showView('view-auditoria', this); carregarFiltroAuditoria();" class="menu-item"><span class="menu-icon">🕵️</span> Auditoria</a>
             <a onclick="showView('view-ferramentas', this)" class="menu-item"><span class="menu-icon">🛠️</span> Ferramentas</a>
 
             <div class="menu-label">Marketplace</div>
@@ -7702,21 +7699,13 @@
 
         // ==========================================
         // DASHBOARD AUDITORIA
-        // ABRIR A TELA DE AUDITORIA E CARREGAR SELECT
+        // CARREGAR SELECT DE EVENTOS
         // ==========================================
-        window.abrirTelaAuditoria = async function() {
-            // 1. Esconde as outras telas (adicione os IDs das suas outras telas aqui)
-            const telasParaEsconder = ['view-eventos', 'view-orcamentos', 'view-equipe', 'view-biblioteca', 'view-estoque', 'view-analytics', 'view-ferramentas', 'view-loja']; // Adapte para os IDs que você usa
-            telasParaEsconder.forEach(id => {
-                const tela = document.getElementById(id);
-                if (tela) tela.style.display = 'none';
-            });
-
-            // 2. Mostra a tela de auditoria
-            document.getElementById('view-auditoria').style.display = 'block';
-
-            // 3. Preenche a caixinha de selecionar os eventos
+        window.carregarFiltroAuditoria = async function() {
+            // A aba já foi aberta pelo showView() do HTML.
+            // O nosso único trabalho aqui é preencher a caixinha de seleção.
             const select = document.getElementById('select-evento-auditoria');
+            if (!select) return; // Trava de segurança caso o HTML ainda não tenha carregado
             
             try {
                 // Puxa as festas da sua conta
@@ -7728,6 +7717,7 @@
                     select.innerHTML += `<option value="${ev.id}">${ev.name}</option>`;
                 });
             } catch (err) {
+                console.error("Erro ao puxar eventos para auditoria:", err);
                 select.innerHTML = '<option value="">Erro ao carregar eventos</option>';
             }
         };
