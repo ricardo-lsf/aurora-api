@@ -1683,18 +1683,18 @@
 
                     <label style="margin-top:10px;">Imagem da Ficha Técnica</label>
 
-                    <!-- Botão e Input invisível para o upload -->
+                    <!-- Input escondido e botão para acionar -->
                     <input type="file" id="input-foto-drink" accept="image/*" style="display: none;">
-                    <button type="button" onclick="document.getElementById('input-foto-drink').click()" style="margin-bottom: 10px; padding: 8px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc;">
+                    <button type="button" onclick="document.getElementById('input-foto-drink').click()" class="btn-secundario" style="margin-bottom: 10px; cursor: pointer;">
                         📸 Capturar / Enviar Foto
                     </button>
 
-                    <!-- Seu campo original (deixei como readonly para o usuário não digitar por cima sem querer) -->
-                    <input type="text" id="globalImg" placeholder="A URL da imagem gerada aparecerá aqui..." readonly style="background-color: #f0f0f0;">
+                    <!-- O campo que vai guardar a URL gerada (agora readonly) -->
+                    <input type="text" id="globalImg" placeholder="A URL da imagem aparecerá aqui..." readonly style="background-color: #f0f0f0;">
 
-                    <!-- Sua caixa de preview original -->
+                    <!-- A caixa de preview que você já tinha -->
                     <div class="img-preview-box">
-                        <img id="previewImg" src="" alt="Preview">
+                        <img id="previewImg" src="" alt="Preview" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:8px;">
                         <span id="previewText">Pré-visualização</span>
                     </div>
 
@@ -2615,8 +2615,7 @@
             document.getElementById('finSinalValor').value = formatCurrency(sinalValor);
         };
 
-        window.atualizarPreview = (u) => { const i = document.getElementById('previewImg'), t = document.getElementById('previewText'); if (u && u.length > 10) { i.src = u; i.style.display = 'block'; t.style.display = 'none' } else { i.style.display = 'none'; t.style.display = 'block' } };
-
+        
         let eventoID = null, bibliotecaGlobal = [], insumosCache = [], receitaAtual = [], idsNoEvento = [], eventoAtivoID = null;
         let chartD = null, chartH = null;
         let listaComprasCache = [];
@@ -3947,7 +3946,31 @@
         window.receitaAtual = [];
         window.idDrinkEditando = null;
 
-        // 4.1 CARREGAR DRINKS DA API ---
+        // 4.1 Atualiza DRINKS DA API ---
+        window.atualizarPreview = (u) => { 
+            const i = document.getElementById('previewImg');
+            const t = document.getElementById('previewText'); 
+            
+            if (u && u.length > 10) { 
+                i.src = u; 
+                i.style.display = 'block'; 
+                t.style.display = 'none'; 
+                
+                // Proteção: se a imagem do Supabase falhar ao carregar no HTML
+                i.onerror = () => {
+                    i.style.display = 'none';
+                    t.style.display = 'block';
+                    t.innerText = "Erro ao carregar imagem ❌";
+                };
+            } else { 
+                i.src = ''; // Limpa a imagem anterior
+                i.style.display = 'none'; 
+                t.style.display = 'block'; 
+                t.innerText = "Pré-visualização";
+            } 
+        };
+
+        // 4.2 CARREGAR DRINKS DA API ---
         window.carregarBiblioteca = async () => {
             try {
                 const res = await fetch(`${API_BASE}/drinks/${ACCOUNT_ID}`);
@@ -7891,47 +7914,63 @@
             const arquivo = event.target.files[0];
             if (!arquivo) return;
 
-            // Muda o texto do preview para mostrar que está carregando
-            document.getElementById('previewText').innerText = "Fazendo upload... ⏳";
-            document.getElementById('previewImg').style.display = 'none';
+            // 1. Pegamos os elementos visuais de forma organizada
+            const textElement = document.getElementById('previewText');
+            const imgElement = document.getElementById('previewImg');
+            const inputGlobal = document.getElementById('globalImg');
 
-            // Cria um nome único (ex: 171458902.jpg)
+            // 2. Muda o estado visual para "carregando"
+            textElement.innerText = "Fazendo upload... ⏳";
+            textElement.style.display = 'block';
+            imgElement.style.display = 'none';
+
+            // 3. Cria o nome único do arquivo
             const extensao = arquivo.name.split('.').pop();
             const nomeUnico = `${Date.now()}.${extensao}`;
-            
-            // Pode colocar dentro de uma subpasta se quiser, ou direto na raiz do bucket
             const caminhoSupabase = `${nomeUnico}`; 
 
             try {
-                // 1. Envia para o Supabase (bucket 'drinks')
-                const { data, error } = await supabase
+                // AJUSTE CRÍTICO 1: Busca a conexão do Supabase de forma segura, 
+                // independentemente de como ela foi declarada no topo do arquivo.
+                const clienteDb = window.supabase || window.supabaseClient || (typeof supabase !== 'undefined' ? supabase : null);
+                
+                if (!clienteDb) {
+                    throw new Error("Conexão com o Supabase não encontrada no arquivo.");
+                }
+
+                // 4. Envia para o Supabase (bucket 'drinks')
+                const { data, error } = await clienteDb
                     .storage
                     .from('drinks')
                     .upload(caminhoSupabase, arquivo);
 
                 if (error) throw error;
 
-                // 2. Pega a URL pública
-                const { data: urlData } = supabase
+                // 5. Pega a URL pública
+                const { data: urlData } = clienteDb
                     .storage
                     .from('drinks')
                     .getPublicUrl(caminhoSupabase);
 
                 const urlPublica = urlData.publicUrl;
 
-                // 3. Joga a URL no seu input antigo
-                document.getElementById('globalImg').value = urlPublica;
+                // 6. Joga a URL no input
+                if (inputGlobal) inputGlobal.value = urlPublica;
 
-                // 4. Aciona a SUA função original de preview
-                atualizarPreview(urlPublica);
-                
-                // Retorna o texto do preview ao normal
-                document.getElementById('previewText').innerText = "";
+                // AJUSTE CRÍTICO 2: Chama a função global usando "window." para garantir que ela seja encontrada
+                if (typeof window.atualizarPreview === 'function') {
+                    window.atualizarPreview(urlPublica);
+                }
 
             } catch (erro) {
                 console.error("Erro no upload:", erro.message);
-                alert("Falha ao subir a imagem. Verifique sua conexão e as permissões do Supabase.");
-                document.getElementById('previewText').innerText = "Erro no upload ❌";
+                alert(`Falha ao subir a imagem: ${erro.message}`);
+                textElement.innerText = "Erro no upload ❌";
+                textElement.style.display = 'block';
+            } finally {
+                // AJUSTE DE USABILIDADE: Limpa o input de arquivo no final.
+                // Isso permite que o usuário selecione a mesma foto de novo caso ele tenha apagado sem querer.
+                event.target.value = '';
             }
         });
 
