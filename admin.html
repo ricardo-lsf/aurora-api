@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aurora Admin V77 (Versão Completa e Estavel)</title>
+    <title>Aurora BarOS Admin (Versão Completa)</title>
 
     <script>
         // Verifica se o usuário tem o token de acesso salvo
@@ -20,6 +20,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        const supabaseUrl = 'https://xnvznbmwxvflavmnmxxx.supabase.co'; 
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhudnpuYm13eHZmbGF2bW5teHh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODkxNDMsImV4cCI6MjA4OTg2NTE0M30.EJNiqPeM57QO7b5mwGzem5U9hmftajWBFeeFb7Fxk2g';
+
+        window.supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    </script>
 
     <style>
 
