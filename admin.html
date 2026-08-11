@@ -7898,7 +7898,12 @@
                 
                 console.log("🔍 [Debug] Resposta da API recebida:", resposta.status);
                 
-                if (!resposta.ok) throw new Error(`API retornou erro ${resposta.status}`);
+                if (!resposta.ok) {
+                // Captura o JSON detalhado do erro do FastAPI
+                const erroDetalhado = await resposta.json();
+                console.error("🚨 [Debug] O FastAPI rejeitou com os detalhes:", erroDetalhado);
+                throw new Error(JSON.stringify(erroDetalhado.detail || erroJson));
+                }
                 
                 const receitas = await resposta.json();
                 console.log("🔍 [Debug] Dados recebidos:", receitas);
