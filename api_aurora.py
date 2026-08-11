@@ -223,6 +223,20 @@ class EventoPayload(BaseModel):
     event_type: Optional[str] = None
     upfront_perc: Optional[float] = 0.0
 
+class ImportPackPayload(BaseModel):
+    account_id: str           # ID da agência do cliente que está comprando
+    master_account_id: str    # ID da conta Aurora (Onde ficam os drinks perfeitos)
+    sufixo: str = " (Premium)" # Adiciona isso no nome para não dar conflito de nome repetido
+
+# ==========================================
+# PAYLOAD: RECEITAS AVULSAS
+# ==========================================
+class ImportSelectedPayload(BaseModel):
+    account_id: str
+    master_account_id: str
+    cocktail_ids: List[str]  # Aqui recebemos a lista de IDs ex: ["id1", "id2"]
+    sufixo: str = " (Marketplace)"
+
 # ==========================================
 # ROTA PARA EXIBIR A LOGO
 # ==========================================
@@ -2990,11 +3004,6 @@ def deletar_cocktail(cocktail_id: str, account_id: str):
     finally:
         if conn: conn.close()
 
-class ImportPackPayload(BaseModel):
-    account_id: str           # ID da agência do cliente que está comprando
-    master_account_id: str    # ID da conta Aurora (Onde ficam os drinks perfeitos)
-    sufixo: str = " (Premium)" # Adiciona isso no nome para não dar conflito de nome repetido
-
 # ==========================================
 # ROTA DE MARKETPLACE: IMPORTAR PACOTE
 # ==========================================
@@ -3098,7 +3107,105 @@ def importar_pacote_premium(payload: ImportPackPayload):
         if conn: conn.close()
 
 
-import json # Garanta que a biblioteca json esteja importada no topo do arquivo
+# ==========================================
+# ROTA DE MARKETPLACE: IMPORTAR AVULSOS
+# ==========================================
+@app.post("/marketplace/import-selected")
+def importar_receitas_avulsas(payload: ImportSelectedPayload):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+
+        # 1. Busca APENAS os drinks selecionados da conta Mestre usando ANY
+        cur.execute("""
+            SELECT * FROM cocktails 
+            WHERE account_id = %s::uuid AND id = ANY(%s::uuid[])
+        """, (payload.master_account_id, payload.cocktail_ids))
+        
+        drinks_mestre = cur.fetchall()
+
+        if not drinks_mestre:
+            raise HTTPException(status_code=404, detail="Nenhuma receita encontrada para os IDs informados.")
+
+        mapa_ingredientes = {}
+        drinks_importados = 0
+
+        # 2. Loop principal: Clonar os drinks um a um
+        for drink in drinks_mestre:
+            nome_importado = f"{drink['name']}{payload.sufixo}"
+            
+            # Trava de segurança: Verifica se já existe para não duplicar
+            cur.execute("SELECT id FROM cocktails WHERE account_id = %s::uuid AND name = %s", 
+                       (payload.account_id, nome_importado))
+            if cur.fetchone():
+                continue
+
+            # Insere o drink para o cliente
+            cur.execute("""
+                INSERT INTO cocktails (
+                    account_id, name, category, drink_type, technique, 
+                    preparation_steps, description, sale_price, image_url, min_package_level
+                ) VALUES (%s::uuid, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
+            """, (
+                payload.account_id, nome_importado, drink['category'], drink['drink_type'],
+                drink['technique'], drink['preparation_steps'], drink['description'],
+                drink['sale_price'], drink['image_url'], drink['min_package_level']
+            ))
+            novo_drink_id = cur.fetchone()['id']
+            drinks_importados += 1
+
+            # 3. Puxa a receita (ingredientes) do drink mestre
+            cur.execute("""
+                SELECT * FROM cocktail_ingredients WHERE cocktail_id = %s::uuid
+            """, (drink['id'],))
+            receita_mestre = cur.fetchall()
+
+            for item in receita_mestre:
+                ingrediente_mestre_id = item['ingredient_id']
+                
+                # Traduz ingrediente (busca ou cria no cliente)
+                if ingrediente_mestre_id not in mapa_ingredientes:
+                    cur.execute("SELECT * FROM ingredients WHERE id = %s::uuid", (ingrediente_mestre_id,))
+                    ing_original = cur.fetchone()
+
+                    cur.execute("""
+                        SELECT id FROM ingredients 
+                        WHERE account_id = %s::uuid AND name = %s AND type_id = %s::uuid
+                    """, (payload.account_id, ing_original['name'], ing_original['type_id']))
+                    ing_cliente = cur.fetchone()
+
+                    if ing_cliente:
+                        mapa_ingredientes[ingrediente_mestre_id] = ing_cliente['id']
+                    else:
+                        cur.execute("""
+                            INSERT INTO ingredients (
+                                account_id, type_id, name, brand, measurement_unit, package_quantity, current_cost_price
+                            ) VALUES (%s::uuid, %s::uuid, %s, %s, %s, %s, %s) RETURNING id;
+                        """, (
+                            payload.account_id, ing_original['type_id'], ing_original['name'], 
+                            ing_original['brand'], ing_original['measurement_unit'], 
+                            ing_original['package_quantity'], ing_original['current_cost_price']
+                        ))
+                        mapa_ingredientes[ingrediente_mestre_id] = cur.fetchone()['id']
+
+                # 4. Liga o ingrediente traduzido ao novo drink
+                cur.execute("""
+                    INSERT INTO cocktail_ingredients (cocktail_id, ingredient_id, quantity)
+                    VALUES (%s::uuid, %s::uuid, %s)
+                """, (novo_drink_id, mapa_ingredientes[ingrediente_mestre_id], item['quantity']))
+
+        conn.commit()
+        return {
+            "status": "sucesso", 
+            "mensagem": f"{drinks_importados} receita(s) importada(s) com sucesso!",
+            "ingredientes_processados": len(mapa_ingredientes)
+        }
+
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: conn.close()
 
 # ==========================================
 # ROTA 1: CRIAR EVENTO VIA ORÇAMENTO (PONTE FINALIZADA)

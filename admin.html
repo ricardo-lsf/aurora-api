@@ -7741,6 +7741,76 @@
         };
 
         // ==========================================
+        // FUNÇÃO DA LOJA VIRTUAL: RECEITAS AVULSAS
+        // ==========================================
+        window.comprarReceitasAvulsas = async (arrayDeIdsSelecionados) => {
+            // 1. Valida se o usuário selecionou algo
+            if (!arrayDeIdsSelecionados || arrayDeIdsSelecionados.length === 0) {
+                alert("⚠️ Selecione pelo menos uma receita para importar.");
+                return;
+            }
+
+            const confirmacao = confirm(`💳 Confirmar a aquisição de ${arrayDeIdsSelecionados.length} receita(s) para a sua agência?`);
+            if (!confirmacao) return;
+
+            // 2. Interface de carregamento (Assumindo que haja um botão principal de "Comprar Carrinho")
+            const btn = document.getElementById('btnComprarAvulso'); 
+            const textoOriginal = btn ? btn.innerHTML : 'Comprar Selecionados';
+            
+            if (btn) {
+                btn.innerHTML = "⏳ Importando (Aguarde)...";
+                btn.disabled = true;
+            }
+
+            // ⚠️ COFRE DA AURORA
+            const masterId = "defbe4d2-aeaa-454f-99b2-064b7e52ccc2"; 
+
+            // 3. Monta o payload para a nova rota Python
+            const dados = {
+                account_id: localStorage.getItem('account_id'),
+                master_account_id: masterId,
+                cocktail_ids: arrayDeIdsSelecionados, // Array com os IDs via parâmetro
+                sufixo: " (Marketplace)"
+            };
+
+            try {
+                const resposta = await fetch(`${API_BASE}/marketplace/import-selected`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                if (!resposta.ok) {
+                    const erro = await resposta.json();
+                    throw new Error(erro.detail || "Erro ao importar as receitas.");
+                }
+
+                const retorno = await resposta.json();
+                
+                // 4. Feedback de Sucesso
+                alert(`✅ SUCESSO! \n\n${retorno.mensagem}\nForam analisados e adicionados ${retorno.ingredientes_processados} insumos ao seu estoque.`);
+                
+                if (btn) {
+                    btn.innerHTML = "✔️ Receitas Adquiridas";
+                    btn.style.background = "#27ae60"; // Fica Verde
+                    btn.style.boxShadow = "none";
+                }
+                
+                // Opcional: Recarrega a biblioteca para exibir os novos itens
+                if (typeof window.carregarBiblioteca === 'function') {
+                    window.carregarBiblioteca();
+                }
+                
+            } catch (e) {
+                alert("❌ Erro na transação: " + e.message);
+                if (btn) {
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        // ==========================================
         // DASHBOARD AUDITORIA
         // CARREGAR SELECT DE EVENTOS
         // ==========================================
