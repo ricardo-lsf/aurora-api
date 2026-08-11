@@ -2435,38 +2435,41 @@
 <script type="module">
 
     function showView(viewId, element) {
-    // 1. Esconde todas as seções de conteúdo
-    document.querySelectorAll('.view-section').forEach(view => {
-        view.style.display = 'none';
-    });
+        // 1. Esconde todas as seções de conteúdo
+        document.querySelectorAll('.view-section').forEach(view => {
+            view.style.display = 'none';
+        });
 
-    // 2. Mostra a seção que você clicou
-    const targetView = document.getElementById(viewId);
-    if (targetView) {
-        targetView.style.display = 'block';
-    }
+        // 2. Mostra a seção que você clicou
+        const targetView = document.getElementById(viewId);
+        if (targetView) {
+            targetView.style.display = 'block';
+        }
 
-    // 3. Remove a classe 'active' de todos os itens do menu
-    document.querySelectorAll('.menu-item').forEach(item => {
-        item.classList.remove('active');
-    });
+        // 3. Remove a classe 'active' de todos os itens do menu
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.classList.remove('active');
+        });
 
-    // 4. Adiciona a classe 'active' no botão que foi clicado
-    if (element) {
-        element.classList.add('active');
-    }
+        // 4. Adiciona a classe 'active' no botão que foi clicado
+        if (element) {
+            element.classList.add('active');
+        }
 
-    // 5. Fecha o menu mobile caso esteja aberto (opcional)
-    if (typeof toggleMenu === "function") {
-        const sidebar = document.getElementById('mainSidebar');
-        if (sidebar && sidebar.classList.contains('open')) {
-            toggleMenu();
+        // 5. Fecha o menu mobile caso esteja aberto (opcional)
+        if (typeof toggleMenu === "function") {
+            const sidebar = document.getElementById('mainSidebar');
+            if (sidebar && sidebar.classList.contains('open')) {
+                toggleMenu();
+            }
+        }
+
+        // 🚀 6. GATILHO AUTOMÁTICO DA LOJA
+        // Se a view aberta for a da loja, dispara o carregamento dos cards do cofre sozinho!
+        if (viewId === 'view-loja' && typeof window.carregarLoja === 'function') {
+            window.carregarLoja();
         }
     }
-}
-
-
-
         // ============================================================
         // 0. VARIÁVEIS GLOBAIS E CREDENCIAIS (SEMPRE NO TOPO)
         // ============================================================
