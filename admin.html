@@ -2153,6 +2153,41 @@
                         <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco</div>
                     </div>
                 </div>
+
+                <!-- BARRA DE COMPRA AVULSA -->
+                <div class="glass-panel p-4 rounded-xl mb-6 flex justify-between items-center border border-white/10">
+                    <div>
+                        <h2 class="text-on-surface font-semibold text-lg">Receitas Avulsas</h2>
+                        <p class="text-on-surface-variant text-sm" id="contador-selecionadas">0 receita(s) selecionada(s)</p>
+                    </div>
+                    
+                    <button id="btnComprarAvulso" 
+                            onclick="window.chamarCompraAvulsa()" 
+                            disabled
+                            class="px-6 py-2 bg-aurora-purple text-white rounded-md font-medium hover:bg-aurora-purple/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-aurora-purple/20">
+                        Comprar Selecionadas
+                    </button>
+                </div>
+
+                <!-- Exemplo de como a div da foto do card deve ficar na sua função de renderizar a Loja -->
+                <div class="h-48 relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent z-10"></div>
+                    <img class="w-full h-full object-cover" src="${foto}" alt="${nome}">
+                    
+                    <!-- AQUI ESTÁ A MÁGICA: O Checkbox no topo esquerdo do card -->
+                    <div class="absolute top-3 left-3 z-30">
+                        <input type="checkbox" 
+                            class="receita-checkbox w-5 h-5 rounded border-white/30 bg-black/50 text-aurora-purple focus:ring-aurora-purple cursor-pointer" 
+                            value="${id_do_drink}" 
+                            onchange="window.atualizarContador()">
+                    </div>
+                    
+                    <div class="absolute top-3 right-3 z-20">
+                        <span class="backdrop-blur-sm text-xs px-2 py-1 rounded border bg-surface-dim/80 text-on-surface border-white/10">
+                            R$ ${preco}
+                        </span>
+                    </div>
+                </div>
         </div>
 
     </main>
@@ -7808,6 +7843,40 @@
                     btn.disabled = false;
                 }
             }
+        };
+
+        // Atualiza o texto e destrava o botão quando o usuário marca um checkbox
+        window.atualizarContador = () => {
+            // Pega todos os checkboxes que estão com o "check" marcado
+            const marcados = document.querySelectorAll('.receita-checkbox:checked');
+            const contador = document.getElementById('contador-selecionadas');
+            const btnComprar = document.getElementById('btnComprarAvulso');
+
+            if (contador) {
+                contador.innerText = `${marcados.length} receita(s) selecionada(s)`;
+            }
+            
+            // Se não tiver nada marcado, desabilita o botão
+            if (btnComprar) {
+                btnComprar.disabled = marcados.length === 0;
+            }
+        };
+
+        // Dispara quando o usuário clica no botão "Comprar Selecionadas"
+        window.chamarCompraAvulsa = () => {
+            // Pega os elementos marcados
+            const checkboxes = document.querySelectorAll('.receita-checkbox:checked');
+            
+            // Transforma a lista de elementos HTML em um Array só com os IDs (ex: ['id_1', 'id_2'])
+            const idsSelecionados = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (idsSelecionados.length === 0) {
+                alert("Selecione pelo menos uma receita marcando as caixinhas nos cards!");
+                return;
+            }
+
+            // Chama a função de compra que fizemos no passo anterior, passando o Array!
+            window.comprarReceitasAvulsas(idsSelecionados);
         };
 
         // ==========================================
