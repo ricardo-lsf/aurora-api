@@ -2139,55 +2139,40 @@
         </div>
 
         <div id="view-loja" class="view-section" style="display: none;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🛒 Loja Aurora (Marketplace)</h2>
-                <p style="color: #7f8c8d; margin-bottom: 20px;">Evolua o seu bar adquirindo pacotes prontos de receitas e insumos.</p>
+            <h2 style="color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px;">🛒 Loja Aurora (Marketplace)</h2>
+            <p style="color: #7f8c8d; margin-bottom: 20px;">Evolua o seu bar adquirindo pacotes prontos de receitas e insumos.</p>
+            
+            <div class="premium-banner">
+                <div class="premium-banner-info">
+                    <h2>👑 Pack Masterclass IBA</h2>
+                    <p>Importe instantaneamente 32 receitas oficiais da International Bartenders Association para o seu sistema. Fichas técnicas completas com fotos, modo de preparo e os insumos necessários vinculados automaticamente ao seu estoque.</p>
+                </div>
+                <div style="text-align: right; min-width: 250px;">
+                    <div class="premium-price">R$ 29,90</div>
+                    <button id="btnComprarIBA" class="btn-premium" onclick="comprarPacoteIBA()">📥 Importar Pacote</button>
+                    <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco</div>
+                </div>
+            </div>
+
+            <!-- BARRA DE COMPRA AVULSA -->
+            <div class="glass-panel p-4 rounded-xl mb-6 flex justify-between items-center border border-white/10">
+                <div>
+                    <h2 class="text-on-surface font-semibold text-lg">Receitas Avulsas</h2>
+                    <p class="text-on-surface-variant text-sm" id="contador-selecionadas">0 receita(s) selecionada(s)</p>
+                </div>
                 
-                <div class="premium-banner">
-                    <div class="premium-banner-info">
-                        <h2>👑 Pack Masterclass IBA</h2>
-                        <p>Importe instantaneamente 32 receitas oficiais da International Bartenders Association para o seu sistema. Fichas técnicas completas com fotos, modo de preparo e os insumos necessários vinculados automaticamente ao seu estoque.</p>
-                    </div>
-                    <div style="text-align: right; min-width: 250px;">
-                        <div class="premium-price">R$ 29,90</div>
-                        <button id="btnComprarIBA" class="btn-premium" onclick="comprarPacoteIBA()">📥 Importar Pacote</button>
-                        <div style="margin-top: 10px; font-size: 0.85em; color: #e0e0e0;">Liberação imediata no banco</div>
-                    </div>
-                </div>
+                <button id="btnComprarAvulso" 
+                        onclick="window.chamarCompraAvulsa()" 
+                        disabled
+                        class="px-6 py-2 bg-aurora-purple text-white rounded-md font-medium hover:bg-aurora-purple/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-aurora-purple/20">
+                    Comprar Selecionadas
+                </button>
+            </div>
+            
+            <!-- ONDE OS CARDS VÃO APARECER -->
+            <!-- Mantenha a div onde o seu JavaScript vai injetar os cards da loja (exemplo: id="grid-loja") -->
+            <div id="grid-loja" class="grid-layout"></div>
 
-                <!-- BARRA DE COMPRA AVULSA -->
-                <div class="glass-panel p-4 rounded-xl mb-6 flex justify-between items-center border border-white/10">
-                    <div>
-                        <h2 class="text-on-surface font-semibold text-lg">Receitas Avulsas</h2>
-                        <p class="text-on-surface-variant text-sm" id="contador-selecionadas">0 receita(s) selecionada(s)</p>
-                    </div>
-                    
-                    <button id="btnComprarAvulso" 
-                            onclick="window.chamarCompraAvulsa()" 
-                            disabled
-                            class="px-6 py-2 bg-aurora-purple text-white rounded-md font-medium hover:bg-aurora-purple/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-aurora-purple/20">
-                        Comprar Selecionadas
-                    </button>
-                </div>
-
-                <!-- Exemplo de como a div da foto do card deve ficar na sua função de renderizar a Loja -->
-                <div class="h-48 relative overflow-hidden">
-                    <div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent z-10"></div>
-                    <img class="w-full h-full object-cover" src="${foto}" alt="${nome}">
-                    
-                    <!-- AQUI ESTÁ A MÁGICA: O Checkbox no topo esquerdo do card -->
-                    <div class="absolute top-3 left-3 z-30">
-                        <input type="checkbox" 
-                            class="receita-checkbox w-5 h-5 rounded border-white/30 bg-black/50 text-aurora-purple focus:ring-aurora-purple cursor-pointer" 
-                            value="${id_do_drink}" 
-                            onchange="window.atualizarContador()">
-                    </div>
-                    
-                    <div class="absolute top-3 right-3 z-20">
-                        <span class="backdrop-blur-sm text-xs px-2 py-1 rounded border bg-surface-dim/80 text-on-surface border-white/10">
-                            R$ ${preco}
-                        </span>
-                    </div>
-                </div>
         </div>
 
     </main>
@@ -7878,6 +7863,91 @@
             // Chama a função de compra que fizemos no passo anterior, passando o Array!
             window.comprarReceitasAvulsas(idsSelecionados);
         };
+
+        // ==========================================
+        // FUNÇÃO PARA RENDERIZAR A LOJA VIRTUAL
+        // ==========================================
+        window.carregarLoja = async () => {
+            const gridLoja = document.getElementById('grid-loja');
+            
+            if (!gridLoja) return;
+
+            gridLoja.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">Carregando receitas disponíveis...</p>';
+
+            // ⚠️ COFRE DA AURORA
+            const masterId = "defbe4d2-aeaa-454f-99b2-064b7e52ccc2"; 
+
+            try {
+                const resposta = await fetch(`${API_BASE}/cocktails?account_id=${masterId}`);
+                
+                if (!resposta.ok) throw new Error("Não foi possível carregar a loja.");
+                
+                const receitas = await resposta.json();
+                
+                gridLoja.innerHTML = '';
+                
+                if (!receitas || receitas.length === 0) {
+                    gridLoja.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">Nenhuma receita disponível no momento.</p>';
+                    return;
+                }
+
+                // Cria um fragmento na memória para não sobrecarregar a renderização da tela
+                const fragmento = document.createDocumentFragment();
+
+                receitas.forEach(receita => {
+                    
+                    // Lembre-se de colocar um URL real no fallback abaixo
+                    const imagemSrc = receita.foto_url || 'https://sua-url-do-supabase.com/imagem-padrao.jpg';
+                    
+                    // Preço formatado com vírgula
+                    const precoExibicao = receita.preco ? receita.preco.toFixed(2).replace('.', ',') : '1,90';
+
+                    const card = document.createElement('div');
+                    card.className = "card-receita relative rounded-xl overflow-hidden shadow-lg bg-surface"; 
+
+                    card.innerHTML = `
+                        <div class="h-48 relative overflow-hidden" style="height: 192px; position: relative;">
+                            <div class="absolute inset-0 bg-gradient-to-t from-surface-dim to-transparent z-10" style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); z-index: 10;"></div>
+                            
+                            <img class="w-full h-full object-cover" 
+                                style="width: 100%; height: 100%; object-fit: cover;" 
+                                src="${imagemSrc}" 
+                                alt="${receita.nome}">
+                            
+                            <div class="absolute top-3 left-3 z-30" style="position: absolute; top: 12px; left: 12px; z-index: 30;">
+                                <input type="checkbox" 
+                                    class="receita-checkbox w-5 h-5 cursor-pointer" 
+                                    value="${receita.id}" 
+                                    onchange="window.atualizarContador()">
+                            </div>
+                            
+                            <div class="absolute top-3 right-3 z-20" style="position: absolute; top: 12px; right: 12px; z-index: 20;">
+                                <span class="backdrop-blur-sm text-xs px-2 py-1 rounded border bg-black/80 text-white border-white/10">
+                                    R$ ${precoExibicao}
+                                </span>
+                            </div>
+                            
+                            <div class="absolute bottom-3 left-3 z-20" style="position: absolute; bottom: 12px; left: 12px; z-index: 20;">
+                                <h3 class="text-white font-bold" style="color: white; margin: 0; text-shadow: 1px 1px 2px black;">
+                                    ${receita.nome}
+                                </h3>
+                            </div>
+                        </div>
+                    `;
+
+                    // Adiciona o card no fragmento (na memória)
+                    fragmento.appendChild(card);
+                });
+
+                // Injeta todos os cards de uma vez só no HTML real
+                gridLoja.appendChild(fragmento);
+
+            } catch (erro) {
+                console.error("Erro ao carregar a loja:", erro);
+                gridLoja.innerHTML = `<p style="color: #e74c3c; padding: 20px;">Erro ao carregar receitas: ${erro.message}</p>`;
+            }
+        };
+
 
         // ==========================================
         // DASHBOARD AUDITORIA
