@@ -7871,28 +7871,36 @@
         // FUNÇÃO PARA RENDERIZAR A LOJA VIRTUAL
         // ==========================================
         window.carregarLoja = async () => {
+            console.log("🔍 [Debug] Função carregarLoja iniciada!");
             const gridLoja = document.getElementById('grid-loja');
-            
-            if (!gridLoja) return;
+            if (!gridLoja) {
+                console.error("❌ [Debug] Elemento 'grid-loja' não encontrado no HTML!");
+                return;
+            }
 
-            gridLoja.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">Carregando receitas disponíveis...</p>';
+            gridLoja.innerHTML = '<p>Carregando...</p>';
 
-            // ⚠️ COFRE DA AURORA
             const masterId = "defbe4d2-aeaa-454f-99b2-064b7e52ccc2"; 
 
             try {
+                console.log(`🔍 [Debug] Buscando em: ${API_BASE}/cocktails?account_id=${masterId}`);
+                
                 const resposta = await fetch(`${API_BASE}/cocktails?account_id=${masterId}`);
                 
-                if (!resposta.ok) throw new Error("Não foi possível carregar a loja.");
+                console.log("🔍 [Debug] Resposta da API recebida:", resposta.status);
+                
+                if (!resposta.ok) throw new Error(`API retornou erro ${resposta.status}`);
                 
                 const receitas = await resposta.json();
-                
-                gridLoja.innerHTML = '';
-                
+                console.log("🔍 [Debug] Dados recebidos:", receitas);
+
                 if (!receitas || receitas.length === 0) {
-                    gridLoja.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">Nenhuma receita disponível no momento.</p>';
+                    console.log("⚠️ [Debug] Nenhum dado retornado.");
+                    gridLoja.innerHTML = '<p>Nenhuma receita disponível.</p>';
                     return;
                 }
+
+                gridLoja.innerHTML = '';
 
                 // Cria um fragmento na memória para não sobrecarregar a renderização da tela
                 const fragmento = document.createDocumentFragment();
@@ -7946,8 +7954,8 @@
                 gridLoja.appendChild(fragmento);
 
             } catch (erro) {
-                console.error("Erro ao carregar a loja:", erro);
-                gridLoja.innerHTML = `<p style="color: #e74c3c; padding: 20px;">Erro ao carregar receitas: ${erro.message}</p>`;
+                console.error("🚨 [Debug] Ocorreu um erro:", erro);
+                gridLoja.innerHTML = `<p style="color:red">Erro: ${erro.message}</p>`;
             }
         };
 
