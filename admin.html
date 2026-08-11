@@ -7885,7 +7885,16 @@
             try {
                 console.log(`🔍 [Debug] Buscando em: ${API_BASE}/cocktails?account_id=${masterId}`);
                 
-                const resposta = await fetch(`${API_BASE}/cocktails?account_id=${masterId}`);
+                // Mudamos de fetch simples para uma requisição POST
+                const resposta = await fetch(`${API_BASE}/cocktails`, {
+                    method: 'POST', 
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account_id: masterId // Enviamos o ID no corpo da requisição
+                    })
+                });
                 
                 console.log("🔍 [Debug] Resposta da API recebida:", resposta.status);
                 
