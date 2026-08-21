@@ -204,6 +204,30 @@
 
     <script type="module">
     
+    // 1. Olha para o link que o usuário clicou e procura o account_id
+    const urlParams = new URLSearchParams(window.location.search);
+    const idNaUrl = urlParams.get('account_id');
+
+    // 2. Se o link veio com o ID, salva na memória do celular/PC (LocalStorage)
+    if (idNaUrl) {
+        localStorage.setItem('account_id', idNaUrl);
+        
+        // Opcional: Limpa a URL para o cliente não ficar vendo o ID feio lá em cima
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 3. Agora o sistema tenta pegar o ID que está salvo na memória
+    const accountId = localStorage.getItem('account_id');
+
+    // 4. A validação que você já tem:
+    if (!accountId) {
+        alert("Terminal não configurado! A agência (account_id) não foi encontrada no dispositivo.");
+        // Dica extra: Aqui você poderia exibir um <input> na tela pedindo para a pessoa digitar o Código da Agência
+    } else {
+        console.log("Terminal configurado para a agência:", accountId);
+        // Dispara a função que carrega os drinks e inicia o PDV
+    }
+
     const API_BASE = "https://aurora-api-zj8e.onrender.com";
 
         // --- FUNÇÃO PARA FORMATAR O TELEFONE NA TELA DE LOGIN ---
