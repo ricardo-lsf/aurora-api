@@ -305,6 +305,9 @@
                     localStorage.setItem('usuarioLogado', usuarioAtual);
                     localStorage.setItem('usuarioRole', usuario.role); 
                     
+                    // 👇 ADICIONE ESTA LINHA AQUI 👇
+                    localStorage.setItem('bartenderPhone', tel);
+
                     document.getElementById('user-display').innerText = "👤 " + usuarioAtual;
                     document.getElementById('login-overlay').style.display = 'none'; 
                     
@@ -396,7 +399,17 @@
 
             try {
                 // Bate na nova rota Python que criamos!
-                const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/event/${eventoID}`);
+                // Puxa o telefone do bartender que salvamos no login
+                const telefoneBartender = localStorage.getItem('bartenderPhone');
+
+                // Monta a URL. Se tiver telefone logado, passa na URL; se não tiver, busca o acumulado.
+                let url = `${API_BASE}/sales/event/${eventoID}`;
+                if (telefoneBartender) {
+                    url += `?bartender_phone=${telefoneBartender}`;
+                }
+
+                const resposta = await fetch(url);
+
                 if (!resposta.ok) throw new Error("Falha ao buscar histórico.");
                 
                 const vendasNoBanco = await resposta.json();

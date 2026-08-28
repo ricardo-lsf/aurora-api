@@ -1369,7 +1369,7 @@ def estornar_venda(payload: EstornoVenda):
 # ROTA: RESGATE DE HISTÓRICO (ANTI-F5)
 # ==========================================
 @app.get("/sales/event/{event_id}")
-def listar_vendas_evento(event_id: str):
+def listar_vendas_evento(event_id: str, bartender_phone: str = None):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -1377,14 +1377,25 @@ def listar_vendas_evento(event_id: str):
     try:
         cur = conn.cursor()
         
-        # 🕒 CORREÇÃO 1: Adicionado o "created_at" no SELECT e na ORDENAÇÃO
+        # 1. Monta a base da consulta
         query = """
             SELECT id, cocktail_id, price, user_name, created_at
             FROM sales 
             WHERE event_id = %s
-            ORDER BY created_at ASC
         """
-        cur.execute(query, (event_id,))
+        parametros = [event_id]
+        
+        # 2. A MÁGICA DO FILTRO: Se veio o telefone do front-end, isola as vendas!
+        if bartender_phone:
+            # Substitua 'user_phone' pelo nome real da coluna de telefone na sua tabela 'sales', se for diferente.
+            query += " AND phone = %s"
+            parametros.append(bartender_phone)
+            
+        # 3. Adiciona a ordenação no final
+        query += " ORDER BY created_at ASC"
+        
+        # Executa passando os parâmetros dinâmicos
+        cur.execute(query, tuple(parametros))
         vendas = cur.fetchall()
         
         resultado = []
@@ -1394,7 +1405,6 @@ def listar_vendas_evento(event_id: str):
                 "cocktail_id": str(v[1]),
                 "price": float(v[2]) if v[2] else 0.0,
                 "user_name": str(v[3]) if v[3] else "Desconhecido",
-                # 🕒 CORREÇÃO 2: Pega o 5º item (índice 4) e transforma em texto para o JSON não quebrar
                 "created_at": str(v[4]) if v[4] else None
             })
             
