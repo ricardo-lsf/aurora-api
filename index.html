@@ -391,69 +391,75 @@
         });
 
         // ============================================================
-        // --- MÁQUINA DO TEMPO: RESGATE DE HISTÓRICO DO POSTGRESQL ---
+        // --- MÁQUINA DO TEMPO: RESGATE DE HISTÓRICO BLINDADO ---
         // ============================================================
         window.sincronizarDadosDoBanco = async () => {
             if (!eventoID) return;
             console.log("⏳ Sincronizando histórico com o servidor...");
 
             try {
-                // Bate na nova rota Python que criamos!
                 const telefoneBartender = localStorage.getItem('bartenderPhone');
 
-                // Monta a URL com o filtro
                 let url = `${API_BASE}/sales/event/${eventoID}`;
-                if (telefoneBartender) {
-                    url += `?bartender_phone=${telefoneBartender}`;
+                // Só manda o telefone se ele realmente existir para evitar sujeira na query
+                if (telefoneBartender && telefoneBartender !== "null" && telefoneBartender !== "undefined") {
+                    url += `?bartender_phone=${encodeURIComponent(telefoneBartender)}`;
                 }
 
-                const resposta = await fetch(url);
+                let resposta = await fetch(url);
 
-                if (!resposta.ok) throw new Error("Falha ao buscar histórico.");
+                // 🛡️ PLANO B: Se der erro 400 (provavelmente o filtro de telefone falhou no backend),
+                // tenta buscar o histórico geral do evento sem o filtro de telefone para não zerar a tela!
+                if (resposta.status === 400 && telefoneBartender) {
+                    console.warn("⚠️ Filtro por telefone rejeitado (400). Tentando buscar histórico geral do evento...");
+                    const urlGeral = `${API_BASE}/sales/event/${eventoID}`;
+                    resposta = await fetch(urlGeral);
+                }
+
+                if (!resposta.ok) {
+                    const erroDetalhe = await resposta.text();
+                    throw new Error(`Falha ao buscar histórico (${resposta.status}): ${erroDetalhe}`);
+                }
                 
                 const vendasNoBanco = await resposta.json();
 
-                // 👇 CORREÇÃO: Zera o counts E a memória localLogs!
                 counts = {}; 
-                localLogs = []; // <-- Isso impedia a tela de segurar os dados!
+                localLogs = [];
                 
                 const listaLogs = document.getElementById('lista-logs');
                 if (listaLogs) listaLogs.innerHTML = ''; 
 
-                vendasNoBanco.forEach(venda => {
-                    // Reconstrói o gráfico (counts)
+                // Garante que é um array antes de iterar
+                const listaVendas = Array.isArray(vendasNoBanco) ? vendasNoBanco : (vendasNoBanco.sales || vendasNoBanco.dados || []);
+
+                listaVendas.forEach(venda => {
                     if (!counts[venda.cocktail_id]) counts[venda.cocktail_id] = 0;
                     counts[venda.cocktail_id]++;
 
                     const drink = drinks.find(d => d.id === venda.cocktail_id);
-                    const nomeDoDrink = drink ? drink.nome : "Drink Desconhecido";
+                    const nomeDoDrink = drink ? drink.nome : (venda.drink_name || "Drink Desconhecido");
 
-                    // Captura a hora do Python
                     const horaDoBanco = venda.created_at || venda.timestamp || venda.data || venda.sale_time || venda.hora || venda.date || null;
 
-                    // 👇 CORREÇÃO: Repovoa o cérebro do JavaScript (array localLogs)
                     localLogs.push({
-                        id: venda.id,
+                        id: venda.id || venda.sale_id,
                         nome: nomeDoDrink,
                         cocktail_id: venda.cocktail_id,
                         timestamp: horaDoBanco
                     });
 
-                    // Adiciona visualmente na tela
                     if (typeof adicionarLog === 'function') {
-                        adicionarLog(nomeDoDrink, 1, venda.id, venda.cocktail_id, horaDoBanco);
+                        adicionarLog(nomeDoDrink, 1, venda.id || venda.sale_id, venda.cocktail_id, horaDoBanco);
                     }
                 });
 
-                // Salva o counts sincronizado na memória e atualiza a tela
                 localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
-                
-                // Agora o renderizar vai ler o localLogs cheio e desenhar corretamente!
                 renderizar();
-                console.log("✅ Histórico sincronizado com sucesso! Encontradas", vendasNoBanco.length, "vendas.");
+                console.log("✅ Histórico sincronizado com sucesso! Encontradas", listaVendas.length, "vendas.");
 
             } catch (e) {
                 console.error("🚨 Erro ao sincronizar com o banco:", e);
+                // Não limpamos o counts aqui para preservar o que está no localStorage caso caia a rede/API
             }
         };
         
