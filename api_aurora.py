@@ -1377,25 +1377,30 @@ def listar_vendas_evento(event_id: str, bartender_phone: str = None):
     try:
         cur = conn.cursor()
         
-        # 1. Monta a base da consulta
-        query = """
-            SELECT id, cocktail_id, price, user_name, created_at
-            FROM sales 
-            WHERE event_id = %s
-        """
-        parametros = [event_id]
-        
-        # 2. A MÁGICA DO FILTRO: Se veio o telefone do front-end, isola as vendas!
+        # 1. Se veio o telefone, faz o JOIN com a tabela 'staff' cruzando o user_name
+        # O regexp_replace remove parênteses, traços e espaços dos dois lados para dar match perfeito
         if bartender_phone:
-            # Substitua 'user_phone' pelo nome real da coluna de telefone na sua tabela 'sales', se for diferente.
-            query += " AND phone = %s"
-            parametros.append(bartender_phone)
-            
-        # 3. Adiciona a ordenação no final
-        query += " ORDER BY created_at ASC"
+            query = """
+                SELECT s.id, s.cocktail_id, s.price, s.user_name, s.created_at
+                FROM sales s
+                JOIN staff st ON s.user_name = st.name
+                WHERE s.event_id = %s
+                  AND regexp_replace(st.phone, '\D', '', 'g') = regexp_replace(%s, '\D', '', 'g')
+                ORDER BY s.created_at ASC
+            """
+            parametros = (event_id, bartender_phone)
+        else:
+            # 2. Se não veio telefone, traz as vendas gerais do evento
+            query = """
+                SELECT id, cocktail_id, price, user_name, created_at
+                FROM sales 
+                WHERE event_id = %s
+                ORDER BY created_at ASC
+            """
+            parametros = (event_id,)
         
-        # Executa passando os parâmetros dinâmicos
-        cur.execute(query, tuple(parametros))
+        # Executa a consulta
+        cur.execute(query, parametros)
         vendas = cur.fetchall()
         
         resultado = []
