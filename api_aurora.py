@@ -131,6 +131,7 @@ class NovaVenda(BaseModel):
     cocktail_id: str
     price: float  # Se for Open Bar, o PDV vai mandar 0.00. Se for Cash Bar, manda o valor pago.
     user_name: Optional[str] = "Bartender"
+    staff_id: Optional[str] = None  # 👈 Chave estrangeira UUID do bartender
 
 class EstornoVenda(BaseModel):
     sale_id: str
@@ -1257,7 +1258,7 @@ def registrar_venda(payload: NovaVenda):
     try:
         cur = conn.cursor() 
         
-        # PASSO 1: Busca a receita e os custos (Removido o current_stock global que não usaremos)
+        # PASSO 1: Busca a receita e os custos
         query_receita = """
             SELECT 
                 ci.ingredient_id, 
@@ -1276,14 +1277,12 @@ def registrar_venda(payload: NovaVenda):
 
         custo_total_drink = 0.0
 
-        # ==========================================
-        # NOVO PASSO 2: BAIXA DE ESTOQUE POR EVENTO
-        # ==========================================
+        # PASSO 2: BAIXA DE ESTOQUE POR EVENTO
         for ing in ingredientes_receita:
             id_insumo = ing[0]
             qtd_necessaria = float(ing[1])
-            custo_garrafa = float(ing[2]) if ing[2] else 0.0 # Índice 2: Custo
-            tamanho_emb = float(ing[3]) if ing[3] and ing[3] > 0 else 1.0 # Índice 3: Embalagem
+            custo_garrafa = float(ing[2]) if ing[2] else 0.0
+            tamanho_emb = float(ing[3]) if ing[3] and ing[3] > 0 else 1.0
             
             # Cálculo do Frozen Cost
             custo_por_unidade = custo_garrafa / tamanho_emb
@@ -1300,13 +1299,20 @@ def registrar_venda(payload: NovaVenda):
             if cur.rowcount == 0:
                 raise Exception(f"Insumo ID {id_insumo} não foi alocado para este evento.")
 
-        # PASSO 3: Salva a venda
+        # PASSO 3: Salva a venda (agora gravando o staff_id)
         query_venda = """
-            INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO sales (event_id, cocktail_id, price, frozen_cost, user_name, staff_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
         """
-        cur.execute(query_venda, (payload.event_id, payload.cocktail_id, payload.price, custo_total_drink, payload.user_name))
+        cur.execute(query_venda, (
+            payload.event_id, 
+            payload.cocktail_id, 
+            payload.price, 
+            custo_total_drink, 
+            payload.user_name,
+            payload.staff_id
+        ))
         
         venda_id = cur.fetchone()[0]
 
@@ -1327,10 +1333,12 @@ def registrar_venda(payload: NovaVenda):
 # ==========================================
 # ROTA MESTRA 2: ESTORNAR VENDA E DEVOLVER ESTOQUE
 # ==========================================
-
 @app.post("/sales/cancel")
 def estornar_venda(payload: EstornoVenda):
     conn = get_db_connection()
+    if not conn:
+        raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
+        
     cur = conn.cursor()
     try:
         # 1. Busca o cocktail_id dessa venda para saber o que devolver ao estoque
@@ -1366,10 +1374,10 @@ def estornar_venda(payload: EstornoVenda):
         conn.close()
 
 # ==========================================
-# ROTA: RESGATE DE HISTÓRICO (ANTI-F5)
+# ROTA: RESGATE DE HISTÓRICO BLINDADO
 # ==========================================
 @app.get("/sales/event/{event_id}")
-def listar_vendas_evento(event_id: str, bartender_phone: str = None):
+def listar_vendas_evento(event_id: str, staff_id: str = None, bartender_phone: str = None):
     conn = get_db_connection()
     if not conn:
         raise HTTPException(status_code=500, detail="Erro de conexão com o banco")
@@ -1377,29 +1385,40 @@ def listar_vendas_evento(event_id: str, bartender_phone: str = None):
     try:
         cur = conn.cursor()
         
-        # 1. Se veio o telefone, faz o JOIN com a tabela 'staff' cruzando o user_name
-        # O regexp_replace remove parênteses, traços e espaços dos dois lados para dar match perfeito
-        if bartender_phone:
+        # 1. PREFERENCIAL: Busca direta por staff_id (Única, ultra-rápida e imune a homônimos)
+        if staff_id:
             query = """
-                SELECT s.id, s.cocktail_id, s.price, s.user_name, s.created_at
-                FROM sales s
-                JOIN staff st ON s.user_name = st.name
-                WHERE s.event_id = %s
-                  AND regexp_replace(st.phone, '\D', '', 'g') = regexp_replace(%s, '\D', '', 'g')
-                ORDER BY s.created_at ASC
+                SELECT id, cocktail_id, price, user_name, created_at, staff_id
+                FROM sales 
+                WHERE event_id = %s AND staff_id = %s
+                ORDER BY created_at ASC
+            """
+            parametros = (event_id, staff_id)
+
+        # 2. FALLBACK: Se o front antigo ainda enviar por telefone
+        elif bartender_phone:
+            query = """
+                SELECT id, cocktail_id, price, user_name, created_at, staff_id
+                FROM sales 
+                WHERE event_id = %s 
+                  AND staff_id IN (
+                      SELECT id FROM staff 
+                      WHERE regexp_replace(phone, '\D', '', 'g') = regexp_replace(%s, '\D', '', 'g')
+                  )
+                ORDER BY created_at ASC
             """
             parametros = (event_id, bartender_phone)
+
+        # 3. GERAL: Retorna todas as vendas do evento caso não passe nenhum filtro
         else:
-            # 2. Se não veio telefone, traz as vendas gerais do evento
             query = """
-                SELECT id, cocktail_id, price, user_name, created_at
+                SELECT id, cocktail_id, price, user_name, created_at, staff_id
                 FROM sales 
                 WHERE event_id = %s
                 ORDER BY created_at ASC
             """
             parametros = (event_id,)
         
-        # Executa a consulta
         cur.execute(query, parametros)
         vendas = cur.fetchall()
         
@@ -1408,14 +1427,14 @@ def listar_vendas_evento(event_id: str, bartender_phone: str = None):
             resultado.append({
                 "id": str(v[0]),
                 "cocktail_id": str(v[1]),
-                "price": float(v[2]) if v[2] else 0.0,
+                "price": float(v[2]) if v[2] is not None else 0.0,
                 "user_name": str(v[3]) if v[3] else "Desconhecido",
-                "created_at": str(v[4]) if v[4] else None
+                "created_at": str(v[4]) if v[4] else None,
+                "staff_id": str(v[5]) if v[5] else None
             })
             
         cur.close()
         conn.close()
-        
         return resultado
         
     except Exception as e:

@@ -391,30 +391,34 @@
         });
 
         // ============================================================
-        // --- MÁQUINA DO TEMPO: RESGATE DE HISTÓRICO BLINDADO ---
+        // --- RESGATE DE HISTÓRICO INDIVIDUAL (POR STAFF_ID) ---
         // ============================================================
         window.sincronizarDadosDoBanco = async () => {
             if (!eventoID) return;
             console.log("⏳ Sincronizando histórico com o servidor...");
 
             try {
-                const telefoneBartender = localStorage.getItem('bartenderPhone');
+                const staffId = localStorage.getItem('staffId') || localStorage.getItem('staff_id');
+                let telefoneBartender = localStorage.getItem('bartenderPhone');
 
-                let url = `${API_BASE}/sales/event/${eventoID}`;
-                // Só manda o telefone se ele realmente existir para evitar sujeira na query
-                if (telefoneBartender && telefoneBartender !== "null" && telefoneBartender !== "undefined") {
-                    url += `?bartender_phone=${encodeURIComponent(telefoneBartender)}`;
+                // 🛑 TRAVA DE SEGURANÇA: Se não houver ID nem telefone, aborta para não misturar caixas
+                if ((!staffId || staffId === "null" || staffId === "undefined") && 
+                    (!telefoneBartender || telefoneBartender === "null" || telefoneBartender === "undefined")) {
+                    console.warn("⚠️ Identificação do bartender não encontrada no localStorage. Abortando sincronização.");
+                    return; 
                 }
 
-                let resposta = await fetch(url);
-
-                // 🛡️ PLANO B: Se der erro 400 (provavelmente o filtro de telefone falhou no backend),
-                // tenta buscar o histórico geral do evento sem o filtro de telefone para não zerar a tela!
-                if (resposta.status === 400 && telefoneBartender) {
-                    console.warn("⚠️ Filtro por telefone rejeitado (400). Tentando buscar histórico geral do evento...");
-                    const urlGeral = `${API_BASE}/sales/event/${eventoID}`;
-                    resposta = await fetch(urlGeral);
+                // Monta os parâmetros da URL priorizando o staff_id
+                const params = new URLSearchParams();
+                if (staffId && staffId !== "null" && staffId !== "undefined") {
+                    params.append('staff_id', staffId);
+                } else if (telefoneBartender) {
+                    params.append('bartender_phone', telefoneBartender);
                 }
+
+                const url = `https://aurora-api-zj8e.onrender.com/sales/event/${eventoID}?${params.toString()}`;
+
+                const resposta = await fetch(url);
 
                 if (!resposta.ok) {
                     const erroDetalhe = await resposta.text();
@@ -423,13 +427,13 @@
                 
                 const vendasNoBanco = await resposta.json();
 
+                // Limpa contagens visuais e logs locais para reinjetar do banco
                 counts = {}; 
                 localLogs = [];
                 
                 const listaLogs = document.getElementById('lista-logs');
                 if (listaLogs) listaLogs.innerHTML = ''; 
 
-                // Garante que é um array antes de iterar
                 const listaVendas = Array.isArray(vendasNoBanco) ? vendasNoBanco : (vendasNoBanco.sales || vendasNoBanco.dados || []);
 
                 listaVendas.forEach(venda => {
@@ -438,7 +442,7 @@
 
                     const drink = drinks.find(d => d.id === venda.cocktail_id);
                     const nomeDoDrink = drink ? drink.nome : (venda.drink_name || "Drink Desconhecido");
-
+                    
                     const horaDoBanco = venda.created_at || venda.timestamp || venda.data || venda.sale_time || venda.hora || venda.date || null;
 
                     localLogs.push({
@@ -454,12 +458,11 @@
                 });
 
                 localStorage.setItem('counts_ev_' + eventoID, JSON.stringify(counts));
-                renderizar();
-                console.log("✅ Histórico sincronizado com sucesso! Encontradas", listaVendas.length, "vendas.");
+                if (typeof renderizar === 'function') renderizar();
+                console.log(`✅ Histórico individual sincronizado! ${listaVendas.length} vendas recuperadas.`);
 
             } catch (e) {
                 console.error("🚨 Erro ao sincronizar com o banco:", e);
-                // Não limpamos o counts aqui para preservar o que está no localStorage caso caia a rede/API
             }
         };
         
@@ -645,7 +648,7 @@
 
 
         // ============================================================
-        // --- MOTOR DE VENDAS ATUALIZADO E BLINDADO ---
+        // --- MOTOR DE VENDAS ATUALIZADO E BLINDADO COM STAFF_ID ---
         // ============================================================
         window.mudar = async (id, q) => {
             // 1. Bloqueios de segurança básicos
@@ -676,6 +679,9 @@
             
             try {
                 if (q > 0) {
+                    // Recupa o staff_id gravado no localStorage durante o login/autenticação
+                    const staffId = localStorage.getItem('staffId') || localStorage.getItem('staff_id');
+
                     // --- REGISTRO DE VENDA ---
                     const payloadVenda = {
                         event_id: eventoID, 
@@ -684,7 +690,8 @@
                         price: parseFloat(d.precoVenda || d.preco || 0),
                         cost: parseFloat(d.precoCusto || d.custo || 0), 
                         user_name: usuarioAtual || "Sistema",     
-                        client_name: "Balcão"
+                        client_name: "Balcão",
+                        staff_id: (staffId && staffId !== "null" && staffId !== "undefined") ? staffId : null
                     };
 
                     const resposta = await fetch(`https://aurora-api-zj8e.onrender.com/sales/`, { 
@@ -727,7 +734,6 @@
         // ============================================================
         // --- MOTOR DE ESTORNO PELO HISTÓRICO (O botão "×") ---
         // ============================================================
-        // 🛑 AJUSTE VISUAL 3: Agora a função recebe drink_id ao invés de drink_nome
         window.estornarVenda = async (venda_id, drink_id, elementoLi) => {
             if (!eventoID) return;
             
@@ -761,7 +767,6 @@
 
                 // SUCESSO! HORA DE AJUSTAR AS CAIXINHAS NA TELA
                 if (d) {
-                    // 🛑 AJUSTE VISUAL 4: Forçamos a matemática. A caixinha sobe e a foto "Esgotado" acende!
                     d.estoque = parseInt(d.estoque, 10) + 1;
                     
                     if (counts[d.id] && counts[d.id] > 0) {
