@@ -3609,18 +3609,18 @@
 
                 window.orcamentosCache = json.dados.map(d => ({
                     id: d.id,
-                    numero: d.numero,
-                    cliente: d.cliente,
-                    dataEvento: d.data_evento, 
-                    local: d.local,
-                    qtdPessoas: d.qtd_pessoas,
-                    pacote_escolhido: d.pacote_escolhido,
-                    valorPessoa: d.valor_pessoa,
+                    numero: d.cod_number,
+                    cliente: d.client,
+                    dataEvento: d.event_date, 
+                    local: d.location,
+                    qtdPessoas: d.headcount,
+                    pacote_escolhido: d.selected_package,
+                    valorPessoa: d.price_person,
                     extras: d.extras,
                     total: d.total,
-                    custoEstimado: d.custo_estimado, 
-                    valorSugerido: d.valor_sugerido,
-                    drinks: typeof d.drinks_selecionados === 'string' ? JSON.parse(d.drinks_selecionados) : (d.drinks_selecionados || []),
+                    custoEstimado: d.estimated_cost, 
+                    valorSugerido: d.suggested_price,
+                    drinks: typeof d.selected_drinks === 'string' ? JSON.parse(d.selected_drinks) : (d.selected_drinks || []),
                     
                     // 👇 OS 7 CAMPOS NOVOS AGORA SÃO SALVOS NO CACHE DO NAVEGADOR
                     cnpj_cpf: d.cnpj_cpf,
@@ -3629,7 +3629,7 @@
                     start_time: d.start_time,
                     duration_h: d.duration_h,
                     event_type: d.event_type,
-                    sinal_negocio: d.sinal_negocio
+                    sinal_negocio: d.deposit_amount
                 }));
 
                 l.innerHTML = '';
@@ -3752,11 +3752,11 @@
             const el = (idElemento) => document.getElementById(idElemento);
 
             if (el('orcIdHidden')) el('orcIdHidden').value = d.id;
-            if (el('orcNumeroDisplay')) el('orcNumeroDisplay').innerText = d.numero || 'Novo';
-            if (el('orcCliente')) el('orcCliente').value = d.cliente || '';
-            if (el('orcData')) el('orcData').value = d.dataEvento || '';
-            if (el('orcLocal')) el('orcLocal').value = d.local || '';
-            if (el('orcQtdPessoas')) el('orcQtdPessoas').value = d.qtdPessoas || '';
+            if (el('orcNumeroDisplay')) el('orcNumeroDisplay').innerText = d.cod_number || 'Novo';
+            if (el('orcCliente')) el('orcCliente').value = d.client || '';
+            if (el('orcData')) el('orcData').value = d.event_date || '';
+            if (el('orcLocal')) el('orcLocal').value = d.location || '';
+            if (el('orcQtdPessoas')) el('orcQtdPessoas').value = d.headcount || '';
             if (el('orcExtras')) el('orcExtras').value = d.extras || 0;
 
             // 👇 OS 7 CAMPOS NOVOS ENTRANDO AQUI!
@@ -3766,11 +3766,11 @@
             if (el('orcHoraInicio')) el('orcHoraInicio').value = d.start_time || '';
             if (el('orcHoras')) el('orcHoras').value = d.duration_h || 4; 
             if (el('orcTipoEvento')) el('orcTipoEvento').value = d.event_type || '';
-            if (el('orcSinalPerc')) el('orcSinalPerc').value = d.sinal_negocio || 30;
+            if (el('orcSinalPerc')) el('orcSinalPerc').value = d.deposit_amount || 30;
 
             // Carrega o pacote se existir no banco (para exibir os cadeados corretos)
-            if (el('orcPacote') && d.pacote_escolhido) {
-                el('orcPacote').value = d.pacote_escolhido;
+            if (el('orcPacote') && d.selected_package) {
+                el('orcPacote').value = d.selected_package;
             }
 
             // 2. Formata os valores de exibição com a máscara de dinheiro
