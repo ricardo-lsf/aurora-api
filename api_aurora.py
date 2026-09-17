@@ -2623,13 +2623,13 @@ def listar_orcamentos(account_id: str):
         # 👇 AGORA A COBERTA TÁ GRANDE! Colocamos todos os campos novos no SELECT
         query = """
             SELECT 
-                id, numero, cliente, data_evento, local, 
-                qtd_pessoas, pacote_escolhido, valor_pessoa, 
-                extras, total, drinks_selecionados, status, custo_estimado, valor_sugerido,
-                cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
+                id, cod_number, client, event_date, location, 
+                headcount, selected_package, price_person, 
+                extras, total, selected_drinks, status, estimated_cost, suggested_price,
+                cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, deposit_amount
             FROM budgets 
             WHERE account_id = %s
-            ORDER BY numero DESC 
+            ORDER BY cod_number DESC 
             LIMIT 50;
         """
         
@@ -2667,22 +2667,22 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
         if orc.id:
             query_update = """
                 UPDATE budgets SET
-                    cliente = %s, data_evento = %s, local = %s, 
-                    qtd_pessoas = %s, pacote_escolhido = %s, valor_pessoa = %s, 
-                    extras = %s, total = %s, drinks_selecionados = %s, 
-                    custo_estimado = %s, valor_sugerido = %s,
+                    client = %s, event_date = %s, location = %s, 
+                    headcount = %s, selected_package = %s, price_person = %s, 
+                    extras = %s, total = %s, selected_drinks = %s, 
+                    estimated_cost = %s, suggested_price = %s,
                     cnpj_cpf = %s, responsible_name = %s, phone = %s, 
-                    start_time = %s, duration_h = %s, event_type = %s, sinal_negocio = %s
+                    start_time = %s, duration_h = %s, event_type = %s, deposit_amount = %s
                 WHERE id = %s AND account_id = %s
-                RETURNING numero;
+                RETURNING cod_number;
             """
             cur.execute(query_update, (
-                orc.cliente, orc.data_evento if orc.data_evento else None, orc.local, 
-                orc.qtd_pessoas, orc.pacote_escolhido, orc.valor_pessoa, 
+                orc.client, orc.event_date if orc.event_date else None, orc.location, 
+                orc.headcount, orc.selected_package, orc.price_person, 
                 orc.extras, orc.total, drinks_jsonb, 
-                orc.custo_estimado, orc.valor_sugerido,
+                orc.estimated_cost, orc.suggested_price,
                 orc.cnpj_cpf, orc.responsible_name, orc.phone, 
-                orc.start_time, orc.duration_h, orc.event_type, orc.sinal_negocio,
+                orc.start_time, orc.duration_h, orc.event_type, orc.deposit_amount,
                 orc.id, orc.account_id
             ))
             
@@ -2697,7 +2697,7 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
        # FLUXO 2: CRIAR NOVO ORÇAMENTO
         else:
             # 1. Busca todos os números de orçamentos para achar o maior absoluto (À prova de exclusões)
-            cur.execute("SELECT numero FROM budgets WHERE numero LIKE 'ORC-%%';")
+            cur.execute("SELECT cod_number FROM budgets WHERE cod_number LIKE 'ORC-%%';")
             todos_numeros = cur.fetchall()
             
             maior_numero = 0
@@ -2716,9 +2716,9 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
             # Comando INSERT 100% alinhado com as variáveis
             query_insert = """
                 INSERT INTO budgets (
-                    account_id, numero, cliente, data_evento, local, qtd_pessoas, valor_pessoa, 
-                    extras, total, pacote_escolhido, drinks_selecionados, status, custo_estimado, valor_sugerido,
-                    cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, sinal_negocio
+                    account_id, cod_number, client, event_date, location, headcount, price_person, 
+                    extras, total, selected_package, selected_drinks, status, estimated_cost, suggested_price,
+                    cnpj_cpf, responsible_name, phone, start_time, duration_h, event_type, deposit_amount
                 ) VALUES (
                     %s::uuid, %s, %s, %s, %s, %s, %s, 
                     %s, %s, %s, %s, %s, %s, %s,
@@ -2726,10 +2726,10 @@ def salvar_orcamento(orc: NovoOrcamentoInput):
                 ) RETURNING id;
             """
             cur.execute(query_insert, (
-                orc.account_id, numero_final, orc.cliente, orc.data_evento if orc.data_evento else None,
-                orc.local, orc.qtd_pessoas, orc.valor_pessoa, 
-                orc.extras, orc.total, orc.pacote_escolhido, drinks_jsonb, "Pendente", orc.custo_estimado, orc.valor_sugerido,
-                orc.cnpj_cpf, orc.responsible_name, orc.phone, orc.start_time, orc.duration_h, orc.event_type, orc.sinal_negocio
+                orc.account_id, numero_final, orc.client, orc.event_date if orc.event_date else None,
+                orc.location, orc.headcount, orc.price_person, 
+                orc.extras, orc.total, orc.selected_package, drinks_jsonb, "Pendente", orc.estimated_cost, orc.suggested_price,
+                orc.cnpj_cpf, orc.responsible_name, orc.phone, orc.start_time, orc.duration_h, orc.event_type, orc.deposit_amount
             ))
             
             id_final = cur.fetchone()[0]
