@@ -3609,17 +3609,17 @@
 
                 window.orcamentosCache = json.dados.map(d => ({
                     id: d.id,
-                    numero: d.cod_number,
-                    cliente: d.client,
-                    dataEvento: d.event_date, 
-                    local: d.location,
-                    qtdPessoas: d.headcount,
-                    pacote_escolhido: d.selected_package,
-                    valorPessoa: d.price_person,
+                    cod_number: d.cod_number,
+                    client: d.client,
+                    event_date: d.event_date, 
+                    location: d.location,
+                    headcount: d.headcount,
+                    selected_package: d.selected_package,
+                    price_person: d.price_person,
                     extras: d.extras,
                     total: d.total,
-                    custoEstimado: d.estimated_cost, 
-                    valorSugerido: d.suggested_price,
+                    estimated_cost: d.estimated_cost, 
+                    suggested_price: d.suggested_price,
                     drinks: typeof d.selected_drinks === 'string' ? JSON.parse(d.selected_drinks) : (d.selected_drinks || []),
                     
                     // 👇 OS 7 CAMPOS NOVOS AGORA SÃO SALVOS NO CACHE DO NAVEGADOR
