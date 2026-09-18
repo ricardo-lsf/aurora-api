@@ -171,17 +171,17 @@ class EstoqueDrink(BaseModel):
 class NovoOrcamentoInput(BaseModel):
     id: Optional[str] = None
     account_id: str
-    cliente: str
-    data_evento: Optional[str] = None
-    local: Optional[str] = None
-    qtd_pessoas: int
-    valor_pessoa: float
+    client: str
+    event_date: Optional[str] = None
+    location: Optional[str] = None
+    headcount: int
+    price_person: float
     extras: float
     total: float
-    pacote_escolhido: str
+    selected_package: str
     drinks: List[dict]
-    custo_estimado: float
-    valor_sugerido: float
+    estimated_cost: float
+    suggested_price: float
     # 👇 NOVOS CAMPOS ADICIONADOS PARA A NOVA TELA
     cnpj_cpf: Optional[str] = None
     responsible_name: Optional[str] = None
@@ -189,7 +189,7 @@ class NovoOrcamentoInput(BaseModel):
     start_time: Optional[str] = None
     duration_h: Optional[int] = None
     event_type: Optional[str] = None
-    sinal_negocio: Optional[float] = None
+    deposit_amount: Optional[float] = None
 
 class ItemRetorno(BaseModel):
     ingredient_id: str
