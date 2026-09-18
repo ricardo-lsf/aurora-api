@@ -3860,17 +3860,17 @@
                 const payload = {
                     id: idOrcamento || null,
                     account_id: localStorage.getItem('account_id'),
-                    cliente: cliente,
-                    data_evento: document.getElementById('orcData').value || null,
-                    local: document.getElementById('orcLocal').value || "",
-                    qtd_pessoas: qtd,
-                    valor_pessoa: valorPessoa,
+                    client: cliente,
+                    event_date: document.getElementById('orcData').value || null,
+                    location: document.getElementById('orcLocal').value || "",
+                    headcount: qtd,
+                    price_person: valorPessoa,
                     extras: extrasValue,
                     total: totalNegociado,
-                    pacote_escolhido: document.getElementById('orcPacote').value,
+                    selected_package: document.getElementById('orcPacote').value,
                     drinks: drinksSelecionados,
-                    custo_estimado: custoEstimado,
-                    valor_sugerido: valorSugerido,
+                    estimated_cost: custoEstimado,
+                    suggested_price: valorSugerido,
                     
                     // 🚨 OS NOVOS CAMPOS MIGRANDO PARA O PYTHON
                     cnpj_cpf: document.getElementById('orcCnpjCpf').value || "",
@@ -3879,7 +3879,7 @@
                     start_time: document.getElementById('orcHoraInicio').value || null,
                     duration_h: parseInt(document.getElementById('orcHoras').value) || 4,
                     event_type: document.getElementById('orcTipoEvento').value || "",
-                    sinal_negocio: parseFloat(document.getElementById('orcSinalPerc').value) || 30.0
+                    deposit_amount: parseFloat(document.getElementById('orcSinalPerc').value) || 30.0
                 };
 
                 // 4. Dispara para a API
