@@ -3783,10 +3783,10 @@
                 el('orcPrecoPessoaDisplay').innerText = `(${formataDinheiro(d.valorPessoa)} por pessoa)`;
             }
             if (el('orcCustoDisplay')) {
-                el('orcCustoDisplay').innerText = formataDinheiro(d.custoEstimado);
+                el('orcCustoDisplay').innerText = formataDinheiro(d.estimated_cost);
             }
             if (el('orcSugeridoDisplay')) {
-                el('orcSugeridoDisplay').innerText = formataDinheiro(d.valorSugerido);
+                el('orcSugeridoDisplay').innerText = formataDinheiro(d.suggested_price);
             }
             if (el('orcValorNegociado')) {
                 el('orcValorNegociado').value = parseFloat(d.total || 0).toFixed(2);
@@ -3869,7 +3869,7 @@
                     total: totalNegociado,
                     selected_package: document.getElementById('orcPacote').value,
                     drinks: drinksSelecionados,
-                    estimated_cost: estimated_cost,
+                    estimated_cost: custoEstimado,
                     suggested_price: valorSugerido,
                     
                     // 🚨 OS NOVOS CAMPOS MIGRANDO PARA O PYTHON
